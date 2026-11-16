@@ -66,6 +66,9 @@ uv run alembic upgrade head   # migrations (planned)
   `Annotated[...]` for parameters and dependencies, return types on path operations,
   router-level `prefix`/`tags`, plain `def` unless the code is fully async.
   Errors use `application/problem+json`. Timestamps are UTC.
+  Every API endpoint must include comprehensive OpenAPI documentation (concise `summary`,
+  rich docstrings / `description`, explicit `response_model`, parameter descriptions via
+  `Query`/`Path`/`Body(description=...)`, and typed error responses in `responses={...}`).
 - **Minimalism**: follow the installed `ponytail` skill. Write only what the task
   needs. Never cut validation, error handling, security, accessibility,
   authorization checks, audit events, or source citations.
@@ -114,6 +117,7 @@ uv run alembic upgrade head   # migrations (planned)
 | `DOCS/Security.md` | Threat model, controls, production checklist |
 | `DOCS/status.md` | Progress tracker (update after every module) |
 | `DOCS/providers.md` | Approved AI providers and review records |
+| `DOCS/backend_orchestration.md` | Work division & ownership between the two backend developers |
 
 ## Build Order
 
