@@ -12,6 +12,35 @@ const en = {
     mockNotice: "Mock sign-in — development only. No password is checked.",
     mockDisabled: "NOT_CONFIGURED — Mock sign-in is disabled. Set MOCK_AUTH=true in .env.local.",
     signOut: "Sign out",
+    advocate: "Advocate",
+    mockData: "SAMPLE_DATA_NOT_REAL_LAW — Sample data, not real law.",
+  },
+  nav: {
+    workspace: "Workspace",
+    dashboard: "Dashboard",
+    matters: "My Matters",
+    clients: "Clients",
+    settings: "Settings",
+  },
+  dashboard: {
+    eyebrow: "Tuesday, 14 January",
+    greeting: "Good morning, {name}",
+    subtitle: "Here is what needs your attention today.",
+    viewAll: "View all matters",
+    statActive: "Active cases",
+    statClients: "Total clients",
+    statHearing: "Next hearing",
+    statActiveTrend: "{active} of {total} matters active",
+    statClientsTrend: "{count} client records",
+    statNone: "No hearing scheduled",
+    recentMatters: "Recent matters",
+    recentMattersSub: "Your latest active matters",
+    seeAll: "See all",
+    recentActivity: "Recent activity",
+    recentActivitySub: "Latest case updates",
+    quickActions: "Quick actions",
+    newCase: "New Case",
+    newClient: "New Client",
   },
   meta: {
     lawyerLogin: "Lawyer Login",
@@ -83,6 +112,35 @@ const bn: Dictionary = {
     mockDisabled:
       "NOT_CONFIGURED — মক লগইন বন্ধ আছে। .env.local ফাইলে MOCK_AUTH=true সেট করুন।",
     signOut: "সাইন আউট",
+    advocate: "আইনজীবী",
+    mockData: "SAMPLE_DATA_NOT_REAL_LAW — নমুনা তথ্য, প্রকৃত আইন নয়।",
+  },
+  nav: {
+    workspace: "কর্মক্ষেত্র",
+    dashboard: "ড্যাশবোর্ড",
+    matters: "আমার মামলা",
+    clients: "মক্কেল",
+    settings: "সেটিংস",
+  },
+  dashboard: {
+    eyebrow: "মঙ্গলবার, ১৪ জানুয়ারি",
+    greeting: "সুপ্রভাত, {name}",
+    subtitle: "আজ যে বিষয়গুলোতে আপনার মনোযোগ প্রয়োজন।",
+    viewAll: "সব মামলা দেখুন",
+    statActive: "সক্রিয় মামলা",
+    statClients: "মোট মক্কেল",
+    statHearing: "পরবর্তী শুনানি",
+    statActiveTrend: "{total}টির মধ্যে {active}টি মামলা সক্রিয়",
+    statClientsTrend: "{count}টি মক্কেল রেকর্ড",
+    statNone: "কোনো শুনানি নির্ধারিত নেই",
+    recentMatters: "সাম্প্রতিক মামলা",
+    recentMattersSub: "আপনার সর্বশেষ সক্রিয় মামলাগুলো",
+    seeAll: "সব দেখুন",
+    recentActivity: "সাম্প্রতিক কার্যক্রম",
+    recentActivitySub: "সর্বশেষ মামলার আপডেট",
+    quickActions: "দ্রুত কার্যক্রম",
+    newCase: "নতুন মামলা",
+    newClient: "নতুন মক্কেল",
   },
   meta: {
     lawyerLogin: "আইনজীবী লগইন",
@@ -138,6 +196,22 @@ const bn: Dictionary = {
 };
 
 export const dictionaries: Record<Language, Dictionary> = { en, bn };
+
+const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+
+export function numberFor(language: Language, value: number | string) {
+  const text = String(value);
+  if (language === "en") return text;
+  return text.replace(/\d/g, (digit) => banglaDigits[Number(digit)]);
+}
+
+export function pick(value: { en: string; bn: string }, language: Language) {
+  return value[language];
+}
+
+export function format(template: string, values: Record<string, string | number>) {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
+}
 
 export function titleFor(language: Language, key: keyof Dictionary["meta"]) {
   const copy = dictionaries[language];

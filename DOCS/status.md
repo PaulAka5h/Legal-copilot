@@ -42,7 +42,7 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 1 Foundation | Roles, organizations, case membership | In progress | | | `lawyer` and `client` roles enforced by route-group guards; organizations and case membership not started |
 | 1 Foundation | Database migrations and RLS | Not started | | | |
 | 1 Foundation | Case creation | Not started | | | |
-| 2 Dashboards | Lawyer dashboard shell | Not started | | | |
+| 2 Dashboards | Lawyer dashboard shell | In progress | Manual browser check passed | Role guard unchanged | Sidebar (Dashboard, My Matters, Clients, Settings), mobile bottom nav, header language toggle and sign-out, dashboard stat cards, recent matters, recent activity, floating quick actions built. Matters, clients and settings screens still stubs. |
 | 2 Dashboards | Client dashboard shell | Not started | | | |
 | 2 Dashboards | Client invitations and activation | Not started | | | |
 | 2 Dashboards | Client-visible updates and sharing | Not started | | | |
@@ -99,7 +99,7 @@ Anything that depends on an outside service or dataset is listed here with its c
 ## 5. Known issues
 
 - Authentication is a development-only mock. With `MOCK_AUTH=true`, the login actions set an `lc_session` cookie (`mock.lawyer` or `mock.client`). There is no password check, user table, organization, case membership, or RLS yet. Production always ignores the mock cookie and returns `NOT_CONFIGURED`.
-- `/lawyer/dashboard`, `/lawyer/matters`, `/lawyer/clients`, and `/client/dashboard` are labelled `NOT_CONFIGURED` stubs. They are guarded by role but are not working dashboards.
+- `/lawyer/matters`, `/lawyer/clients`, and `/client/dashboard` are still `NOT_CONFIGURED` stubs. `/lawyer/dashboard` now has the Stage 2a shell and content.
 - The prefilled lawyer email/password and client ID/password on the login pages are sample data from the approved design, not usable accounts. Login does not read them.
 - `cacheComponents` and `partialPrefetching` were removed from `frontend/next.config.ts` because cookie-based language rendering blocked prerendering of `/_not-found`. Revisit when the cookie strategy or route-level caching is settled.
 
@@ -110,3 +110,4 @@ Anything that depends on an outside service or dataset is listed here with its c
 | 2026-11-16 | Documentation set created: PRD, TRD, architecture, database, flows, agents, security, README, status, providers |
 | 2026-11-16 | Frontend Stage 1: Next.js 16.4 + Tailwind v4 app, theme tokens/fonts, cookie-backed EN/BN dictionaries, shared auth components, `/lawyer/login` and `/client/login`; dashboard routes are `NOT_CONFIGURED` stubs |
 | 2026-11-16 | Frontend Stage 1b: development-only mock sessions behind `MOCK_AUTH=true`, role-guarded `(lawyer)`/`(client)` route groups, sign-out, login redirects, and clean localized page titles |
+| 2026-11-16 | Frontend Stage 2a: lawyer shell (sidebar, mobile bottom nav, language toggle, sign-out) and dashboard (stat cards, recent matters, recent activity, floating quick actions). Mock lawyer data sits behind `src/lib/api/lawyer.ts`. |
