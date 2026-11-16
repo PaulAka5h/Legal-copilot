@@ -37,9 +37,9 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 
 | Phase | Module | Status | Tests | Isolation tests | Notes |
 |---|---|---|---|---|---|
-| 1 Foundation | Project setup, Docker Compose | Not started | | | |
-| 1 Foundation | Authentication and sessions | Not started | | | |
-| 1 Foundation | Roles, organizations, case membership | Not started | | | |
+| 1 Foundation | Project setup, Docker Compose | In progress | | | Frontend Next.js 16.4 + Tailwind v4 shell created; Docker Compose not started |
+| 1 Foundation | Authentication and sessions | Stubbed | Manual browser checks passed | Role redirect tests passed | Development-only mock session behind `MOCK_AUTH=true`; production ignores it; no password check or user table |
+| 1 Foundation | Roles, organizations, case membership | In progress | | | `lawyer` and `client` roles enforced by route-group guards; organizations and case membership not started |
 | 1 Foundation | Database migrations and RLS | Not started | | | |
 | 1 Foundation | Case creation | Not started | | | |
 | 2 Dashboards | Lawyer dashboard shell | Not started | | | |
@@ -98,10 +98,15 @@ Anything that depends on an outside service or dataset is listed here with its c
 
 ## 5. Known issues
 
-None yet.
+- Authentication is a development-only mock. With `MOCK_AUTH=true`, the login actions set an `lc_session` cookie (`mock.lawyer` or `mock.client`). There is no password check, user table, organization, case membership, or RLS yet. Production always ignores the mock cookie and returns `NOT_CONFIGURED`.
+- `/lawyer/dashboard`, `/lawyer/matters`, `/lawyer/clients`, and `/client/dashboard` are labelled `NOT_CONFIGURED` stubs. They are guarded by role but are not working dashboards.
+- The prefilled lawyer email/password and client ID/password on the login pages are sample data from the approved design, not usable accounts. Login does not read them.
+- `cacheComponents` and `partialPrefetching` were removed from `frontend/next.config.ts` because cookie-based language rendering blocked prerendering of `/_not-found`. Revisit when the cookie strategy or route-level caching is settled.
 
 ## 6. Change log
 
 | Date | Change |
 |---|---|
 | 2026-11-16 | Documentation set created: PRD, TRD, architecture, database, flows, agents, security, README, status, providers |
+| 2026-11-16 | Frontend Stage 1: Next.js 16.4 + Tailwind v4 app, theme tokens/fonts, cookie-backed EN/BN dictionaries, shared auth components, `/lawyer/login` and `/client/login`; dashboard routes are `NOT_CONFIGURED` stubs |
+| 2026-11-16 | Frontend Stage 1b: development-only mock sessions behind `MOCK_AUTH=true`, role-guarded `(lawyer)`/`(client)` route groups, sign-out, login redirects, and clean localized page titles |
