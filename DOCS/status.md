@@ -41,8 +41,8 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 1 Foundation | Authentication and sessions | Stubbed | Manual browser checks passed | Role redirect tests passed | Development-only mock session behind `MOCK_AUTH=true`; production ignores it; no password check or user table |
 | 1 Foundation | Roles, organizations, case membership | In progress | | | `lawyer` and `client` roles enforced by route-group guards; organizations and case membership not started |
 | 1 Foundation | Database migrations and RLS | Not started | | | |
-| 1 Foundation | Case creation | Not started | | | |
-| 2 Dashboards | Lawyer dashboard shell | In progress | Manual browser check passed | Role guard unchanged | Sidebar (Dashboard, My Matters, Clients, Settings), mobile bottom nav, header language toggle and sign-out, dashboard stat cards, recent matters, recent activity, floating quick actions built. Matters, clients and settings screens still stubs. |
+| 1 Foundation | Case creation | Stubbed | Manual form check passed | Role guard unchanged | `/lawyer/matters/new` writes to the in-memory mock matters list; no database yet. |
+| 2 Dashboards | Lawyer dashboard shell | In progress | Lint and production build pass | Role guard unchanged; data isolation tests not written | Sidebar (Dashboard, My Matters, Clients, Settings), mobile bottom nav, header language toggle and sign-out, dashboard, matters list/create, clients list/create/detail, settings. All data is in-memory mock data; no database or RLS yet. |
 | 2 Dashboards | Client dashboard shell | Not started | | | |
 | 2 Dashboards | Client invitations and activation | Not started | | | |
 | 2 Dashboards | Client-visible updates and sharing | Not started | | | |
@@ -99,7 +99,8 @@ Anything that depends on an outside service or dataset is listed here with its c
 ## 5. Known issues
 
 - Authentication is a development-only mock. With `MOCK_AUTH=true`, the login actions set an `lc_session` cookie (`mock.lawyer` or `mock.client`). There is no password check, user table, organization, case membership, or RLS yet. Production always ignores the mock cookie and returns `NOT_CONFIGURED`.
-- `/lawyer/matters`, `/lawyer/clients`, and `/client/dashboard` are still `NOT_CONFIGURED` stubs. `/lawyer/dashboard` now has the Stage 2a shell and content.
+- `/client/dashboard` is still a `NOT_CONFIGURED` stub. The lawyer portal screens are mock-backed and reset to seed data when the dev server restarts.
+- Client IDs and temporary passwords are generated locally for the mock. The password is shown once in the new-client success card and is not stored. Reset password returns `NOT_CONFIGURED`.
 - The prefilled lawyer email/password and client ID/password on the login pages are sample data from the approved design, not usable accounts. Login does not read them.
 - `cacheComponents` and `partialPrefetching` were removed from `frontend/next.config.ts` because cookie-based language rendering blocked prerendering of `/_not-found`. Revisit when the cookie strategy or route-level caching is settled.
 
@@ -111,3 +112,5 @@ Anything that depends on an outside service or dataset is listed here with its c
 | 2026-11-16 | Frontend Stage 1: Next.js 16.4 + Tailwind v4 app, theme tokens/fonts, cookie-backed EN/BN dictionaries, shared auth components, `/lawyer/login` and `/client/login`; dashboard routes are `NOT_CONFIGURED` stubs |
 | 2026-11-16 | Frontend Stage 1b: development-only mock sessions behind `MOCK_AUTH=true`, role-guarded `(lawyer)`/`(client)` route groups, sign-out, login redirects, and clean localized page titles |
 | 2026-11-16 | Frontend Stage 2a: lawyer shell (sidebar, mobile bottom nav, language toggle, sign-out) and dashboard (stat cards, recent matters, recent activity, floating quick actions). Mock lawyer data sits behind `src/lib/api/lawyer.ts`. |
+| 2026-11-16 | Frontend Stage 2b: `/lawyer/matters` searchable/filterable table with mobile cards and `/lawyer/matters/new` create form backed by the mock API. |
+| 2026-11-16 | Frontend Stage 2c: `/lawyer/clients` searchable list, `/lawyer/clients/new` with one-time mock credentials, `/lawyer/clients/[clientId]` cases and `NOT_CONFIGURED` reset stub, `/lawyer/settings` language/profile/sign-out. |

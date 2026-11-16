@@ -14,6 +14,7 @@ import {
   pick,
   type Language,
 } from "@/lib/i18n";
+import { initials } from "@/lib/initials";
 
 type NavKey = "dashboard" | "matters" | "clients" | "settings";
 
@@ -23,15 +24,6 @@ const items: { key: NavKey; href: string; icon: IconName }[] = [
   { key: "clients", href: "/lawyer/clients", icon: "clients" },
   { key: "settings", href: "/lawyer/settings", icon: "settings" },
 ];
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 export function LawyerShell({
   language,

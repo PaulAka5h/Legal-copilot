@@ -35,6 +35,10 @@ export type Client = {
   email: string;
 };
 
+export type ClientSummary = Client & { caseCount: number };
+
+export type ClientDetail = Client & { cases: Matter[] };
+
 export type Activity = {
   id: string;
   icon: "document" | "calendar" | "clients";
@@ -58,8 +62,93 @@ export type LawyerStats = {
   nextHearing: { day: number; month: Localized; matterTitle: Localized } | null;
 };
 
+export type NewMatterInput = {
+  title: string;
+  court: string;
+  caseType: string;
+  clientId: string;
+};
+
+export type NewClientInput = {
+  name: string;
+  phone: string;
+  email: string;
+};
+
+export type ClientCredentials = {
+  name: string;
+  clientId: string;
+  password: string;
+};
+
+export type CreateClientState =
+  | null
+  | ({ status: "ok" } & ClientCredentials)
+  | { status: "error" };
+
+export type ResetPasswordState = { status: "NOT_CONFIGURED" };
+
 export function listMatters(): Matter[] {
   return [...matters];
+}
+
+export function listClients(): ClientSummary[] {
+  return clients.map((client) => ({
+    ...client,
+    caseCount: matters.filter((matter) => matter.clientId === client.id).length,
+  }));
+}
+
+export function getClientDetail(clientId: string): ClientDetail | null {
+  const client = clients.find((item) => item.id === clientId);
+  if (!client) return null;
+
+  return {
+    ...client,
+    cases: matters.filter((matter) => matter.clientId === clientId),
+  };
+}
+
+export function createClient(input: NewClientInput): ClientCredentials | null {
+  const name = input.name.trim();
+  const phone = input.phone.trim();
+  const email = input.email.trim();
+
+  if (!name || !phone || !/\S+@\S+\.\S+/.test(email)) return null;
+
+  const clientId = `CL-${Math.floor(1000 + Math.random() * 9000)}-BD`;
+  const password = globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+
+  clients.unshift({ id: clientId, name: { en: name, bn: name }, phone, email });
+
+  return { name, clientId, password };
+}
+
+export function resetClientPassword(): ResetPasswordState {
+  return { status: "NOT_CONFIGURED" };
+}
+
+export function createMatter(input: NewMatterInput): Matter | null {
+  const client = clients.find((item) => item.id === input.clientId);
+  const court = courts.find((item) => item.en === input.court);
+  const caseType = caseTypes.find((item) => item.en === input.caseType);
+  const title = input.title.trim();
+
+  if (!client || !court || !caseType || !title) return null;
+
+  const matter: Matter = {
+    id: `LC-${Math.floor(10000 + Math.random() * 90000)}`,
+    title: { en: title, bn: title },
+    clientId: client.id,
+    clientName: client.name,
+    court,
+    caseType,
+    hearingNumber: 1,
+    status: "active",
+  };
+
+  matters.unshift(matter);
+  return matter;
 }
 
 export function getRecentMatters(limit = 3): Matter[] {
