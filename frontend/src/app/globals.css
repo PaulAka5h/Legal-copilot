@@ -1994,3 +1994,456 @@
     font-size: 31px;
   }
 }
+
+/* Stage 3: client portal */
+.client-shell {
+  max-width: 1440px;
+  min-height: 100vh;
+  margin: auto;
+}
+
+.client-shell .topbar {
+  justify-content: space-between;
+  background: var(--color-cream);
+}
+
+.client-shell .main-content {
+  max-width: 1240px;
+}
+
+.case-id i {
+  margin-left: 8px;
+  padding: 4px 7px;
+  color: #d3f5e1;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+.case-layout {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 0.68fr;
+  gap: 18px;
+}
+
+.progress-panel,
+.docs-panel,
+.summaries-panel,
+.lawyer-panel {
+  grid-column: 1 / -1;
+}
+
+.percent {
+  color: var(--color-green);
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.progress-wrap {
+  position: relative;
+  margin: 31px 7px 8px;
+}
+
+.progress-track {
+  position: absolute;
+  z-index: 0;
+  top: 15px;
+  left: 5%;
+  right: 5%;
+  height: 4px;
+  background: var(--color-surface);
+  border-radius: 5px;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  background: var(--color-green);
+  border-radius: 5px;
+  animation: progress 1.1s 0.25s both;
+  transform-origin: left;
+}
+
+.stage-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.stage-dot {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  color: #9ba1a5;
+  background: #fff;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.stage.complete .stage-dot {
+  color: #fff;
+  background: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.stage.current .stage-dot {
+  color: var(--color-deep);
+  background: #fff;
+  border: 3px solid var(--color-green);
+  box-shadow: 0 0 0 5px #eaf6ef;
+}
+
+.stage b {
+  margin-top: 10px;
+  color: #51595d;
+  font-size: 8px;
+}
+
+.stage.current b {
+  color: var(--color-deep);
+}
+
+.stage small {
+  margin-top: 4px;
+  color: #9aa0a5;
+  font-size: 7px;
+}
+
+.next-hearing {
+  grid-column: 1 / -1;
+  padding: 21px 25px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--color-pale);
+  border: 1px solid #d7edf6;
+  border-radius: 12px;
+}
+
+.calendar-large {
+  width: 63px;
+  height: 67px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 4px 10px rgba(20, 26, 29, 0.1);
+}
+
+.calendar-large small {
+  width: 100%;
+  padding: 4px;
+  background: #28708d;
+  text-align: center;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.calendar-large b {
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.calendar-large span {
+  color: var(--color-muted);
+  font-size: 7px;
+}
+
+.next-hearing h2 {
+  margin: 6px 0 4px;
+  font-size: 15px;
+}
+
+.next-hearing p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 9px;
+}
+
+.lawyer-entered {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-muted);
+  font-size: 8px;
+}
+
+.count-chip {
+  padding: 6px 9px;
+  color: var(--color-deep);
+  background: #edf8f2;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.profile-list dd a {
+  color: var(--color-deep);
+  text-decoration: none;
+}
+
+.document-list {
+  margin-top: 16px;
+}
+
+.document-row {
+  min-height: 58px;
+  padding: 9px 2px;
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  gap: 11px;
+  align-items: center;
+  border-top: 1px solid var(--color-border);
+}
+
+.pdf-icon {
+  width: 35px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: #687176;
+  background: var(--color-surface);
+  border-radius: 5px 5px 9px 5px;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.document-row > span:nth-child(2) {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.document-row b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+}
+
+.document-row small {
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 7px;
+}
+
+.document-row button {
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  color: var(--color-blue);
+  background: none;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.summary-list {
+  margin-top: 16px;
+}
+
+.summary-row {
+  min-height: 74px;
+  padding: 13px 2px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--color-border);
+  color: inherit;
+  text-decoration: none;
+}
+
+.summary-row:hover b {
+  color: var(--color-green);
+}
+
+.summary-row > span:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-row b {
+  color: var(--color-ink);
+  font-size: 11px;
+  transition: 0.2s;
+}
+
+.summary-row p {
+  margin: 4px 0 0;
+  color: #555e62;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.summary-row small {
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 8px;
+}
+
+.summary-row > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-green);
+}
+
+.approved-badge {
+  padding: 4px 8px;
+  color: var(--color-deep);
+  background: #ebf7f0;
+  border-radius: 99px;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.summary-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 8px;
+}
+
+.summary-detail > p {
+  margin: 14px 0 0;
+  color: #3c4347;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.summary-detail .empty-note {
+  color: var(--color-muted);
+  font-size: 10px;
+}
+
+.summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-meta small {
+  color: var(--color-muted);
+  font-size: 9px;
+}
+
+.empty-note {
+  margin: 16px 0 0;
+  color: var(--color-muted);
+  font-size: 10px;
+}
+
+.toast {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  background: var(--color-ink);
+  border-radius: 10px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  font-size: 10px;
+  animation: toast-in 0.25s both;
+}
+
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.language-bn .percent,
+.language-bn .calendar-large b {
+  font-family: var(--font-bangla);
+}
+
+@media (max-width: 900px) {
+  .case-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .client-shell .topbar > .logo .logo-copy {
+    display: none;
+  }
+
+  .progress-panel {
+    overflow-x: auto;
+  }
+
+  .progress-wrap {
+    min-width: 590px;
+    margin-bottom: 12px;
+  }
+
+  .next-hearing {
+    align-items: flex-start;
+    padding: 18px;
+  }
+
+  .document-row {
+    grid-template-columns: 35px 1fr auto;
+  }
+
+  .document-row button span {
+    display: none;
+  }
+
+  .summary-row b {
+    font-size: 10px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
