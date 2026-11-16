@@ -4,7 +4,16 @@ import type {
   LawyerProfile,
   Localized,
   Matter,
+  MatterStage,
 } from "@/lib/api/lawyer";
+
+export const matterStages: MatterStage[] = [
+  { id: "filed", label: { en: "Case filed", bn: "মামলা দায়ের" } },
+  { id: "notice", label: { en: "Notice served", bn: "নোটিশ জারি" } },
+  { id: "evidence", label: { en: "Evidence", bn: "সাক্ষ্য" } },
+  { id: "arguments", label: { en: "Arguments", bn: "যুক্তিতর্ক" } },
+  { id: "decision", label: { en: "Decision", bn: "রায়" } },
+];
 
 export const lawyerProfile: LawyerProfile = {
   firstName: { en: "Farhana", bn: "ফারহানা" },
@@ -29,6 +38,14 @@ export const matters: Matter[] = [
       month: { en: "JAN", bn: "জানু" },
       time: { en: "10:30 AM", bn: "সকাল ১০:৩০" },
     },
+    stages: [
+      { ...matterStages[0], date: { en: "12 Sep", bn: "১২ সেপ্টেম্বর" } },
+      { ...matterStages[1], date: { en: "28 Sep", bn: "২৮ সেপ্টেম্বর" } },
+      matterStages[2],
+      matterStages[3],
+      matterStages[4],
+    ],
+    currentStageId: "evidence",
   },
   {
     id: "LC-24012",
@@ -44,6 +61,14 @@ export const matters: Matter[] = [
       month: { en: "JAN", bn: "জানু" },
       time: { en: "12:00 PM", bn: "দুপুর ১২:০০" },
     },
+    stages: [
+      { ...matterStages[0], date: { en: "02 Dec", bn: "২ ডিসেম্বর" } },
+      { ...matterStages[1], date: { en: "20 Dec", bn: "২০ ডিসেম্বর" } },
+      matterStages[2],
+      matterStages[3],
+      matterStages[4],
+    ],
+    currentStageId: "evidence",
   },
   {
     id: "LC-23997",
@@ -59,6 +84,14 @@ export const matters: Matter[] = [
       month: { en: "JAN", bn: "জানু" },
       time: { en: "11:15 AM", bn: "সকাল ১১:১৫" },
     },
+    stages: [
+      { ...matterStages[0], date: { en: "10 Aug", bn: "১০ আগস্ট" } },
+      { ...matterStages[1], date: { en: "22 Aug", bn: "২২ আগস্ট" } },
+      { ...matterStages[2], date: { en: "15 Oct", bn: "১৫ অক্টোবর" } },
+      matterStages[3],
+      matterStages[4],
+    ],
+    currentStageId: "arguments",
   },
   {
     id: "LC-23986",
@@ -69,6 +102,14 @@ export const matters: Matter[] = [
     caseType: { en: "Family", bn: "পারিবারিক" },
     hearingNumber: 4,
     status: "closed",
+    stages: [
+      { ...matterStages[0], date: { en: "05 Mar", bn: "৫ মার্চ" } },
+      { ...matterStages[1], date: { en: "18 Mar", bn: "১৮ মার্চ" } },
+      { ...matterStages[2], date: { en: "20 Jun", bn: "২০ জুন" } },
+      { ...matterStages[3], date: { en: "02 Sep", bn: "২ সেপ্টেম্বর" } },
+      { ...matterStages[4], date: { en: "14 Nov 2024", bn: "১৪ নভেম্বর ২০২৪" } },
+    ],
+    currentStageId: "decision",
   },
 ];
 

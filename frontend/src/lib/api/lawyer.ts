@@ -4,6 +4,7 @@ import {
   clients,
   courts,
   lawyerProfile,
+  matterStages,
   matters,
 } from "@/lib/mock/lawyer";
 
@@ -16,6 +17,12 @@ export type UpcomingHearing = {
   time: Localized;
 };
 
+export type MatterStage = {
+  id: string;
+  label: Localized;
+  date?: Localized;
+};
+
 export type Matter = {
   id: string;
   title: Localized;
@@ -26,6 +33,8 @@ export type Matter = {
   hearingNumber: number;
   status: MatterStatus;
   nextHearing?: UpcomingHearing;
+  stages: MatterStage[];
+  currentStageId: string;
 };
 
 export type Client = {
@@ -92,6 +101,25 @@ export function listMatters(): Matter[] {
   return [...matters];
 }
 
+export function getCase(caseId: string): Matter | null {
+  return matters.find((matter) => matter.id === caseId) ?? null;
+}
+
+export function setCaseStage(caseId: string, stageId: string): boolean {
+  const matter = matters.find((item) => item.id === caseId);
+
+  if (
+    !matter ||
+    matter.status === "closed" ||
+    !matter.stages.some((stage) => stage.id === stageId)
+  ) {
+    return false;
+  }
+
+  matter.currentStageId = stageId;
+  return true;
+}
+
 export function listClients(): ClientSummary[] {
   return clients.map((client) => ({
     ...client,
@@ -145,6 +173,8 @@ export function createMatter(input: NewMatterInput): Matter | null {
     caseType,
     hearingNumber: 1,
     status: "active",
+    stages: matterStages.map((stage) => ({ ...stage })),
+    currentStageId: "filed",
   };
 
   matters.unshift(matter);

@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import {
   createClient,
   createMatter,
+  setCaseStage,
   type CreateClientState,
 } from "@/lib/api/lawyer";
+import { getSession } from "@/lib/session";
 
 export async function createMatterAction(formData: FormData) {
   const matter = createMatter({
@@ -21,6 +23,21 @@ export async function createMatterAction(formData: FormData) {
   revalidatePath("/lawyer/matters");
   revalidatePath("/lawyer/dashboard");
   redirect("/lawyer/matters");
+}
+
+export async function updateMatterStageAction(formData: FormData) {
+  const session = await getSession();
+  if (!session || session.role !== "lawyer") redirect("/lawyer/login");
+
+  const caseId = String(formData.get("caseId") ?? "");
+  const stageId = String(formData.get("stageId") ?? "");
+
+  if (!setCaseStage(caseId, stageId)) redirect("/lawyer/matters");
+
+  revalidatePath(`/lawyer/matters/${caseId}`);
+  revalidatePath("/lawyer/matters");
+  revalidatePath("/lawyer/dashboard");
+  redirect(`/lawyer/matters/${caseId}`);
 }
 
 export async function createClientAction(

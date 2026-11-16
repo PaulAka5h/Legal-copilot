@@ -2447,3 +2447,104 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* Stage 4: lawyer matter detail */
+.stage-picker {
+  min-width: 250px;
+  padding: 15px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.stage-label {
+  color: #9cdab8;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.stage-picker form {
+  display: flex;
+  gap: 7px;
+}
+
+.stage-picker select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.stage-picker select option {
+  color: var(--color-ink);
+  background: #fff;
+}
+
+.stage-picker button {
+  padding: 8px 12px;
+  color: var(--color-deep);
+  background: #fff;
+  border: 0;
+  border-radius: 8px;
+  font-size: 8px;
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+.stage-picker button:hover {
+  background: #eaf6ef;
+}
+
+.stage-picker select:disabled,
+.stage-picker button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.stage-help {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.stage-hearing {
+  color: #9cdab8;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.matters-table a.table-row {
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.matters-table a.table-row:hover {
+  background: #fbfcfb;
+}
+
+.matters-table a.table-row:focus-visible {
+  outline: 3px solid rgba(0, 152, 74, 0.2);
+  outline-offset: -3px;
+}
+
+@media (max-width: 620px) {
+  .stage-picker {
+    width: 100%;
+    padding: 14px 0 0;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .stage-picker form {
+    width: 100%;
+  }
+}

@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  CaseProgress,
+  progressFor,
+  type CaseProgressStage,
+} from "@/components/CaseProgress";
 import { ClientDocuments } from "@/components/client/ClientDocuments";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
@@ -24,13 +29,13 @@ export default async function ClientDashboardPage() {
   const dashboard = copy.clientDashboard;
   const caseData = getClientCase();
 
-  const totalStages = caseData.stages.length;
-  const reachedStages = caseData.stages.filter(
-    (stage) => stage.state !== "upcoming",
-  ).length;
-  const percent = totalStages
-    ? Math.round((reachedStages / totalStages) * 100)
-    : 0;
+  const stages: CaseProgressStage[] = caseData.stages.map((stage) => ({
+    id: stage.id,
+    label: pick(stage.label, language),
+    note: pick(stage.note, language),
+    state: stage.state,
+  }));
+  const { reached, total, percent } = progressFor(stages);
   const nextHearing = caseData.nextHearing;
 
   return (
@@ -72,8 +77,8 @@ export default async function ClientDashboardPage() {
               <h2>{dashboard.progressTitle}</h2>
               <p>
                 {format(dashboard.progressSub, {
-                  reached: numberFor(language, reachedStages),
-                  total: numberFor(language, totalStages),
+                  reached: numberFor(language, reached),
+                  total: numberFor(language, total),
                 })}
               </p>
             </div>
@@ -83,29 +88,11 @@ export default async function ClientDashboardPage() {
               })}
             </span>
           </div>
-          <div className="progress-wrap">
-            <div className="progress-track" aria-hidden="true">
-              <span style={{ width: `${percent}%` }} />
-            </div>
-            <div className="stage-list">
-              {caseData.stages.map((stage, index) => (
-                <div className={`stage ${stage.state}`} key={stage.id}>
-                  <span className="stage-dot">
-                    {stage.state === "complete" ? (
-                      <Icon name="check" size={14} />
-                    ) : (
-                      numberFor(language, index + 1)
-                    )}
-                  </span>
-                  <b>{pick(stage.label, language)}</b>
-                  <small>{pick(stage.note, language)}</small>
-                  {stage.state === "complete" ? (
-                    <span className="sr-only">{dashboard.complete}</span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
+          <CaseProgress
+            language={language}
+            stages={stages}
+            completeLabel={dashboard.complete}
+          />
         </div>
 
         {nextHearing ? (

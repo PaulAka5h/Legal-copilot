@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { Matter, MatterStatus } from "@/lib/api/lawyer";
@@ -85,7 +86,11 @@ export function MattersTable({
         </div>
 
         {filtered.map((matter) => (
-          <div className="table-row" key={matter.id}>
+          <Link
+            className="table-row"
+            href={`/lawyer/matters/${matter.id}`}
+            key={matter.id}
+          >
             <span className="matter-cell">
               <small>{matter.id}</small>
               <b>{pick(matter.title, language)}</b>
@@ -108,7 +113,7 @@ export function MattersTable({
                 <span /> {copy.status[matter.status]}
               </em>
             </span>
-          </div>
+          </Link>
         ))}
 
         {!filtered.length ? (
