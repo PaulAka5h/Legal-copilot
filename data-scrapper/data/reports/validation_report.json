@@ -1,0 +1,13 @@
+{
+  "total_discovered_acts": 1685,
+  "successfully_scraped_acts": 5,
+  "partially_scraped_acts": 0,
+  "failed_acts": 0,
+  "total_extracted_sections": 68,
+  "bangla_sections_count": 12,
+  "english_sections_count": 56,
+  "duplicate_records_count": 7,
+  "empty_content_count": 0,
+  "total_validation_warnings": 0,
+  "sample_issues": []
+}

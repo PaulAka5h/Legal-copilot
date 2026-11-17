@@ -12,19 +12,29 @@ strategy is reassessed. One app, two dashboards: lawyer and client.
 
 The AI supports the lawyer. It never decides cases or promises outcomes.
 
-| Part     | Stack                                             | Location    |
-| -------- | ------------------------------------------------- | ----------- |
-| Frontend | Next.js (App Router, TypeScript, Tailwind CSS)    | `frontend/` |
-| Backend  | FastAPI (Python, managed with uv), REST + OpenAPI | `backend/`  |
-| Database | PostgreSQL + pgvector (Docker Compose)            | `infra/`    |
-| Worker   | Same code as backend, separate process (OCR, embeddings, AI runs) | `backend/` |
-| Storage  | S3-compatible (MinIO in development)              | `infra/`    |
+| Part          | Stack                                             | Location         |
+| ------------- | ------------------------------------------------- | ---------------- |
+| Scraper & RAG Dataset | Python 3.11+, BeautifulSoup4, lxml, Requests (JSON/JSONL) | `data-scrapper/` |
+| Frontend      | Next.js (App Router, TypeScript, Tailwind CSS)    | `frontend/`      |
+| Backend       | FastAPI (Python, managed with uv), REST + OpenAPI | `backend/`       |
+| Database      | PostgreSQL + pgvector (Docker Compose)            | `infra/`         |
+| Worker        | Same code as backend, separate process (OCR, embeddings, AI runs) | `backend/`       |
+| Storage       | S3-compatible (MinIO in development)              | `infra/`         |
 
 ## Commands
 
 Commands marked (planned) are added during project setup. Update this list when they exist.
 
 ```bash
+# Data Scraper (run inside data-scrapper/)
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py --help
+python main.py scrape catalog          # discover and catalog acts
+python main.py scrape full             # extract catalog + acts + section chunks
+python main.py validate                # audit extracted JSON/JSONL dataset
+pytest tests/                          # run scraper unit & integration tests
+
 # Services (run in repo root)
 docker compose up -d db redis minio   # (planned)
 
@@ -43,6 +53,11 @@ uv run alembic upgrade head   # migrations (planned)
 
 ## Conventions
 
+- **Data Scraper / RAG Dataset**: Modular Python scraper in `data-scrapper/`.
+  Outputs deterministic, verified hierarchical legal texts (Acts, Sections, Subsections)
+  in JSON and JSONL under `data-scrapper/data/processed/`. Must maintain UTF-8 encoding
+  integrity for Bangla (`bn`) and English (`en`), link source provenance URLs, and pass
+  the validator before downstream RAG ingestion.
 - **Frontend**: App Router with the `src/` directory. Server Components by default;
   add `"use client"` only when needed. Type everything; no `any`. Routes are split
   into `/lawyer/...` and `/client/...` groups. The server decides the role, never
@@ -51,6 +66,9 @@ uv run alembic upgrade head   # migrations (planned)
   `Annotated[...]` for parameters and dependencies, return types on path operations,
   router-level `prefix`/`tags`, plain `def` unless the code is fully async.
   Errors use `application/problem+json`. Timestamps are UTC.
+  Every API endpoint must include comprehensive OpenAPI documentation (concise `summary`,
+  rich docstrings / `description`, explicit `response_model`, parameter descriptions via
+  `Query`/`Path`/`Body(description=...)`, and typed error responses in `responses={...}`).
 - **Minimalism**: follow the installed `ponytail` skill. Write only what the task
   needs. Never cut validation, error handling, security, accessibility,
   authorization checks, audit events, or source citations.
@@ -99,6 +117,7 @@ uv run alembic upgrade head   # migrations (planned)
 | `DOCS/Security.md` | Threat model, controls, production checklist |
 | `DOCS/status.md` | Progress tracker (update after every module) |
 | `DOCS/providers.md` | Approved AI providers and review records |
+| `DOCS/backend_orchestration.md` | Work division & ownership between the two backend developers |
 
 ## Build Order
 
@@ -129,3 +148,7 @@ to invoke each skill and subagent.
 - When reviewing code, run the `code-reviewer` agent; for security-sensitive
   changes, also run the `security-reviewer` agent.
 - A module is not done until its isolation tests pass.
+- Keep `DOCS/backend_orchestration.md` and `DOCS/status.md` current. If the plan and the code
+  disagree, tell the team and update the plan. Do not drift silently.
+- If a task would break a Legal Product Rule to save time, skip the task and flag
+  it. The rules come before the schedule.

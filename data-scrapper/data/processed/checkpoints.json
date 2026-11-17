@@ -1,0 +1,28 @@
+{
+  "completed_acts": {
+    "1306": {
+      "act_name": "বাংলাদেশ ট্যারিফ কমিশন (সংশোধন) আইন, ২০২০",
+      "sections_count": 6
+    },
+    "1": {
+      "act_name": "The Districts Act, 1836",
+      "sections_count": 1
+    },
+    "2": {
+      "act_name": "The Public Accountant's Default Act, 1850",
+      "sections_count": 6
+    },
+    "3": {
+      "act_name": "The Judicial Officer's Protection Act, 1850",
+      "sections_count": 1
+    }
+  },
+  "failed_acts": {},
+  "partially_completed_acts": {
+    "11": {
+      "act_name": "The Penal Code, 1860",
+      "sections_count": 245,
+      "failed_sections": []
+    }
+  }
+}

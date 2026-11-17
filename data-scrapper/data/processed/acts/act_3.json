@@ -1,0 +1,32 @@
+{
+  "act_id": "3",
+  "act_name": "The Judicial Officer's Protection Act, 1850",
+  "act_number": "XVIII",
+  "act_year": "1850",
+  "language": "en",
+  "enactment_date": null,
+  "source_url": "https://bdlaws.minlaw.gov.bd/act-3.html",
+  "total_sections": 1,
+  "scraped_at": "2026-11-16T20:32:31.453214+00:00",
+  "sections": [
+    {
+      "document_id": "bd-act-3-sec-1-en",
+      "act_id": "3",
+      "act_name": "The Judicial Officer's Protection Act, 1850",
+      "act_number": "XVIII",
+      "act_year": "1850",
+      "language": "en",
+      "chapter_number": null,
+      "chapter_title": null,
+      "section_number": "1",
+      "section_title": "Non-liability to suit of officers acting judicially, for official acts done in good faith, and of officers executing warrants and orders",
+      "section_content": "1. No Judge, Magistrate, Justice of the Peace, Collector or other person acting judicially shall be liable to be sued in any Civil Court for any act done or ordered to be done by him in the discharge of his judicial duty, whether or not within the limits of his jurisdiction: Provided that he at the time, in good faith, believed himself to have jurisdiction to do or order the act complained of; and no officer of any Court or other person, bound to execute the lawful warrants or orders of any such Judge, Magistrate, Justice of the Peace, Collector or other person acting judicially shall be liable to be sued in any Civil Court, for the execution of any warrant or order, which he would be bound to execute, if within the jurisdiction of the person issuing the same.",
+      "subsections": [],
+      "source_url": "https://bdlaws.minlaw.gov.bd/act-3/section-8167.html",
+      "source_website": "bdlaws.minlaw.gov.bd",
+      "enactment_date": "4th April, 1850",
+      "scraped_at": "2026-11-16T20:32:31.453087+00:00",
+      "content_hash": "b31dbf10b1831b3f24fa04faa89e505423469b0428778bfb8de4ddca89c8f60e"
+    }
+  ]
+}
