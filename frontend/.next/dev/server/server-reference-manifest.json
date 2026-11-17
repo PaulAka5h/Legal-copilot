@@ -1,0 +1,54 @@
+{
+  "node": {
+    "003756a88bc0c32f44d17b184be468e31d344aa74b": {
+      "workers": {
+        "app/lawyer/login/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/login/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "filename": "src/app/actions.ts",
+      "exportedName": "clientLogin"
+    },
+    "003a93ff4c58e78a016ce5fff6cd6bd71f99d386a8": {
+      "workers": {
+        "app/lawyer/(lawyer)/dashboard/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/(lawyer)/dashboard/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        },
+        "app/lawyer/login/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/login/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "filename": "src/app/actions.ts",
+      "exportedName": "signOut"
+    },
+    "00d17989c2df01e5c3c2a74a8035832e31257a401f": {
+      "workers": {
+        "app/lawyer/login/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/login/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "filename": "src/app/actions.ts",
+      "exportedName": "lawyerLogin"
+    },
+    "40833f6d2ad85e825c79b4fb83d7a5871c2f9bf12a": {
+      "workers": {
+        "app/lawyer/(lawyer)/dashboard/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/(lawyer)/dashboard/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        },
+        "app/lawyer/login/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/login/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "filename": "src/app/actions.ts",
+      "exportedName": "setLanguage"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "EebhfHxueJP+XgxG+aybQ0bmUj1qAQaNKjmRdrDrmt0="
+}
