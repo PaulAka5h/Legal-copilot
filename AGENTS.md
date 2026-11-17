@@ -148,3 +148,7 @@ to invoke each skill and subagent.
 - When reviewing code, run the `code-reviewer` agent; for security-sensitive
   changes, also run the `security-reviewer` agent.
 - A module is not done until its isolation tests pass.
+- Keep `DOCS/BUILD_PLAN.md` and `DOCS/status.md` current. If the plan and the code
+  disagree, tell the team and update the plan. Do not drift silently.
+- If a task would break a Legal Product Rule to save time, skip the task and flag
+  it. The rules come before the schedule.
