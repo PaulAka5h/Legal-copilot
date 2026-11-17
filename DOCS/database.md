@@ -152,6 +152,26 @@ CREATE TABLE password_reset_tokens (
 );
 ```
 
+Anonymous authentication lookup must not use a general RLS bypass. The Phase 1
+auth-support migration adds narrowly scoped `SECURITY DEFINER` functions for
+email/session lookup, login lockout updates, and per-IP throttling. They use a
+fixed `search_path`, are owned by `app_owner`, and are executable by `app_user`
+only. The internal rate-limit table is forced through RLS with no direct
+`app_user` policy or table grant; its function maintains a 15-minute window.
+Session revocation also uses a scoped security-definer function: the normal
+session SELECT policy hides revoked sessions, so direct updates cannot safely
+revoke an active session without weakening that visibility rule. The function
+only revokes sessions belonging to the transaction's current user.
+
+```sql
+CREATE TABLE auth_login_ip_limits (
+  ip               inet PRIMARY KEY,
+  window_started_at timestamptz NOT NULL,
+  attempt_count    integer NOT NULL CHECK (attempt_count > 0),
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+```
+
 ## 5. Cases, membership, invitations
 
 ```sql

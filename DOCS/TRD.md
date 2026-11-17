@@ -69,6 +69,13 @@ Status: Draft 1. Items marked **(decide)** need a decision during project setup.
 | POST | `/auth/invitations/accept` | Client sets password using invitation token |
 | GET | `/me` | Current user and role |
 
+The browser session cookie is named `lc_session`, is httpOnly, and uses
+`SameSite=Lax`. Its Secure flag defaults on in production and off otherwise,
+with `SESSION_COOKIE_SECURE` available to override. Cookie-authenticated
+state-changing requests must include an `Origin` exactly matching `APP_ORIGIN`;
+there is no separate CSRF header. `GET /api/v1/me` returns `id`, `email`,
+`role`, `full_name`, and `preferred_language`.
+
 **Clients and cases (lawyer)**
 | Method | Path |
 |---|---|
