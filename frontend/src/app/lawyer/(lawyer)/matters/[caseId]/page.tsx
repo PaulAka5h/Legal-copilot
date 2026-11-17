@@ -8,7 +8,13 @@ import {
   type CaseProgressStage,
 } from "@/components/CaseProgress";
 import { Icon } from "@/components/Icon";
-import { getCase, type Matter } from "@/lib/api/lawyer";
+import { MatterWorkspace } from "@/components/lawyer/MatterWorkspace";
+import {
+  getCase,
+  listDocuments,
+  listHearings,
+  type Matter,
+} from "@/lib/api/lawyer";
 import {
   dictionaries,
   format,
@@ -57,10 +63,13 @@ function stagesFor(
 
 export default async function LawyerMatterPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ caseId: string }>;
+  searchParams: Promise<{ hearingError?: string; noteError?: string }>;
 }) {
   const { caseId } = await params;
+  const { hearingError, noteError } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
   const matter = getCase(caseId);
@@ -68,8 +77,14 @@ export default async function LawyerMatterPage({
   if (!matter) notFound();
 
   const stages = stagesFor(matter, language, copy.caseDetail);
+  const hearings = listHearings(caseId);
   const { reached, total, percent } = progressFor(stages);
   const locked = matter.status === "closed";
+  const hearingFormError = hearingError
+    ? "hearing"
+    : noteError
+      ? "note"
+      : null;
 
   return (
     <>
@@ -154,6 +169,17 @@ export default async function LawyerMatterPage({
             completeLabel={copy.caseDetail.complete}
           />
         </div>
+
+        <MatterWorkspace
+          key={matter.id}
+          caseId={matter.id}
+          hearings={hearings}
+          initialDocuments={listDocuments(caseId)}
+          language={language}
+          copy={copy.caseDetail}
+          locked={locked}
+          error={hearingFormError}
+        />
       </div>
     </>
   );

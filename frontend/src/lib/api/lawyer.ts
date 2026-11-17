@@ -1,8 +1,19 @@
 import {
+  MAX_DOCUMENT_BYTES,
+  isAllowedDocument,
+} from "@/lib/documents";
+import { storedSummaries } from "@/lib/mock/client";
+import {
+  hearingSummarySections,
+  hearingSummaryVersions,
+} from "@/lib/mock/hearingSummaries";
+import {
   activities,
   caseTypes,
   clients,
   courts,
+  documents,
+  hearings,
   lawyerProfile,
   matterStages,
   matters,
@@ -10,6 +21,8 @@ import {
 
 export type Localized = { en: string; bn: string };
 export type MatterStatus = "active" | "closed";
+export type DocumentStatus = "uploading" | "processing" | "ready" | "failed";
+export type SummaryStatus = "none" | "processing" | "draft_ready" | "approved";
 
 export type UpcomingHearing = {
   day: number;
@@ -35,6 +48,86 @@ export type Matter = {
   nextHearing?: UpcomingHearing;
   stages: MatterStage[];
   currentStageId: string;
+};
+
+export type HearingNoteVersion = {
+  id: string;
+  text: string;
+};
+
+export type Hearing = {
+  id: string;
+  number: number;
+  date: string;
+  court: Localized;
+  notes: HearingNoteVersion[];
+  summaryStatus: SummaryStatus;
+};
+
+export type NewHearingInput = {
+  date: string;
+  note: string;
+};
+
+export type ClaimType = "document" | "lawyer" | "ai" | "assumption";
+export type Verification = "verified" | "unverified";
+export type SummarySectionId =
+  | "keyNotes"
+  | "laws"
+  | "risks"
+  | "rights"
+  | "notes"
+  | "nextSteps";
+
+export type SummaryClaim = {
+  id: string;
+  type: ClaimType;
+  verification: Verification;
+  text: Localized;
+  source: Localized;
+};
+
+export type SummarySection = {
+  id: SummarySectionId;
+  claims: SummaryClaim[];
+};
+
+export type HearingSummaryVersion = {
+  id: string;
+  version: number;
+  createdAt: string;
+  editedBy: Localized;
+  sections: SummarySection[];
+};
+
+export type HearingSummary = {
+  caseId: string;
+  hearingId: string;
+  hearingNumber: number;
+  hearingDate: string;
+  court: Localized;
+  matterTitle: Localized;
+  clientName: Localized;
+  status: SummaryStatus;
+  version: number;
+  sections: SummarySection[];
+  versions: HearingSummaryVersion[];
+};
+
+export type CaseDocument = {
+  id: string;
+  hearingId: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  status: DocumentStatus;
+};
+
+export type NewDocumentInput = {
+  hearingId: string;
+  name: string;
+  size: number;
+  mimeType: string;
 };
 
 export type Client = {
@@ -117,6 +210,281 @@ export function setCaseStage(caseId: string, stageId: string): boolean {
   }
 
   matter.currentStageId = stageId;
+  return true;
+}
+
+function isValidDate(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === date
+  );
+}
+
+export function listHearings(caseId: string): Hearing[] {
+  return [...(hearings[caseId] ?? [])].sort((a, b) => a.number - b.number);
+}
+
+function summaryVersionsFor(hearing: Hearing): HearingSummaryVersion[] {
+  const existing = hearingSummaryVersions[hearing.id];
+  if (existing) return existing;
+
+  const seed: HearingSummaryVersion = {
+    id: `summary-${hearing.id}-v1`,
+    version: 1,
+    createdAt: `${hearing.date}T18:00:00.000Z`,
+    editedBy: { en: "AI draft", bn: "এআই খসড়া" },
+    sections: structuredClone(hearingSummarySections),
+  };
+
+  hearingSummaryVersions[hearing.id] = [seed];
+  return hearingSummaryVersions[hearing.id];
+}
+
+function buildHearingSummary(
+  matter: Matter,
+  hearing: Hearing,
+): HearingSummary {
+  const versions = summaryVersionsFor(hearing);
+  const latest = versions[versions.length - 1];
+
+  return {
+    caseId: matter.id,
+    hearingId: hearing.id,
+    hearingNumber: hearing.number,
+    hearingDate: hearing.date,
+    court: hearing.court,
+    matterTitle: matter.title,
+    clientName: matter.clientName,
+    status: hearing.summaryStatus,
+    version: latest.version,
+    sections: latest.sections,
+    versions: [...versions],
+  };
+}
+
+function summaryPublishedOn(): Localized {
+  const now = new Date();
+  return {
+    en: new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(now),
+    bn: new Intl.DateTimeFormat("bn-BD", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(now),
+  };
+}
+
+export function getHearingSummary(
+  caseId: string,
+  hearingId: string,
+): HearingSummary | null {
+  const matter = getCase(caseId);
+  const hearing = hearings[caseId]?.find((item) => item.id === hearingId);
+
+  if (!matter || !hearing) return null;
+  if (
+    hearing.summaryStatus !== "draft_ready" &&
+    hearing.summaryStatus !== "approved"
+  ) {
+    return null;
+  }
+
+  return buildHearingSummary(matter, hearing);
+}
+
+export function saveHearingSummaryVersion(
+  caseId: string,
+  hearingId: string,
+  sections: SummarySection[],
+): HearingSummary | null {
+  const matter = getCase(caseId);
+  const hearing = hearings[caseId]?.find((item) => item.id === hearingId);
+
+  if (!matter || !hearing) return null;
+  if (
+    hearing.summaryStatus !== "draft_ready" &&
+    hearing.summaryStatus !== "approved"
+  ) {
+    return null;
+  }
+  if (
+    sections.length === 0 ||
+    sections.some((section) => section.claims.length === 0)
+  ) {
+    return null;
+  }
+
+  const versions = summaryVersionsFor(hearing);
+  const version = Math.max(0, ...versions.map((item) => item.version)) + 1;
+
+  versions.push({
+    id: globalThis.crypto.randomUUID(),
+    version,
+    createdAt: new Date().toISOString(),
+    editedBy: getLawyerProfile().name,
+    sections: structuredClone(sections),
+  });
+
+  hearing.summaryStatus = "draft_ready";
+
+  const clientSummaryId = `summary-${hearing.id}`;
+  const clientIndex = storedSummaries.findIndex(
+    (summary) => summary.id === clientSummaryId,
+  );
+  if (clientIndex >= 0) storedSummaries.splice(clientIndex, 1);
+
+  return buildHearingSummary(matter, hearing);
+}
+
+export function approveHearingSummary(
+  caseId: string,
+  hearingId: string,
+): HearingSummary | null {
+  const matter = getCase(caseId);
+  const hearing = hearings[caseId]?.find((item) => item.id === hearingId);
+
+  if (!matter || !hearing) return null;
+  if (
+    hearing.summaryStatus !== "draft_ready" &&
+    hearing.summaryStatus !== "approved"
+  ) {
+    return null;
+  }
+
+  const versions = summaryVersionsFor(hearing);
+  const latest = versions[versions.length - 1];
+  const keyNote = latest.sections.find(
+    (section) => section.id === "keyNotes",
+  )?.claims[0];
+  const excerpt = keyNote?.text ?? {
+    en: `The summary for hearing ${hearing.number} is ready.`,
+    bn: `শুনানি ${hearing.number} সারসংক্ষেপ প্রস্তুত।`,
+  };
+
+  const entry = {
+    id: `summary-${hearing.id}`,
+    caseId: matter.id,
+    title: {
+      en: `Hearing ${hearing.number} summary`,
+      bn: `শুনানি ${hearing.number} সারসংক্ষেপ`,
+    },
+    excerpt,
+    publishedOn: summaryPublishedOn(),
+  };
+  const clientIndex = storedSummaries.findIndex(
+    (summary) => summary.id === entry.id,
+  );
+  if (clientIndex >= 0) {
+    storedSummaries[clientIndex] = { ...entry, status: "approved" };
+  } else {
+    storedSummaries.unshift({ ...entry, status: "approved" });
+  }
+
+  hearing.summaryStatus = "approved";
+  return buildHearingSummary(matter, hearing);
+}
+
+export function downloadHearingSummary(): { status: "NOT_CONFIGURED" } {
+  return { status: "NOT_CONFIGURED" };
+}
+
+export function addHearing(
+  caseId: string,
+  input: NewHearingInput,
+): Hearing | null {
+  const matter = getCase(caseId);
+  const note = input.note.trim();
+
+  if (!matter || matter.status === "closed") return null;
+  if (!isValidDate(input.date) || !note) return null;
+
+  const caseHearings = hearings[caseId] ?? [];
+  const hearing: Hearing = {
+    id: globalThis.crypto.randomUUID(),
+    number: Math.max(0, ...caseHearings.map((item) => item.number)) + 1,
+    date: input.date,
+    court: matter.court,
+    notes: [{ id: globalThis.crypto.randomUUID(), text: note }],
+    summaryStatus: "none",
+  };
+
+  hearings[caseId] = [...caseHearings, hearing];
+  matter.hearingNumber = hearing.number;
+  return hearing;
+}
+
+export function addHearingNote(
+  caseId: string,
+  hearingId: string,
+  text: string,
+): Hearing | null {
+  const matter = getCase(caseId);
+  const hearing = hearings[caseId]?.find((item) => item.id === hearingId);
+  const note = text.trim();
+
+  if (!matter || matter.status === "closed" || !hearing || !note) return null;
+
+  hearing.notes.push({ id: globalThis.crypto.randomUUID(), text: note });
+  return hearing;
+}
+
+export function listDocuments(caseId: string): CaseDocument[] {
+  return [...(documents[caseId] ?? [])];
+}
+
+export function addDocument(
+  caseId: string,
+  input: NewDocumentInput,
+): CaseDocument | null {
+  const matter = getCase(caseId);
+  const belongsToCase = hearings[caseId]?.some(
+    (hearing) => hearing.id === input.hearingId,
+  );
+
+  if (!matter || matter.status === "closed" || !belongsToCase) return null;
+  if (!isAllowedDocument(input.name, input.mimeType)) return null;
+  if (
+    !Number.isInteger(input.size) ||
+    input.size <= 0 ||
+    input.size > MAX_DOCUMENT_BYTES
+  ) {
+    return null;
+  }
+
+  const document: CaseDocument = {
+    id: globalThis.crypto.randomUUID(),
+    hearingId: input.hearingId,
+    name: input.name,
+    size: input.size,
+    mimeType: input.mimeType,
+    status: "processing",
+  };
+
+  documents[caseId] = [...(documents[caseId] ?? []), document];
+  return document;
+}
+
+export function setDocumentStatus(
+  caseId: string,
+  documentId: string,
+  status: DocumentStatus,
+): boolean {
+  if (status !== "processing" && status !== "ready" && status !== "failed") {
+    return false;
+  }
+
+  const document = documents[caseId]?.find((item) => item.id === documentId);
+  if (!document) return false;
+
+  document.status = status;
   return true;
 }
 
