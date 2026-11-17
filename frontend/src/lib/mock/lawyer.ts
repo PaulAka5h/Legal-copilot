@@ -1,6 +1,8 @@
 import type {
   Activity,
+  CaseDocument,
   Client,
+  Hearing,
   LawyerProfile,
   Localized,
   Matter,
@@ -112,6 +114,327 @@ export const matters: Matter[] = [
     currentStageId: "decision",
   },
 ];
+
+const dhakaDistrict: Localized = {
+  en: "Dhaka District Court",
+  bn: "ঢাকা জেলা আদালত",
+};
+const highCourt: Localized = {
+  en: "High Court Division",
+  bn: "হাইকোর্ট বিভাগ",
+};
+const arbitration: Localized = {
+  en: "Arbitration Tribunal",
+  bn: "সালিশি ট্রাইব্যুনাল",
+};
+const familyCourt: Localized = {
+  en: "Family Court, Dhaka",
+  bn: "পারিবারিক আদালত, ঢাকা",
+};
+
+export const hearings: Record<string, Hearing[]> = {
+  "LC-24018": [
+    {
+      id: "h-24018-1",
+      number: 1,
+      date: "2024-10-08",
+      court: dhakaDistrict,
+      summaryStatus: "approved",
+      notes: [
+        {
+          id: "h-24018-1-n1",
+          text: "Defendant entered appearance. Next date fixed for framing of issues.",
+        },
+      ],
+    },
+    {
+      id: "h-24018-2",
+      number: 2,
+      date: "2024-11-21",
+      court: dhakaDistrict,
+      summaryStatus: "draft_ready",
+      notes: [
+        {
+          id: "h-24018-2-n1",
+          text: "Court framed issues for trial.",
+        },
+        {
+          id: "h-24018-2-n2",
+          text: "Four issues framed; two deferred to the next date.",
+        },
+      ],
+    },
+    {
+      id: "h-24018-3",
+      number: 3,
+      date: "2025-01-17",
+      court: dhakaDistrict,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-24018-3-n1",
+          text: "Plaintiff witness examination. Bring the original deed.",
+        },
+      ],
+    },
+  ],
+  "LC-24012": [
+    {
+      id: "h-24012-1",
+      number: 1,
+      date: "2024-12-02",
+      court: highCourt,
+      summaryStatus: "draft_ready",
+      notes: [
+        {
+          id: "h-24012-1-n1",
+          text: "Case transferred to the High Court Division. Parties notified.",
+        },
+      ],
+    },
+    {
+      id: "h-24012-2",
+      number: 2,
+      date: "2024-12-20",
+      court: highCourt,
+      summaryStatus: "draft_ready",
+      notes: [
+        {
+          id: "h-24012-2-n1",
+          text: "Interim order hearing scheduled. Certified copy of the deed filed.",
+        },
+      ],
+    },
+  ],
+  "LC-23997": [
+    {
+      id: "h-23997-1",
+      number: 1,
+      date: "2024-08-10",
+      court: arbitration,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-23997-1-n1",
+          text: "First sitting. Tribunal constituted and parties identified.",
+        },
+      ],
+    },
+    {
+      id: "h-23997-2",
+      number: 2,
+      date: "2024-08-22",
+      court: arbitration,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-23997-2-n1",
+          text: "Procedural timetable agreed. Claimant to file documents.",
+        },
+      ],
+    },
+    {
+      id: "h-23997-3",
+      number: 3,
+      date: "2024-10-15",
+      court: arbitration,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-23997-3-n1",
+          text: "Claimant's documents filed. Respondent sought time to reply.",
+        },
+      ],
+    },
+    {
+      id: "h-23997-4",
+      number: 4,
+      date: "2024-12-05",
+      court: arbitration,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-23997-4-n1",
+          text: "Reply filed. Tribunal directed parties to exchange witness lists.",
+        },
+      ],
+    },
+    {
+      id: "h-23997-5",
+      number: 5,
+      date: "2025-01-21",
+      court: arbitration,
+      summaryStatus: "processing",
+      notes: [
+        {
+          id: "h-23997-5-n1",
+          text: "Witness lists due. Hearing on the preliminary objection.",
+        },
+      ],
+    },
+  ],
+  "LC-23986": [
+    {
+      id: "h-23986-1",
+      number: 1,
+      date: "2024-03-05",
+      court: familyCourt,
+      summaryStatus: "approved",
+      notes: [
+        {
+          id: "h-23986-1-n1",
+          text: "First appearance. Parties referred to mediation.",
+        },
+      ],
+    },
+    {
+      id: "h-23986-2",
+      number: 2,
+      date: "2024-03-18",
+      court: familyCourt,
+      summaryStatus: "approved",
+      notes: [
+        {
+          id: "h-23986-2-n1",
+          text: "Mediation did not settle the matter. Evidence directions given.",
+        },
+      ],
+    },
+    {
+      id: "h-23986-3",
+      number: 3,
+      date: "2024-06-20",
+      court: familyCourt,
+      summaryStatus: "approved",
+      notes: [
+        {
+          id: "h-23986-3-n1",
+          text: "Evidence recorded. Final arguments scheduled.",
+        },
+      ],
+    },
+    {
+      id: "h-23986-4",
+      number: 4,
+      date: "2024-09-02",
+      court: familyCourt,
+      summaryStatus: "approved",
+      notes: [
+        {
+          id: "h-23986-4-n1",
+          text: "Final arguments heard. Judgment reserved.",
+        },
+      ],
+    },
+  ],
+};
+
+export const documents: Record<string, CaseDocument[]> = {
+  "LC-24018": [
+    {
+      id: "doc-24018-1",
+      hearingId: "h-24018-1",
+      name: "Notice_of_Suit.pdf",
+      size: 248000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-24018-2",
+      hearingId: "h-24018-2",
+      name: "Written_Statement.pdf",
+      size: 512000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-24018-3",
+      hearingId: "h-24018-2",
+      name: "Witness_List.pdf",
+      size: 96000,
+      mimeType: "application/pdf",
+      status: "failed",
+    },
+    {
+      id: "doc-24018-4",
+      hearingId: "h-24018-3",
+      name: "Deed_of_Sale.pdf",
+      size: 3400000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-24018-5",
+      hearingId: "h-24018-3",
+      name: "Site_Photo_01.jpg",
+      size: 2100000,
+      mimeType: "image/jpeg",
+      status: "ready",
+    },
+    {
+      id: "doc-24018-6",
+      hearingId: "h-24018-3",
+      name: "Plaintiff_Affidavit.pdf",
+      size: 1250000,
+      mimeType: "application/pdf",
+      status: "processing",
+    },
+  ],
+  "LC-24012": [
+    {
+      id: "doc-24012-1",
+      hearingId: "h-24012-1",
+      name: "Transfer_Order.pdf",
+      size: 320000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-24012-2",
+      hearingId: "h-24012-2",
+      name: "Interim_Order_Copy.pdf",
+      size: 410000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+  ],
+  "LC-23997": [
+    {
+      id: "doc-23997-1",
+      hearingId: "h-23997-1",
+      name: "Arbitration_Agreement.pdf",
+      size: 880000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-23997-2",
+      hearingId: "h-23997-3",
+      name: "Claimant_Documents.pdf",
+      size: 2600000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+    {
+      id: "doc-23997-3",
+      hearingId: "h-23997-5",
+      name: "Witness_List.pdf",
+      size: 140000,
+      mimeType: "application/pdf",
+      status: "processing",
+    },
+  ],
+  "LC-23986": [
+    {
+      id: "doc-23986-1",
+      hearingId: "h-23986-4",
+      name: "Judgment_Copy.pdf",
+      size: 1900000,
+      mimeType: "application/pdf",
+      status: "ready",
+    },
+  ],
+};
 
 export const clients: Client[] = [
   {

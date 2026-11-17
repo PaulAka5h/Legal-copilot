@@ -1,8 +1,14 @@
 import {
+  MAX_DOCUMENT_BYTES,
+  isAllowedDocument,
+} from "@/lib/documents";
+import {
   activities,
   caseTypes,
   clients,
   courts,
+  documents,
+  hearings,
   lawyerProfile,
   matterStages,
   matters,
@@ -10,6 +16,8 @@ import {
 
 export type Localized = { en: string; bn: string };
 export type MatterStatus = "active" | "closed";
+export type DocumentStatus = "uploading" | "processing" | "ready" | "failed";
+export type SummaryStatus = "none" | "processing" | "draft_ready" | "approved";
 
 export type UpcomingHearing = {
   day: number;
@@ -35,6 +43,41 @@ export type Matter = {
   nextHearing?: UpcomingHearing;
   stages: MatterStage[];
   currentStageId: string;
+};
+
+export type HearingNoteVersion = {
+  id: string;
+  text: string;
+};
+
+export type Hearing = {
+  id: string;
+  number: number;
+  date: string;
+  court: Localized;
+  notes: HearingNoteVersion[];
+  summaryStatus: SummaryStatus;
+};
+
+export type NewHearingInput = {
+  date: string;
+  note: string;
+};
+
+export type CaseDocument = {
+  id: string;
+  hearingId: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  status: DocumentStatus;
+};
+
+export type NewDocumentInput = {
+  hearingId: string;
+  name: string;
+  size: number;
+  mimeType: string;
 };
 
 export type Client = {
@@ -117,6 +160,111 @@ export function setCaseStage(caseId: string, stageId: string): boolean {
   }
 
   matter.currentStageId = stageId;
+  return true;
+}
+
+function isValidDate(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === date
+  );
+}
+
+export function listHearings(caseId: string): Hearing[] {
+  return [...(hearings[caseId] ?? [])].sort((a, b) => a.number - b.number);
+}
+
+export function addHearing(
+  caseId: string,
+  input: NewHearingInput,
+): Hearing | null {
+  const matter = getCase(caseId);
+  const note = input.note.trim();
+
+  if (!matter || matter.status === "closed") return null;
+  if (!isValidDate(input.date) || !note) return null;
+
+  const caseHearings = hearings[caseId] ?? [];
+  const hearing: Hearing = {
+    id: globalThis.crypto.randomUUID(),
+    number: Math.max(0, ...caseHearings.map((item) => item.number)) + 1,
+    date: input.date,
+    court: matter.court,
+    notes: [{ id: globalThis.crypto.randomUUID(), text: note }],
+    summaryStatus: "none",
+  };
+
+  hearings[caseId] = [...caseHearings, hearing];
+  matter.hearingNumber = hearing.number;
+  return hearing;
+}
+
+export function addHearingNote(
+  caseId: string,
+  hearingId: string,
+  text: string,
+): Hearing | null {
+  const matter = getCase(caseId);
+  const hearing = hearings[caseId]?.find((item) => item.id === hearingId);
+  const note = text.trim();
+
+  if (!matter || matter.status === "closed" || !hearing || !note) return null;
+
+  hearing.notes.push({ id: globalThis.crypto.randomUUID(), text: note });
+  return hearing;
+}
+
+export function listDocuments(caseId: string): CaseDocument[] {
+  return [...(documents[caseId] ?? [])];
+}
+
+export function addDocument(
+  caseId: string,
+  input: NewDocumentInput,
+): CaseDocument | null {
+  const matter = getCase(caseId);
+  const belongsToCase = hearings[caseId]?.some(
+    (hearing) => hearing.id === input.hearingId,
+  );
+
+  if (!matter || matter.status === "closed" || !belongsToCase) return null;
+  if (!isAllowedDocument(input.name, input.mimeType)) return null;
+  if (
+    !Number.isInteger(input.size) ||
+    input.size <= 0 ||
+    input.size > MAX_DOCUMENT_BYTES
+  ) {
+    return null;
+  }
+
+  const document: CaseDocument = {
+    id: globalThis.crypto.randomUUID(),
+    hearingId: input.hearingId,
+    name: input.name,
+    size: input.size,
+    mimeType: input.mimeType,
+    status: "processing",
+  };
+
+  documents[caseId] = [...(documents[caseId] ?? []), document];
+  return document;
+}
+
+export function setDocumentStatus(
+  caseId: string,
+  documentId: string,
+  status: DocumentStatus,
+): boolean {
+  if (status !== "processing" && status !== "ready" && status !== "failed") {
+    return false;
+  }
+
+  const document = documents[caseId]?.find((item) => item.id === documentId);
+  if (!document) return false;
+
+  document.status = status;
   return true;
 }
 
