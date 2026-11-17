@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   setDocumentStatusAction,
@@ -221,6 +222,12 @@ export function MatterWorkspace({
                       </p>
                     </div>
                     <SummaryBadge status={hearing.summaryStatus} copy={copy} />
+                    <Link
+                      className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
+                      href={`/lawyer/matters/${caseId}/hearings/${hearing.id}/summary`}
+                    >
+                      {copy.viewSummary}
+                    </Link>
                   </div>
 
                   <DocumentList

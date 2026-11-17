@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { addHearingAction, addHearingNoteAction } from "@/app/lawyer/actions";
 import { Icon } from "@/components/Icon";
 import {
@@ -102,6 +103,12 @@ export function HearingsTimeline({
                       })}
                     </b>
                     <SummaryBadge status={hearing.summaryStatus} copy={copy} />
+                    <Link
+                      className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
+                      href={`/lawyer/matters/${caseId}/hearings/${hearing.id}/summary`}
+                    >
+                      {copy.viewSummary}
+                    </Link>
                   </div>
                   <span className="mt-0.5 text-[9px] text-[color:var(--color-muted)]">
                     {pick(hearing.court, language)}

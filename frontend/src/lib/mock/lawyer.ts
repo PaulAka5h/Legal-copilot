@@ -169,7 +169,7 @@ export const hearings: Record<string, Hearing[]> = {
       number: 3,
       date: "2025-01-17",
       court: dhakaDistrict,
-      summaryStatus: "processing",
+      summaryStatus: "draft_ready",
       notes: [
         {
           id: "h-24018-3-n1",
