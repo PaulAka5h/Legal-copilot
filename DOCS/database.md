@@ -152,6 +152,11 @@ CREATE TABLE password_reset_tokens (
 );
 ```
 
+Revision `0004_b9_auth_support` adds the `mfa_recovery_codes` table and the
+constrained password-reset lookup/consume security-definer functions. Recovery
+codes are stored as SHA-256 hashes, and TOTP secrets are encrypted application-side
+before they are written to `users.mfa_secret_enc`.
+
 Anonymous authentication lookup must not use a general RLS bypass. The Phase 1
 auth-support migration adds narrowly scoped `SECURITY DEFINER` functions for
 email/session lookup, login lockout updates, and per-IP throttling. They use a

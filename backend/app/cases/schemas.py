@@ -75,3 +75,32 @@ class CaseAccess(BaseModel):
     case_id: UUID
     role: Literal["lead_lawyer", "team_lawyer", "assistant", "client"]
     permissions: dict[str, bool]
+
+
+class CaseMemberCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    user_id: UUID
+    role: Literal["team_lawyer", "assistant"]
+    permissions: dict[str, bool] = Field(default_factory=dict)
+
+
+class CaseMemberResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    user_id: UUID
+    role: Literal["lead_lawyer", "team_lawyer", "assistant", "client"]
+    permissions: dict[str, bool]
+    status: Literal["active", "read_only", "revoked"]
+    granted_at: datetime
+    revoked_at: datetime | None
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    occurred_at: datetime
+    actor_user_id: UUID | None
+    actor_role: str | None
+    action: str
+    object_type: str | None
+    object_id: UUID | None
+    request_id: str | None

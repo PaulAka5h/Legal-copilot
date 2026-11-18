@@ -22,6 +22,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.session_factory = None
+        if app_settings.app_env == "production" and not app_settings.mfa_encryption_key:
+            raise RuntimeError("MFA_ENCRYPTION_KEY is required in production")
         if app_settings.database_url:
             engine = create_database_engine(app_settings.database_url)
             try:

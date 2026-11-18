@@ -25,6 +25,13 @@ def test_health_endpoint_returns_minimal_status() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_ready_endpoint_reports_database_health(api_client) -> None:
+    response = api_client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready"}
+
+
 def test_request_id_is_generated_and_valid_inbound_id_is_preserved() -> None:
     client = TestClient(create_app(Settings(app_env="test")))
 
