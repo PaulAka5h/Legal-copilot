@@ -1,27 +1,43 @@
+# Python Virtual Environments & Packages
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.tsbuildinfo
+
 # Dependencies and generated output
 **/node_modules/
 **/.next/
 **/out/
 **/.turbo/
 **/coverage/
-**/__pycache__/
-**/.venv/
-**/venv/
-**/.pytest_cache/
-**/.mypy_cache/
-**/.ruff_cache/
-*.py[cod]
-*.tsbuildinfo
-*.log
 /build/
 /dist/
 
+# Large Datasets & Scraped Raw/Processed Corpus (Preserve on local disk, do not push to GitHub)
+data-scrapper/data/raw/
+data-scrapper/data/processed/acts/
+data-scrapper/data/processed/sections.jsonl
+data-scrapper/data/processed/checkpoints.json
+data-scrapper/data/failed/
+data-scrapper/data/reports/
+data-scrapper/logs/
+*.log
+
+# Sensitive Files & Local Environment Variables
 # Environment files
 .env
 .env.*
 !.env.example
 
-# Operating system and editor files
+# OS & Editor generated files
 .DS_Store
 Thumbs.db
 Desktop.ini
@@ -30,3 +46,10 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+# Testing & Build artifacts
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
