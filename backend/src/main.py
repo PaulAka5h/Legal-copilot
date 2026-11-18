@@ -10,6 +10,11 @@ Provides:
 
 import os
 from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+
+# Load backend/.env if present
+load_dotenv(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")))
+
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field

@@ -69,4 +69,4 @@ def test_gateway_environment_provider_selection(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-mock-key")
     gw = LLMGateway()
     assert gw.current_provider == "gemini"
-    assert gw.current_model == "gemini-2.5-flash"
+    assert gw.current_model == "gemini-3.5-flash-lite"
