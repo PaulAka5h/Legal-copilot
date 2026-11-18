@@ -69,15 +69,21 @@ class LLMGateway:
         approved_providers: Optional[List[str]] = None,
     ):
         # Whitelist from environment or DOCS/providers.md defaults
-        raw_approved = os.getenv("LLM_APPROVED_PROVIDERS", "mock")
+        raw_approved = os.getenv("LLM_APPROVED_PROVIDERS", "mock,gemini")
         self.approved_providers = approved_providers or [
             p.strip().lower() for p in raw_approved.split(",") if p.strip()
         ]
         
-        # If no provider passed, initialize default (mock)
+        # If no provider passed, initialize based on LLM_PROVIDER env
         if provider is None:
-            from backend.src.ai.providers.mock import MockLLMProvider
-            self._provider = MockLLMProvider()
+            provider_type = os.getenv("LLM_PROVIDER", "mock").strip().lower()
+            if provider_type == "gemini":
+                from backend.src.ai.providers.gemini import GeminiProvider
+                model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                self._provider = GeminiProvider(model_name=model_name)
+            else:
+                from backend.src.ai.providers.mock import MockLLMProvider
+                self._provider = MockLLMProvider()
         else:
             self._provider = provider
 
