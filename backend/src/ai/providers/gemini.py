@@ -35,7 +35,11 @@ class GeminiProvider(BaseLLMProvider):
         temperature: float = 0.1,
     ) -> LLMResponse:
         if not self._api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured in environment.")
+            raise RuntimeError(
+                "GEMINI_API_KEY is not configured in your environment or .env file.\n"
+                "Please run: export GEMINI_API_KEY='your-key-here'\n"
+                "Or pass api_key=... to GeminiProvider(api_key='...')."
+            )
 
         from google import genai
         from google.genai import types
