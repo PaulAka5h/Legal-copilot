@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from backend.src.analysis.router import router as analysis_router
 from backend.src.documents.pipeline import DocumentProcessingPipeline
+from backend.src.strategy.router import router as strategy_router
 from backend.src.legal_kb.embeddings import MockEmbeddingProvider
 from backend.src.legal_kb.retriever import LegalHybridRetriever
 from backend.src.legal_kb.schemas import LegalChunkPayload
@@ -72,6 +73,7 @@ class SearchResponse(BaseModel):
 
 
 app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(strategy_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

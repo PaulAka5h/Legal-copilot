@@ -77,6 +77,23 @@ print("\n[4] VERIFIED BANGLADESH STATUTE CITATIONS:"); \
 [print(f"  * {cit.act_name}, Section {cit.section} ({cit.source_url})") for cit in res.citations]; \
 print("\nSUCCESS: LLM response parsed and verified!")'
 
+test-strategy:
+	@echo "Testing Chess-Inspired Legal Strategy Engine..."
+	cd backend && PYTHONPATH=.. uv run python -c '\
+from src.strategy.engine import StrategyEngine; \
+engine = StrategyEngine(); \
+strats = engine.generate_strategies_for_case("case-demo-strat", {"case_type": "Cheque Dishonour"}, [{"filename": "cheque.pdf", "text": "Cheque 4928192"}]); \
+print(f"\n[1] GENERATED {len(strats)} CANDIDATE STRATEGIES (DYNAMIC K):"); \
+[print(f"  * {s.name} (Status: {s.status.value}, Rating: {s.rubric_evaluation.overall_rating.value})") for s in strats]; \
+comp = engine.get_latest_comparison("case-demo-strat"); \
+print("\n[2] STRATEGY COMPARISON & REASONED RECOMMENDATION:"); \
+print("  Recommendation:", comp.recommendation_reason); \
+print("  Trade-offs:", comp.trade_offs_analysis); \
+print("\n[3] ADVERSARIAL SCENARIO TREE (DEPTH 2):"); \
+tree = strats[0].scenario_tree; \
+[print(f"  [Opponent Depth 1 ({opp.plausibility.value})]: {opp.text}\n    -> [Our Rebuttal Depth 2]: {opp.responses[0].text[:85]}...\n       [Residual Risk]: {opp.responses[0].residual_risk.risk_summary}") for opp in tree.opposing_arguments]; \
+print("\nSUCCESS: Chess Strategy Engine verified!")'
+
 # ------------------------------------------------------------------------------
 # Frontend (Next.js)
 # ------------------------------------------------------------------------------
