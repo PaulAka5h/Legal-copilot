@@ -14,6 +14,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from backend.src.analysis.router import router as analysis_router
 from backend.src.documents.pipeline import DocumentProcessingPipeline
 from backend.src.legal_kb.embeddings import MockEmbeddingProvider
 from backend.src.legal_kb.retriever import LegalHybridRetriever
@@ -68,6 +69,9 @@ class SearchResponse(BaseModel):
     query: str
     total_results: int
     results: List[SearchResponseItem]
+
+
+app.include_router(analysis_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
