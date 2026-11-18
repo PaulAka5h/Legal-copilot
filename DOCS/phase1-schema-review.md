@@ -18,6 +18,7 @@ Akash and Backend Dev 2 explicitly approve shared use.
 | `0002_auth_support` | IP throttle table, audit log table, lookup/throttle/login functions | Local draft |
 | `0003_session_revocation` | Scoped session revocation function | Local draft |
 | `0004_b9_auth_support` | MFA recovery codes, password-reset lookup/consume functions | Local draft |
+| `0005_b10_audit_writer` | Central append-only audit insert function and mutation trigger | Local draft |
 
 ## Trust boundary
 

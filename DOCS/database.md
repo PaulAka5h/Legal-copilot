@@ -782,6 +782,13 @@ REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM app_user;
 GRANT INSERT, SELECT ON audit_logs TO app_user;
 ```
 
+Revision `0005_b10_audit_writer` adds `app.write_audit_event` as the
+application's single ordered insert path and an append-only trigger that rejects
+UPDATE and DELETE. The function serializes inserts with a transaction advisory
+lock and validates that the actor matches `app.current_user_id` and, for case
+events, that the actor is a current case lawyer. Hash columns remain reserved for
+Phase 8.
+
 ## 12. Row level security
 
 ### 12.1 Lawyer-side case tables

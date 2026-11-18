@@ -203,12 +203,11 @@ async def write_audit_event(
     await session.execute(
         text(
             """
-            INSERT INTO public.audit_logs
-              (organization_id, case_id, actor_user_id, actor_role, action,
-               object_type, object_id, ip, user_agent, request_id, details)
-            VALUES (:organization_id, :case_id, :actor_user_id, :actor_role,
-                    :action, :object_type, :object_id, CAST(:ip AS inet),
-                    :user_agent, :request_id, CAST(:details AS jsonb))
+            SELECT app.write_audit_event(
+              :organization_id, :case_id, :actor_user_id, :actor_role,
+              :action, :object_type, :object_id, CAST(:ip AS inet),
+              :user_agent, :request_id, CAST(:details AS jsonb)
+            )
             """
         ),
         {
