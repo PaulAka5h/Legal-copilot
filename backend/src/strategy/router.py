@@ -15,7 +15,9 @@ from backend.src.strategy.engine import (
     MockStrategyApprovalError,
     StrategyEngine,
 )
+from backend.src.strategy.orchestrator import StrategyOrchestrator
 from backend.src.strategy.schemas import (
+    LegalStrategyReportRecord,
     ScenarioTree,
     StrategyComparisonRecord,
     StrategyRecord,
@@ -24,12 +26,17 @@ from backend.src.strategy.schemas import (
 
 router = APIRouter(prefix="/cases", tags=["Strategy Engine"])
 
-# Global singleton strategy engine instance
+# Global singleton strategy engine & orchestrator instances
 _strategy_engine = StrategyEngine()
+_strategy_orchestrator = StrategyOrchestrator()
 
 
 def get_strategy_engine() -> StrategyEngine:
     return _strategy_engine
+
+
+def get_strategy_orchestrator() -> StrategyOrchestrator:
+    return _strategy_orchestrator
 
 
 class StrategyGenerateRequest(BaseModel):
@@ -229,3 +236,29 @@ def reject_strategy(
         return engine.reject_strategy(case_id, strategy_id, lawyer_id=payload.lawyer_id, reason=payload.notes or "")
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy not found")
+
+
+@router.post(
+    "/{case_id}/strategies/report",
+    response_model=LegalStrategyReportRecord,
+    status_code=status.HTTP_200_OK,
+    summary="Generate Comprehensive Legal Strategy Report",
+    description="Orchestrates full RAG + LLM pipeline: material facts, bilingual query expansion, statutory & precedent analysis, 2-ply adversarial tree, 5-dimension rubric scoring, comparison matrix, and actionable next steps.",
+)
+def generate_strategy_report(
+    case_id: Annotated[str, Path(description="Case UUID")],
+    payload: Annotated[StrategyGenerateRequest, Body(description="Case facts and document list")],
+) -> LegalStrategyReportRecord:
+    orchestrator = get_strategy_orchestrator()
+    facts = payload.case_facts or {"case_type": "Cheque Dishonour", "title": "Commercial Debt Recovery"}
+    docs = payload.available_documents or [
+        {"filename": "cheque.pdf", "text": "Cheque #4928192"},
+        {"filename": "memo.pdf", "text": "Dishonour memo code 01"},
+    ]
+    report = orchestrator.generate_final_report(
+        case_id=case_id,
+        case_facts=facts,
+        available_documents=docs,
+        organization_id=payload.organization_id,
+    )
+    return report

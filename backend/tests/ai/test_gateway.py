@@ -62,3 +62,11 @@ def test_document_sanitizer_wrap_and_corpus():
     assert "petition.pdf" in corpus
     assert "memo.pdf" in corpus
     assert "</evidence_corpus>" in corpus
+
+
+def test_gateway_environment_provider_selection(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-mock-key")
+    gw = LLMGateway()
+    assert gw.current_provider == "gemini"
+    assert gw.current_model == "gemini-2.5-flash"
