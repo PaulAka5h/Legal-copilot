@@ -30,11 +30,7 @@ export default async function ClientLoginPage() {
     <AuthLayout
       type="client"
       language={language}
-      switcher={
-        <>
-          {copy.switchPrompt} <Link href="/lawyer/login">{copy.switchAction}</Link>
-        </>
-      }
+      switcher={<Link href="/lawyer/login">{copy.switchAction}</Link>}
     >
       <span className="eyebrow">{copy.portal}</span>
       <h2>{copy.title}</h2>
@@ -63,6 +59,10 @@ export default async function ClientLoginPage() {
           <Icon name="arrow" size={19} />
         </button>
       </MockLoginForm>
+      <div className="help-note">
+        <Icon name="user" size={17} />
+        <span>{copy.noAccountNote}</span>
+      </div>
       <div className="help-note">
         <Icon name="lock" size={17} />
         <span>

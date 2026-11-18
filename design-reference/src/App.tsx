@@ -464,9 +464,8 @@ function LawyerLogin({ onLogin, onClient }: { onLogin: () => void; onClient: () 
       type="lawyer"
       switcher={
         <>
-          <Bilingual en="Are you a client?" bn="আপনি কি মক্কেল?" />{" "}
           <button onClick={onClient}>
-            <Bilingual en="Client login" bn="মক্কেল লগইন" />
+            <Bilingual en="Log in as a client" bn="মক্কেল হিসেবে লগ ইন করুন" />
           </button>
         </>
       }
@@ -531,9 +530,8 @@ function ClientLogin({ onLogin, onLawyer }: { onLogin: () => void; onLawyer: () 
       type="client"
       switcher={
         <>
-          <Bilingual en="Are you a lawyer?" bn="আপনি কি আইনজীবী?" />{" "}
           <button onClick={onLawyer}>
-            <Bilingual en="Lawyer login" bn="আইনজীবী লগইন" />
+            <Bilingual en="Log in as a lawyer" bn="আইনজীবী হিসেবে লগ ইন করুন" />
           </button>
         </>
       }

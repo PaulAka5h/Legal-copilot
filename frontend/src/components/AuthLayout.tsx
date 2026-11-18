@@ -13,7 +13,7 @@ export function AuthLayout({
   type: "lawyer" | "client";
   language: Language;
   children: ReactNode;
-  switcher: ReactNode;
+  switcher?: ReactNode;
 }) {
   const copy = dictionaries[language][type];
 
@@ -42,7 +42,7 @@ export function AuthLayout({
         <LanguageToggle language={language} />
         <div className="auth-card">
           {children}
-          <div className="auth-switch">{switcher}</div>
+          {switcher ? <div className="auth-switch">{switcher}</div> : null}
         </div>
       </section>
     </div>
