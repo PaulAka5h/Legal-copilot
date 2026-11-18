@@ -117,7 +117,7 @@ export async function saveHearingSummaryAction(formData: FormData) {
   const hearingId = String(formData.get("hearingId") ?? "");
   const language = formData.get("language") === "bn" ? "bn" : "en";
   const path = summaryPath(caseId, hearingId);
-  const current = getHearingSummary(caseId, hearingId);
+  const current = await getHearingSummary(caseId, hearingId);
 
   if (!caseId || !hearingId || !current) {
     redirect(`/lawyer/matters/${encodeURIComponent(caseId)}`);
@@ -192,8 +192,9 @@ export async function downloadHearingSummaryAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   const hearingId = String(formData.get("hearingId") ?? "");
   const path = summaryPath(caseId, hearingId);
+  const summary = await getHearingSummary(caseId, hearingId);
 
-  if (!caseId || !hearingId || !getHearingSummary(caseId, hearingId)) {
+  if (!caseId || !hearingId || !summary) {
     redirect(`/lawyer/matters/${encodeURIComponent(caseId)}`);
   }
 

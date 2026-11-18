@@ -23,6 +23,8 @@ dependencies = [
     "sqlalchemy[asyncio]>=2,<3",
     "tabulate>=0.10.0",
     "testcontainers[postgres]>=4.15.0",
+    "pytesseract>=0.3.13",
+    "uvicorn>=0.54.0",
 ]
 
 [dependency-groups]

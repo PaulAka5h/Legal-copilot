@@ -74,20 +74,23 @@ def postgres_pgvector_store():
     embeddings = embedding_provider.embed_documents([c.text for c in all_chunks])
     store.add_chunks(all_chunks, embeddings)
 
-    return store, embedding_provider
+    return store, embedding_provider, all_chunks
 
 
 def test_pgvector_insertion_and_dense_search(postgres_pgvector_store):
-    store, embedding_provider = postgres_pgvector_store
-    q_vec = embedding_provider.embed_query("punishment for murder")
+    store, embedding_provider, all_chunks = postgres_pgvector_store
+    # With MockEmbeddingProvider (hash-based unit vectors for test suites),
+    # querying with the exact passage text guarantees cosine similarity == 1.0
+    q_vec = embedding_provider.embed_documents([all_chunks[0].text])[0]
     results = store.search_dense(q_vec, top_k=2)
 
     assert len(results) > 0
     assert any("302" in (r.chunk.section or "") for r in results)
+    assert results[0].score > 0.99
 
 
 def test_pgvector_sparse_fts_search(postgres_pgvector_store):
-    store, _ = postgres_pgvector_store
+    store, *_ = postgres_pgvector_store
     results = store.search_sparse("cheque dishonour unpaid", top_k=2)
 
     assert len(results) > 0
@@ -95,7 +98,7 @@ def test_pgvector_sparse_fts_search(postgres_pgvector_store):
 
 
 def test_pgvector_exact_section_search(postgres_pgvector_store):
-    store, _ = postgres_pgvector_store
+    store, *_ = postgres_pgvector_store
     results = store.search_exact_section("302")
 
     assert len(results) > 0
@@ -103,7 +106,7 @@ def test_pgvector_exact_section_search(postgres_pgvector_store):
 
 
 def test_pgvector_hybrid_retriever_e2e(postgres_pgvector_store):
-    store, embedding_provider = postgres_pgvector_store
+    store, embedding_provider, _ = postgres_pgvector_store
     retriever = LegalHybridRetriever(vector_store=store, embedding_provider=embedding_provider)
 
     results = retriever.retrieve("What does Section 138 say?", rerank_top_k=2)
