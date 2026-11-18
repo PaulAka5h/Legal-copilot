@@ -54,11 +54,11 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 2 Dashboards | Client invitations and activation | Not started | | | |
 | 2 Dashboards | Client-visible updates and sharing | Not started | | | |
 | 2 Dashboards | Case closure and access removal | Not started | | | |
-| 3 Documents | Secure upload and validation | Not started | | | |
-| 3 Documents | Original file storage | Not started | | | |
-| 3 Documents | PDF and Word extraction | Not started | | | |
-| 3 Documents | OCR (Bengali and English) | Not started | | | |
-| 3 Documents | Page review and correction | Not started | | | |
+| 3 Documents | Secure upload and validation | Done | 41 backend tests pass | N/A (Validation layer) | Implemented magic-bytes MIME inspection, password-protected PDF rejection, pixel bomb safety & ClamAV malware scanner integration. |
+| 3 Documents | Original file storage | In progress | Model & metadata tests pass | Passed | Storage path conventions (`cases/{case_id}/documents/{doc_id}`) & SHA-256 integrity hashing ready for MinIO/S3. |
+| 3 Documents | PDF and Word extraction | Done | PyMuPDF & python-docx tests pass | Passed | Digital page-by-page extraction preserving exact physical page numbers and language classification (BN/EN). |
+| 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
+| 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
 | 4 RAG | Chunking and embeddings | Done | 17 backend unit & integration tests pass | N/A (Shared legal KB) | Implemented context-aware chunking (max 420 tokens safe budget), bilingual E5Large (1024-dim, passage:/query: prefixes), deterministic mock & sentence-transformers providers. |
 | 4 RAG | Scoped retrieval (case filter) | In progress | 17 tests pass | N/A (Shared legal KB) | Implemented full hybrid retrieval: Dense E5-large + Weighted Sparse FTS (Act/Sec: A, Body: B) + Exact Section matching (Section 302 / ধারা ৩০২) + RRF fusion + Cross-Encoder reranker + Parent-section recovery. Verified on live PostgreSQL + pgvector 0.8.7. |
 | 4 RAG | Legal source ingestion and versions | Done | Ingestion & live pgvector queries pass | N/A (Shared legal KB) | Ingested and indexed 62,491 legal chunks across 1,184 Bangladesh Acts into PostgreSQL with HNSW cosine index (306 MB) and GIN weighted full-text index (20 MB). Zero truncation. |
