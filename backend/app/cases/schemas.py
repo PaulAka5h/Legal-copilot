@@ -104,3 +104,19 @@ class AuditLogResponse(BaseModel):
     object_type: str | None
     object_id: UUID | None
     request_id: str | None
+
+
+class InvitationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    client_profile_id: UUID
+
+
+class InvitationResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    client_profile_id: UUID
+    email: str
+    expires_at: datetime
+    accepted_at: datetime | None = None
+    revoked_at: datetime | None = None
+    development_token: str | None = None

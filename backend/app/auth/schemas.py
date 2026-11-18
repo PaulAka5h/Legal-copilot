@@ -65,3 +65,9 @@ class MfaVerifyRequest(BaseModel):
 class MfaVerifyResponse(BaseModel):
     enabled: bool
     recovery_codes: list[str]
+
+
+class InvitationAcceptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    token: str = Field(min_length=32, max_length=256)
+    password: str = Field(min_length=12, max_length=256)

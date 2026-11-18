@@ -43,6 +43,7 @@ from app.auth.schemas import (
     MfaSetupResponse,
     MfaVerifyRequest,
     MfaVerifyResponse,
+    InvitationAcceptRequest,
     PasswordForgotRequest,
     PasswordResetRequest,
 )
@@ -512,6 +513,95 @@ async def mfa_verify(
         request_id=getattr(request.state, "request_id", None),
     )
     return MfaVerifyResponse(enabled=True, recovery_codes=recovery_codes)
+
+
+@auth_router.post(
+    "/invitations/accept",
+    summary="Accept a client invitation",
+    description="Uses a single-use invitation token to activate a client account and session.",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    responses=problem_responses(400, 403, 429, 422, 503),
+)
+async def accept_invitation(
+    request: Request,
+    response: Response,
+    session_factory: SessionFactoryDep,
+    payload: Annotated[
+        InvitationAcceptRequest,
+        Body(description="Invitation token and new password"),
+    ],
+) -> UserResponse:
+    ip_address = request_ip(request)
+    if not await consume_login_attempt(session_factory, ip_address):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many invitation attempts. Try again later.",
+        )
+    password_hash = await asyncio.to_thread(hash_password, payload.password)
+    session_token = new_session_token()
+    expires_at = datetime.now(UTC) + timedelta(
+        hours=request.app.state.settings.session_absolute_hours
+    )
+    async with session_factory() as session:
+        async with session.begin():
+            accepted = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT * FROM app.accept_case_invitation(
+                          :token_hash, :password_hash, :session_hash, :expires_at,
+                          CAST(:ip AS inet), :user_agent, :request_id
+                        )
+                        """
+                    ),
+                    {
+                        "token_hash": hash_token(payload.token),
+                        "password_hash": password_hash,
+                        "session_hash": hash_token(session_token),
+                        "expires_at": expires_at,
+                        "ip": str(ip_address),
+                        "user_agent": request.headers.get("user-agent", "")[:512] or None,
+                        "request_id": getattr(request.state, "request_id", None),
+                    },
+                )
+            ).mappings().one_or_none()
+    if accepted is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation is invalid, expired, revoked, or already used.",
+        )
+    user_id = accepted["result_user_id"]
+    async with user_transaction(session_factory, user_id) as session:
+        await write_audit_event(
+            session,
+            action="case.invitation_accepted",
+            actor_user_id=user_id,
+            actor_role="client",
+            object_type="user",
+            object_id=user_id,
+            ip_address=ip_address,
+            user_agent=request.headers.get("user-agent", "")[:512] or None,
+            request_id=getattr(request.state, "request_id", None),
+        )
+    settings = request.app.state.settings
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        max_age=settings.session_absolute_hours * 3600,
+        httponly=True,
+        secure=settings.secure_session_cookie,
+        samesite="lax",
+        path="/",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return UserResponse(
+        id=user_id,
+        email=accepted["result_email"],
+        role="client",
+        full_name=accepted["result_full_name"],
+        preferred_language="en",
+    )
 
 
 @auth_router.post(

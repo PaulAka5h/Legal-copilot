@@ -10,6 +10,8 @@ from app.cases.schemas import (
     CaseCreate,
     CaseMemberCreate,
     CaseMemberResponse,
+    InvitationCreate,
+    InvitationResponse,
     CasePatch,
     CaseResponse,
 )
@@ -239,6 +241,100 @@ async def list_case_audit(
         AuditLogResponse.model_validate(dict(row))
         for row in result.mappings().all()
     ]
+
+
+async def create_case_invitation(
+    session: AsyncSession,
+    *,
+    acting_user_id: UUID,
+    case_id: UUID,
+    payload: InvitationCreate,
+    token_hash: bytes,
+    expires_at,
+) -> InvitationResponse | None:
+    profile = (
+        await session.execute(
+            text(
+                """
+                SELECT cp.id, cp.organization_id, cp.email::text
+                FROM public.client_profiles cp
+                JOIN public.cases c ON c.id = :case_id
+                  AND c.organization_id = cp.organization_id
+                WHERE cp.id = :profile_id
+                  AND cp.organization_id = c.organization_id
+                """
+            ),
+            {"case_id": case_id, "profile_id": payload.client_profile_id},
+        )
+    ).mappings().one_or_none()
+    if profile is None or profile["email"] is None:
+        return None
+    await session.execute(
+        text(
+            """
+            UPDATE public.case_invitations
+            SET revoked_at = now()
+            WHERE case_id = :case_id
+              AND client_profile_id = :profile_id
+              AND accepted_at IS NULL
+              AND revoked_at IS NULL
+            """
+        ),
+        {"case_id": case_id, "profile_id": payload.client_profile_id},
+    )
+    row = (
+        await session.execute(
+            text(
+                """
+                INSERT INTO public.case_invitations
+                  (case_id, organization_id, client_profile_id, email,
+                   client_reference, token_hash, expires_at, created_by)
+                VALUES
+                  (:case_id, :organization_id, :profile_id, CAST(:email AS citext),
+                   :reference, :token_hash, :expires_at, :acting_user_id)
+                RETURNING id, case_id, client_profile_id, email::text,
+                          expires_at, accepted_at, revoked_at
+                """
+            ),
+            {
+                "case_id": case_id,
+                "organization_id": profile["organization_id"],
+                "profile_id": payload.client_profile_id,
+                "email": profile["email"],
+                "reference": f"client-{uuid4()}",
+                "token_hash": token_hash,
+                "expires_at": expires_at,
+                "acting_user_id": acting_user_id,
+            },
+        )
+    ).mappings().one()
+    return InvitationResponse.model_validate(dict(row))
+
+
+async def revoke_case_invitation(
+    session: AsyncSession,
+    *,
+    case_id: UUID,
+    invitation_id: UUID,
+) -> InvitationResponse | None:
+    row = (
+        await session.execute(
+            text(
+                """
+                UPDATE public.case_invitations
+                SET revoked_at = now()
+                WHERE case_id = :case_id
+                  AND id = :invitation_id
+                  AND accepted_at IS NULL
+                  AND revoked_at IS NULL
+                RETURNING id, case_id, client_profile_id, email::text,
+                          expires_at, accepted_at, revoked_at
+                """
+            ),
+            {"case_id": case_id, "invitation_id": invitation_id},
+        )
+    ).mappings().one_or_none()
+    return InvitationResponse.model_validate(dict(row)) if row is not None else None
 
 
 async def create_case(

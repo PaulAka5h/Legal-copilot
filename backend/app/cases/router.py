@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from app.auth.dependencies import (
     request_ip,
 )
 from app.auth.repository import write_audit_event
+from app.auth.security import hash_token, new_session_token
 from app.cases.dependencies import CaseAccessDep
 from app.cases.repository import (
     add_case_member,
@@ -22,6 +24,8 @@ from app.cases.repository import (
     list_cases,
     patch_case,
     revoke_case_member,
+    create_case_invitation,
+    revoke_case_invitation,
 )
 from app.cases.schemas import (
     AuditLogResponse,
@@ -30,6 +34,8 @@ from app.cases.schemas import (
     CaseMemberResponse,
     CasePatch,
     CaseResponse,
+    InvitationCreate,
+    InvitationResponse,
 )
 from app.errors import problem_responses
 
@@ -314,3 +320,116 @@ async def list_case_audit_endpoint(
     session: UserSessionDep,
 ) -> list[AuditLogResponse]:
     return await list_case_audit(session, case_id=case_access.case_id)
+
+
+@router.post(
+    "/{case_id}/invitations",
+    summary="Create a client invitation",
+    description="Revokes prior unused invitations and creates a hashed single-use token.",
+    response_model=InvitationResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=problem_responses(400, 401, 403, 404, 409, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def create_invitation_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+    payload: Annotated[InvitationCreate, Body(description="Client invitation")],
+) -> InvitationResponse:
+    if request.app.state.settings.app_env == "production":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Invitation email delivery is not configured.",
+        )
+    if not (
+        case_access.role == "lead_lawyer"
+        or case_access.permissions.get("can_manage_members", False)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Case member management permission is required.",
+        )
+    token = new_session_token()
+    expires_at = datetime.now(UTC) + timedelta(hours=48)
+    invitation = await create_case_invitation(
+        session,
+        acting_user_id=user.id,
+        case_id=case_id,
+        payload=payload,
+        token_hash=hash_token(token),
+        expires_at=expires_at,
+    )
+    if invitation is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Client profile or email is not available for this case.",
+        )
+    if request.app.state.settings.app_env != "production":
+        invitation.development_token = token
+    await write_audit_event(
+        session,
+        action="case.invitation_created",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="case_invitation",
+        object_id=invitation.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        case_id=case_id,
+        details={"client_profile_id": str(invitation.client_profile_id)},
+    )
+    return invitation
+
+
+@router.delete(
+    "/{case_id}/invitations/{invitation_id}",
+    summary="Revoke a client invitation",
+    description="Revokes an unused client invitation immediately.",
+    response_model=InvitationResponse,
+    responses=problem_responses(401, 403, 404, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def revoke_invitation_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    invitation_id: Annotated[UUID, Path(description="Invitation ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+) -> InvitationResponse:
+    if not (
+        case_access.role == "lead_lawyer"
+        or case_access.permissions.get("can_manage_members", False)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Case member management permission is required.",
+        )
+    invitation = await revoke_case_invitation(
+        session,
+        case_id=case_id,
+        invitation_id=invitation_id,
+    )
+    if invitation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invitation was not found.",
+        )
+    await write_audit_event(
+        session,
+        action="case.invitation_revoked",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="case_invitation",
+        object_id=invitation.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        case_id=case_id,
+        details={"client_profile_id": str(invitation.client_profile_id)},
+    )
+    return invitation
