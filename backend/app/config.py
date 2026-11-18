@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     session_cookie_secure: bool | None = None
     session_idle_minutes: int = Field(default=30, gt=0)
     session_absolute_hours: int = Field(default=12, gt=0)
+    mfa_encryption_key: str | None = None
 
     @property
     def secure_session_cookie(self) -> bool:

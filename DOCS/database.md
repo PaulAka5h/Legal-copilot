@@ -152,6 +152,11 @@ CREATE TABLE password_reset_tokens (
 );
 ```
 
+Revision `0004_b9_auth_support` adds the `mfa_recovery_codes` table and the
+constrained password-reset lookup/consume security-definer functions. Recovery
+codes are stored as SHA-256 hashes, and TOTP secrets are encrypted application-side
+before they are written to `users.mfa_secret_enc`.
+
 Anonymous authentication lookup must not use a general RLS bypass. The Phase 1
 auth-support migration adds narrowly scoped `SECURITY DEFINER` functions for
 email/session lookup, login lockout updates, and per-IP throttling. They use a
@@ -776,6 +781,13 @@ CREATE INDEX ON audit_logs (actor_user_id, occurred_at DESC);
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM app_user;
 GRANT INSERT, SELECT ON audit_logs TO app_user;
 ```
+
+Revision `0005_b10_audit_writer` adds `app.write_audit_event` as the
+application's single ordered insert path and an append-only trigger that rejects
+UPDATE and DELETE. The function serializes inserts with a transaction advisory
+lock and validates that the actor matches `app.current_user_id` and, for case
+events, that the actor is a current case lawyer. Hash columns remain reserved for
+Phase 8.
 
 ## 12. Row level security
 

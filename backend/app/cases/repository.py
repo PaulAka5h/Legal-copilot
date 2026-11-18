@@ -1,9 +1,20 @@
+import json
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cases.schemas import CaseAccess, CaseCreate, CasePatch, CaseResponse
+from app.cases.schemas import (
+    AuditLogResponse,
+    CaseAccess,
+    CaseCreate,
+    CaseMemberCreate,
+    CaseMemberResponse,
+    InvitationCreate,
+    InvitationResponse,
+    CasePatch,
+    CaseResponse,
+)
 from app.tenancy import resolve_actor_organization
 
 _CASE_FIELDS = """
@@ -102,6 +113,230 @@ async def get_case(
     return CaseResponse.model_validate(dict(row)) if row is not None else None
 
 
+async def list_case_members(
+    session: AsyncSession,
+    *,
+    case_id: UUID,
+) -> list[CaseMemberResponse]:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, case_id, user_id, role, permissions, status,
+                   granted_at, revoked_at
+            FROM public.case_members
+            WHERE case_id = :case_id
+              AND status != 'revoked'
+            ORDER BY granted_at, id
+            """
+        ),
+        {"case_id": case_id},
+    )
+    return [
+        CaseMemberResponse.model_validate(dict(row))
+        for row in result.mappings().all()
+    ]
+
+
+async def add_case_member(
+    session: AsyncSession,
+    *,
+    acting_user_id: UUID,
+    case_id: UUID,
+    payload: CaseMemberCreate,
+) -> CaseMemberResponse | None:
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT organization_id
+                FROM public.cases
+                WHERE id = :case_id
+                """
+            ),
+            {"case_id": case_id},
+        )
+    ).mappings().one_or_none()
+    if row is None:
+        return None
+    organization_id = row["organization_id"]
+    member = (
+        await session.execute(
+            text(
+                """
+                INSERT INTO public.case_members
+                  (case_id, organization_id, user_id, role, permissions, granted_by)
+                VALUES
+                  (:case_id, :organization_id, :user_id, :role,
+                   CAST(:permissions AS jsonb), :acting_user_id)
+                ON CONFLICT (case_id, user_id) DO UPDATE
+                  SET role = EXCLUDED.role,
+                      permissions = EXCLUDED.permissions,
+                      status = 'active',
+                      revoked_at = NULL,
+                      granted_by = EXCLUDED.granted_by
+                RETURNING id, case_id, user_id, role, permissions, status,
+                          granted_at, revoked_at
+                """
+            ),
+            {
+                "case_id": case_id,
+                "organization_id": organization_id,
+                "user_id": payload.user_id,
+                "role": payload.role,
+                "permissions": json.dumps(payload.permissions),
+                "acting_user_id": acting_user_id,
+            },
+        )
+    ).mappings().one_or_none()
+    return (
+        CaseMemberResponse.model_validate(dict(member))
+        if member is not None
+        else None
+    )
+
+
+async def revoke_case_member(
+    session: AsyncSession,
+    *,
+    case_id: UUID,
+    member_id: UUID,
+) -> CaseMemberResponse | None:
+    result = await session.execute(
+        text(
+            """
+            UPDATE public.case_members
+            SET status = 'revoked', revoked_at = now()
+            WHERE case_id = :case_id
+              AND id = :member_id
+              AND role != 'lead_lawyer'
+            RETURNING id, case_id, user_id, role, permissions, status,
+                      granted_at, revoked_at
+            """
+        ),
+        {"case_id": case_id, "member_id": member_id},
+    )
+    row = result.mappings().one_or_none()
+    return CaseMemberResponse.model_validate(dict(row)) if row is not None else None
+
+
+async def list_case_audit(
+    session: AsyncSession,
+    *,
+    case_id: UUID,
+) -> list[AuditLogResponse]:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, occurred_at, actor_user_id, actor_role, action,
+                   object_type, object_id, request_id
+            FROM public.audit_logs
+            WHERE case_id = :case_id
+            ORDER BY occurred_at DESC, id DESC
+            LIMIT 200
+            """
+        ),
+        {"case_id": case_id},
+    )
+    return [
+        AuditLogResponse.model_validate(dict(row))
+        for row in result.mappings().all()
+    ]
+
+
+async def create_case_invitation(
+    session: AsyncSession,
+    *,
+    acting_user_id: UUID,
+    case_id: UUID,
+    payload: InvitationCreate,
+    token_hash: bytes,
+    expires_at,
+) -> InvitationResponse | None:
+    profile = (
+        await session.execute(
+            text(
+                """
+                SELECT cp.id, cp.organization_id, cp.email::text
+                FROM public.client_profiles cp
+                JOIN public.cases c ON c.id = :case_id
+                  AND c.organization_id = cp.organization_id
+                WHERE cp.id = :profile_id
+                  AND cp.organization_id = c.organization_id
+                """
+            ),
+            {"case_id": case_id, "profile_id": payload.client_profile_id},
+        )
+    ).mappings().one_or_none()
+    if profile is None or profile["email"] is None:
+        return None
+    await session.execute(
+        text(
+            """
+            UPDATE public.case_invitations
+            SET revoked_at = now()
+            WHERE case_id = :case_id
+              AND client_profile_id = :profile_id
+              AND accepted_at IS NULL
+              AND revoked_at IS NULL
+            """
+        ),
+        {"case_id": case_id, "profile_id": payload.client_profile_id},
+    )
+    row = (
+        await session.execute(
+            text(
+                """
+                INSERT INTO public.case_invitations
+                  (case_id, organization_id, client_profile_id, email,
+                   client_reference, token_hash, expires_at, created_by)
+                VALUES
+                  (:case_id, :organization_id, :profile_id, CAST(:email AS citext),
+                   :reference, :token_hash, :expires_at, :acting_user_id)
+                RETURNING id, case_id, client_profile_id, email::text,
+                          expires_at, accepted_at, revoked_at
+                """
+            ),
+            {
+                "case_id": case_id,
+                "organization_id": profile["organization_id"],
+                "profile_id": payload.client_profile_id,
+                "email": profile["email"],
+                "reference": f"client-{uuid4()}",
+                "token_hash": token_hash,
+                "expires_at": expires_at,
+                "acting_user_id": acting_user_id,
+            },
+        )
+    ).mappings().one()
+    return InvitationResponse.model_validate(dict(row))
+
+
+async def revoke_case_invitation(
+    session: AsyncSession,
+    *,
+    case_id: UUID,
+    invitation_id: UUID,
+) -> InvitationResponse | None:
+    row = (
+        await session.execute(
+            text(
+                """
+                UPDATE public.case_invitations
+                SET revoked_at = now()
+                WHERE case_id = :case_id
+                  AND id = :invitation_id
+                  AND accepted_at IS NULL
+                  AND revoked_at IS NULL
+                RETURNING id, case_id, client_profile_id, email::text,
+                          expires_at, accepted_at, revoked_at
+                """
+            ),
+            {"case_id": case_id, "invitation_id": invitation_id},
+        )
+    ).mappings().one_or_none()
+    return InvitationResponse.model_validate(dict(row)) if row is not None else None
+
+
 async def create_case(
     session: AsyncSession,
     *,
@@ -116,11 +351,11 @@ async def create_case(
             INSERT INTO public.cases
               (id, organization_id, reference_no, title, case_type, court,
                court_case_no, jurisdiction, opposing_party, description,
-               internal_notes, client_objectives, current_stage, created_by)
+               internal_notes, client_objectives, status, current_stage, created_by)
             VALUES
               (:id, :organization_id, :reference_no, :title, :case_type, :court,
                :court_case_no, :jurisdiction, :opposing_party, :description,
-               :internal_notes, :client_objectives, :current_stage, :acting_user_id)
+               :internal_notes, :client_objectives, 'open', :current_stage, :acting_user_id)
             """
         ),
         {

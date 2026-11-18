@@ -75,3 +75,95 @@ class CaseAccess(BaseModel):
     case_id: UUID
     role: Literal["lead_lawyer", "team_lawyer", "assistant", "client"]
     permissions: dict[str, bool]
+
+
+class CaseMemberCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    user_id: UUID
+    role: Literal["team_lawyer", "assistant"]
+    permissions: dict[str, bool] = Field(default_factory=dict)
+
+
+class CaseMemberResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    user_id: UUID
+    role: Literal["lead_lawyer", "team_lawyer", "assistant", "client"]
+    permissions: dict[str, bool]
+    status: Literal["active", "read_only", "revoked"]
+    granted_at: datetime
+    revoked_at: datetime | None
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    occurred_at: datetime
+    actor_user_id: UUID | None
+    actor_role: str | None
+    action: str
+    object_type: str | None
+    object_id: UUID | None
+    request_id: str | None
+
+
+class InvitationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    client_profile_id: UUID
+
+
+class InvitationResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    client_profile_id: UUID
+    email: str
+    expires_at: datetime
+    accepted_at: datetime | None = None
+    revoked_at: datetime | None = None
+    development_token: str | None = None
+
+
+class ClientUpdateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    title: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=10000)
+    language: Literal["en", "bn"] = "en"
+
+
+class ClientUpdateResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    version: int
+    title: str
+    body: str
+    language: Literal["en", "bn"]
+    status: Literal["draft", "published", "withdrawn"]
+
+
+class CaseCloseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class SharedDocumentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    document_id: UUID
+    display_name: str = Field(min_length=1, max_length=300)
+
+
+class ClientTaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    title: str = Field(min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=10000)
+    due_date: date | None = None
+
+
+class VisibilityPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status_label: str | None = Field(default=None, max_length=200)
+    stage_label: str | None = Field(default=None, max_length=200)
+    plain_explanation: str | None = Field(default=None, max_length=10000)
+
+
+class ClientTaskPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status: Literal["open", "done", "cancelled"]
