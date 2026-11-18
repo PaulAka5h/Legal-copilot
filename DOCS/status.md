@@ -55,7 +55,7 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 3 Documents | Page review and correction | Not started | | | |
 | 4 RAG | Chunking and embeddings | Done | 17 backend unit & integration tests pass | N/A (Shared legal KB) | Implemented context-aware chunking (max 420 tokens safe budget), bilingual E5Large (1024-dim, passage:/query: prefixes), deterministic mock & sentence-transformers providers. |
 | 4 RAG | Scoped retrieval (case filter) | In progress | 17 tests pass | N/A (Shared legal KB) | Implemented full hybrid retrieval: Dense E5-large + Weighted Sparse FTS (Act/Sec: A, Body: B) + Exact Section matching (Section 302 / ধারা ৩০২) + RRF fusion + Cross-Encoder reranker + Parent-section recovery. Verified on live PostgreSQL + pgvector 0.8.7. |
-| 4 RAG | Legal source ingestion and versions | Done | Streaming tests pass | N/A (Shared legal KB) | Ingestion service streams `sections.jsonl` from `data-scrapper/` directly into batches, converts to vector embeddings, and stores in memory/pgvector without data truncation. |
+| 4 RAG | Legal source ingestion and versions | Done | Ingestion & live pgvector queries pass | N/A (Shared legal KB) | Ingested and indexed 62,491 legal chunks across 1,184 Bangladesh Acts into PostgreSQL with HNSW cosine index (306 MB) and GIN weighted full-text index (20 MB). Zero truncation. |
 | 5 Analysis | Facts and timeline | Not started | | | |
 | 5 Analysis | Evidence, contradictions, gaps | Not started | | | |
 | 5 Analysis | Cited legal research | Not started | | | |

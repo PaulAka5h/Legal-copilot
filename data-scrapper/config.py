@@ -29,10 +29,10 @@ BASE_URL = "https://bdlaws.minlaw.gov.bd"
 CHRONOLOGICAL_INDEX_URL = f"{BASE_URL}/laws-of-bangladesh-chronological-index.html"
 ALPHABETICAL_INDEX_URL = f"{BASE_URL}/laws-of-bangladesh-alphabetical-index.html"
 
-REQUEST_TIMEOUT = 30  # seconds
-REQUEST_DELAY = 0.5  # seconds between requests to be polite
-MAX_RETRIES = 4
-BACKOFF_FACTOR = 1.5
+REQUEST_TIMEOUT = 60  # seconds
+REQUEST_DELAY = 1.2  # seconds between requests to avoid server-side rate limit throttling
+MAX_RETRIES = 5
+BACKOFF_FACTOR = 2.0
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
