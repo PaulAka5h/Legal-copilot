@@ -7,6 +7,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pytest_cache/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.tsbuildinfo
+
+# Dependencies and generated output
+**/node_modules/
+**/.next/
+**/out/
+**/.turbo/
+**/coverage/
+/build/
+/dist/
 
 # Large Datasets & Scraped Raw/Processed Corpus (Preserve on local disk, do not push to GitHub)
 data-scrapper/data/raw/
@@ -19,6 +32,7 @@ data-scrapper/logs/
 *.log
 
 # Sensitive Files & Local Environment Variables
+# Environment files
 .env
 .env.*
 !.env.example
@@ -26,8 +40,12 @@ data-scrapper/logs/
 # OS & Editor generated files
 .DS_Store
 Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # Testing & Build artifacts
 dist/

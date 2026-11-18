@@ -142,7 +142,7 @@ export function HearingUpload({
       className={`mt-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors ${
         dragging
           ? "border-[var(--color-green)] bg-[#eaf6ef]"
-          : "border-[color:var(--color-border)] bg-white/50"
+          : "border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
       }`}
       onDragOver={(event) => {
         event.preventDefault();

@@ -19,7 +19,7 @@ import {
 } from "@/lib/i18n";
 
 const inputClass =
-  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-white px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
+  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
 
 export function HearingsTimeline({
   caseId,
@@ -58,7 +58,7 @@ export function HearingsTimeline({
         </span>
       </div>
 
-      <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[#fbfaf6] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+      <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
         {copy.hearingMock}
       </p>
 

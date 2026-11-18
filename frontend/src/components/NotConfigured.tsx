@@ -9,7 +9,7 @@ export function NotConfigured({ language, title }: { language: Language; title: 
 
   return (
     <main className="grid min-h-screen place-items-center bg-cream p-6">
-      <div className="w-full max-w-[560px] rounded-[14px] border border-black/5 bg-white p-9 shadow-card">
+      <div className="w-full max-w-[560px] rounded-[14px] border border-black/5 bg-[color:var(--color-surface)] p-9 shadow-card">
         <Logo language={language} />
         <span className="eyebrow mt-8 block">{copy.eyebrow}</span>
         <h1 className="mt-2 font-serif text-[35px] leading-none text-ink">{copy.title}</h1>

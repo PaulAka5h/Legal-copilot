@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/arafath/ai-builders/Legal-copilot/frontend/src/components/MockLoginForm.tsx"],"sourcesContent":["\"use client\";\n\nimport { useActionState, type ReactNode } from \"react\";\nimport type { LoginState } from \"@/lib/session\";\n\nexport type LoginAction = (state: LoginState, formData: FormData) => Promise<LoginState>;\n\nexport function MockLoginForm({\n  action,\n  notice,\n  children,\n}: {\n  action: LoginAction;\n  notice: string;\n  children: ReactNode;\n}) {\n  const [state, formAction] = useActionState(action, null);\n\n  return (\n    <form action={formAction}>\n      {state?.status === \"NOT_CONFIGURED\" ? (\n        <p className=\"form-error\" role=\"alert\">\n          {notice}\n        </p>\n      ) : null}\n      {children}\n    </form>\n  );\n}\n"],"names":["MockLoginForm","action","notice","children","state","formAction","status","className","role"],"mappings":";;;;;AAEA;AAFA;;;AAOO,SAASA,cAAc,EAC5BC,MAAM,EACNC,MAAM,EACNC,QAAQ,EAKT;IACC,MAAM,CAACC,OAAOC,WAAW,GAAG,IAAA,uNAAc,EAACJ,QAAQ;IAEnD,qBACE,8OAAC;QAAKA,QAAQI;;YACXD,OAAOE,WAAW,iCACjB,8OAAC;gBAAEC,WAAU;gBAAaC,MAAK;0BAC5BN;;;;;uBAED;YACHC;;;;;;;AAGP"}}]
-}
