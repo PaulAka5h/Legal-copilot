@@ -15,12 +15,11 @@ handoff state after B9 through B14 implementation work.
   tasks, shared documents, notifications, and a `NOT_CONFIGURED` download stub.
 - B14: close/reopen APIs and lawyer closed-case write denial.
 
-Test count: 42 passing against local Compose PostgreSQL as `app_user`.
+Test count: 43 passing against local Compose PostgreSQL as `app_user`.
 
-Not verified by the required exit-gate module:
-- one full two-lawyer/two-client/two-case scenario across every lawyer and client endpoint.
-- client closed-case and reopen behavior in a single real-client session scenario.
-- cross-tenant client visibility and withdrawn/draft isolation across the complete portal.
+The exit-gate module passes a two-lawyer/two-client scenario with two cases
+per lawyer, published/draft/withdrawn visibility, wrong-role denial, wrong-case
+404 behavior, and close/reopen access checks.
 
 Stubbed:
 - email sender and invitation/reset delivery.
@@ -39,6 +38,7 @@ All revisions below are local drafts and unreviewed by Akash and Backend Dev 2:
 - `0005_b10_audit_writer`
 - `0006_b12_invitations`
 - `0007_b13_client_visibility`
+- `0008_b13_client_case_read`
 
 No migration is approved for a shared database.
 

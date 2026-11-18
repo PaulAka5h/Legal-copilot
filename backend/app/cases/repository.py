@@ -351,11 +351,11 @@ async def create_case(
             INSERT INTO public.cases
               (id, organization_id, reference_no, title, case_type, court,
                court_case_no, jurisdiction, opposing_party, description,
-               internal_notes, client_objectives, current_stage, created_by)
+               internal_notes, client_objectives, status, current_stage, created_by)
             VALUES
               (:id, :organization_id, :reference_no, :title, :case_type, :court,
                :court_case_no, :jurisdiction, :opposing_party, :description,
-               :internal_notes, :client_objectives, :current_stage, :acting_user_id)
+               :internal_notes, :client_objectives, 'open', :current_stage, :acting_user_id)
             """
         ),
         {

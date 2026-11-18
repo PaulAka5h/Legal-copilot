@@ -21,6 +21,7 @@ Akash and Backend Dev 2 explicitly approve shared use.
 | `0005_b10_audit_writer` | Central append-only audit insert function and mutation trigger | Local draft |
 | `0006_b12_invitations` | Constrained client invitation acceptance function and active-invitation uniqueness | Local draft |
 | `0007_b13_client_visibility` | Hearings, updates, shared documents, tasks, visibility fields, notifications, and RLS | Local draft |
+| `0008_b13_client_case_read` | Client SELECT policy for active open cases | Local draft |
 
 ## Trust boundary
 
