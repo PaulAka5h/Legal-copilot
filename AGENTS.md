@@ -23,20 +23,19 @@ The AI supports the lawyer. It never decides cases or promises outcomes.
 
 ## Commands
 
-Commands marked (planned) are added during project setup. Update this list when they exist.
-
 ```bash
-# Data Scraper (run inside data-scrapper/)
-source venv/bin/activate
-pip install -r requirements.txt
+# Data Scraper (run inside data-scrapper/ with an activated virtual environment)
+python -m pip install -r requirements.txt
 python main.py --help
-python main.py scrape catalog          # discover and catalog acts
-python main.py scrape full             # extract catalog + acts + section chunks
-python main.py validate                # audit extracted JSON/JSONL dataset
-pytest tests/                          # run scraper unit & integration tests
+python main.py --discover              # discover and catalog acts
+python main.py --language en --limit 5 # scrape a small English batch
+python main.py --report                # audit extracted JSON/JSONL dataset
+python -m pytest -v                    # run scraper unit & integration tests
 
 # Services (run in repo root)
-docker compose up -d db redis minio   # (planned)
+docker compose config
+docker compose up -d db
+docker compose up -d db redis minio
 
 # Frontend (run inside frontend/)
 npm run dev            # dev server on http://localhost:3000
@@ -47,8 +46,9 @@ npm run lint           # ESLint
 uv sync                # install dependencies
 uv run fastapi dev     # dev server on http://localhost:8000 (docs at /docs)
 uv run fastapi run     # production server
-uv run pytest          # tests (planned)
-uv run alembic upgrade head   # migrations (planned)
+uv run pytest          # backend tests
+uv run alembic -x bootstrap=true upgrade head  # first migration after schema sign-off, bootstrap URL required
+uv run alembic upgrade head                   # later migrations through app_owner
 ```
 
 ## Conventions

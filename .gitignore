@@ -1,0 +1,32 @@
+# Dependencies and generated output
+**/node_modules/
+**/.next/
+**/out/
+**/.turbo/
+**/coverage/
+**/__pycache__/
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.py[cod]
+*.tsbuildinfo
+*.log
+/build/
+/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

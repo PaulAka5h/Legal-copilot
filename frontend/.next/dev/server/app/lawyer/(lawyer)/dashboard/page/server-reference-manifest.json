@@ -1,0 +1,25 @@
+{
+  "node": {
+    "003a93ff4c58e78a016ce5fff6cd6bd71f99d386a8": {
+      "workers": {
+        "app/lawyer/(lawyer)/dashboard/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/(lawyer)/dashboard/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "exportedName": "signOut",
+      "filename": "src/app/actions.ts"
+    },
+    "40833f6d2ad85e825c79b4fb83d7a5871c2f9bf12a": {
+      "workers": {
+        "app/lawyer/(lawyer)/dashboard/page": {
+          "moduleId": "[project]/.next-internal/server/app/lawyer/(lawyer)/dashboard/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/actions.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "exportedName": "setLanguage",
+      "filename": "src/app/actions.ts"
+    }
+  },
+  "edge": {}
+}
