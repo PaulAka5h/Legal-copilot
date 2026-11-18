@@ -61,6 +61,22 @@ backend-test:
 	@echo "Running backend test suite..."
 	cd backend && PYTHONPATH=.. uv run pytest tests/ -v
 
+test-llm:
+	@echo "Testing LLM Case Analysis & Fact Extraction..."
+	cd backend && PYTHONPATH=.. uv run python -c '\
+from src.analysis.engine import CaseAnalysisEngine; \
+engine = CaseAnalysisEngine(); \
+chunks = [{"id": "c1", "filename": "cheque.pdf", "page": 1, "text": "Cheque 4928192 for BDT 1,500,000 on 10 Jan 2023."}]; \
+res = engine.analyze_case("case-demo", document_chunks=chunks); \
+print("\n[1] CLIENT POSITION:\n", res.client_position); \
+print("\n[2] TIMELINE:"); \
+[print(f"  * {e.event_date}: {e.title} (Page {e.source_page})") for e in res.timeline]; \
+print("\n[3] CONTRADICTIONS:"); \
+[print(f"  * {c.issue}: {c.statement_a} vs {c.statement_b}") for c in res.contradictions]; \
+print("\n[4] VERIFIED BANGLADESH STATUTE CITATIONS:"); \
+[print(f"  * {cit.act_name}, Section {cit.section} ({cit.source_url})") for cit in res.citations]; \
+print("\nSUCCESS: LLM response parsed and verified!")'
+
 # ------------------------------------------------------------------------------
 # Frontend (Next.js)
 # ------------------------------------------------------------------------------
