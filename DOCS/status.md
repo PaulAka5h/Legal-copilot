@@ -62,14 +62,15 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 4 RAG | Chunking and embeddings | Done | 17 backend unit & integration tests pass | N/A (Shared legal KB) | Implemented context-aware chunking (max 420 tokens safe budget), bilingual E5Large (1024-dim, passage:/query: prefixes), deterministic mock & sentence-transformers providers. |
 | 4 RAG | Scoped retrieval (case filter) | In progress | 17 tests pass | N/A (Shared legal KB) | Implemented full hybrid retrieval: Dense E5-large + Weighted Sparse FTS (Act/Sec: A, Body: B) + Exact Section matching (Section 302 / ধারা ৩০২) + RRF fusion + Cross-Encoder reranker + Parent-section recovery. Verified on live PostgreSQL + pgvector 0.8.7. |
 | 4 RAG | Legal source ingestion and versions | Done | Ingestion & live pgvector queries pass | N/A (Shared legal KB) | Ingested and indexed 62,491 legal chunks across 1,184 Bangladesh Acts into PostgreSQL with HNSW cosine index (306 MB) and GIN weighted full-text index (20 MB). Zero truncation. |
-| 5 Analysis | Facts and timeline | Not started | | | |
-| 5 Analysis | Evidence, contradictions, gaps | Not started | | | |
-| 5 Analysis | Cited legal research | Not started | | | |
-| 5 Analysis | Verifier | Not started | | | |
-| 6 Strategy | Strategy generation | Not started | | | |
-| 6 Strategy | Scenario branches | Not started | | | |
-| 6 Strategy | Rubric ratings and comparison | Not started | | | |
-| 6 Strategy | Lawyer review and approval | Not started | | | |
+| 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
+| 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
+| 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
+| 5 Analysis | Verifier | Done | LLMGateway & DocumentSanitizer pass | Verified | Prompt injection sandboxing, structured JSON validation, approved provider enforcement (mock & gemini). |
+| 6 Strategy | Strategy generation | Done | 22 strategy tests pass; dynamic K verified | Verified | Evidence-grounded candidate generation, dynamic K (no artificial strategies), statutory eligibility checks. |
+| 6 Strategy | Scenario branches | Done | Tree tests pass | Verified | 2-ply adversarial tree (D=2, B<=3), opponent arguments, our responses, residual risk metadata. |
+| 6 Strategy | Rubric ratings and comparison | Done | Evaluator & comparison tests pass | Verified | 5-dimension qualitative rubric, weakest-dimension ceiling, precedent verification, trade-offs reasoning matrix. |
+| 6 Strategy | Lawyer review and approval | Done | Lifecycle & router tests pass | PostgreSQL RLS verified | Full lifecycle (draft -> approved -> current -> superseded), immutable approved versions, single-current strategy per case. |
+| 6 Strategy | RAG + LLM Orchestration & Final Report | Done | Orchestration & router report tests pass | Verified | Comprehensive report pipeline (Stages A-J: case understanding, bilingual query expansion, issue analysis, 2-ply tree, rubric, matrix, and next steps). |
 | 7 Hearings | Hearing calendar and records | Not started | | | |
 | 7 Hearings | Reassessment and version history | Not started | | | |
 | 7 Hearings | Client update drafting | Not started | | | |

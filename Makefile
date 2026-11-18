@@ -16,6 +16,8 @@ help:
 	@echo "  make backend-dev       Start FastAPI development server on http://localhost:8000"
 	@echo "  make backend-stop      Stop running backend server (frees port 8000)"
 	@echo "  make backend-test      Run the full backend test suite with pytest"
+	@echo "  make test-strategy     Run Chess Strategy Engine CLI verification"
+	@echo "  make test-report       Run RAG + LLM Full Legal Strategy Report verification"
 	@echo ""
 	@echo "  --- Frontend (Next.js) ---"
 	@echo "  make frontend-dev      Start Next.js frontend development server on http://localhost:3000"
@@ -93,6 +95,24 @@ print("\n[3] ADVERSARIAL SCENARIO TREE (DEPTH 2):"); \
 tree = strats[0].scenario_tree; \
 [print(f"  [Opponent Depth 1 ({opp.plausibility.value})]: {opp.text}\n    -> [Our Rebuttal Depth 2]: {opp.responses[0].text[:85]}...\n       [Residual Risk]: {opp.responses[0].residual_risk.risk_summary}") for opp in tree.opposing_arguments]; \
 print("\nSUCCESS: Chess Strategy Engine verified!")'
+
+test-report:
+	@echo "Testing Full RAG + LLM Legal Strategy Report Orchestration..."
+	cd backend && PYTHONPATH=.. uv run python -c '\
+from src.strategy.orchestrator import StrategyOrchestrator; \
+orch = StrategyOrchestrator(); \
+rep = orch.generate_final_report("case-report-demo", {"case_type": "Cheque Dishonour", "summary": "Commercial debt dispute on cheque #4928192"}, [{"filename": "cheque.pdf", "text": "Cheque 4928192"}]); \
+print("\n[1] CASE SUMMARY:\n ", rep.case_summary); \
+print(f"\n[2] MATERIAL FACTS (UNDISPUTED: {len(rep.undisputed_facts)}, DISPUTED: {len(rep.disputed_facts)}):"); \
+[print(f"  * [Undisputed {f.id}]: {f.statement} ({f.source_document})") for f in rep.undisputed_facts]; \
+[print(f"  * [Disputed {f.id}]: {f.statement} (Reason: {f.dispute_reason})") for f in rep.disputed_facts]; \
+print(f"\n[3] LEGAL ISSUES & PRECEDENT ANALYSIS ({len(rep.identified_issues)} issues):"); \
+[print(f"  * {i.issue_text} -> Statute: {i.applicable_statutes[0].act_name if i.applicable_statutes else None}") for i in rep.identified_issues]; \
+print(f"\n[4] CANDIDATE STRATEGIES GENERATED: {len(rep.candidate_strategies)}"); \
+[print(f"  * {s.name} ({s.rubric_evaluation.overall_rating.value if s.rubric_evaluation else None})") for s in rep.candidate_strategies]; \
+print(f"\n[5] RECOMMENDED NEXT STEPS ({len(rep.recommended_next_steps)}):"); \
+[print(f"  - {step}") for step in rep.recommended_next_steps]; \
+print("\nSUCCESS: RAG + LLM Legal Strategy Report verified!")'
 
 # ------------------------------------------------------------------------------
 # Frontend (Next.js)

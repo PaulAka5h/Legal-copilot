@@ -84,3 +84,26 @@ def test_strategy_api_e2e_flow():
     )
     assert rej_res.status_code == 200
     assert rej_res.json()["status"] == "rejected"
+
+    # 9. Generate comprehensive strategy report
+    rep_res = client.post(
+        f"/api/v1/cases/{case_id}/strategies/report",
+        json={
+            "case_facts": {
+                "case_type": "Cheque Dishonour",
+                "summary": "Commercial debt dispute over supply invoice",
+            },
+            "available_documents": [
+                {"filename": "cheque.pdf", "text": "Cheque #4928192"},
+            ],
+            "organization_id": "test-org-1",
+        },
+    )
+    assert rep_res.status_code == 200
+    report_data = rep_res.json()
+    assert report_data["case_id"] == case_id
+    assert len(report_data["disputed_facts"]) >= 1
+    assert len(report_data["undisputed_facts"]) >= 1
+    assert len(report_data["identified_issues"]) >= 1
+    assert len(report_data["candidate_strategies"]) >= 1
+    assert len(report_data["recommended_next_steps"]) >= 1

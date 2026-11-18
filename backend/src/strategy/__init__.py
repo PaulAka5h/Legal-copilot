@@ -8,12 +8,14 @@ from backend.src.strategy.engine import (
 )
 from backend.src.strategy.evaluator import RubricEvaluator
 from backend.src.strategy.generator import ProductionLLMConfigurationError, StrategyGenerator
+from backend.src.strategy.orchestrator import StrategyOrchestrator
 from backend.src.strategy.router import router as strategy_router
 from backend.src.strategy.tree import ScenarioTreeExpander
 
 __all__ = [
     "StrategyEngine",
     "StrategyGenerator",
+    "StrategyOrchestrator",
     "RubricEvaluator",
     "ScenarioTreeExpander",
     "LegalEligibilityValidator",

@@ -229,3 +229,51 @@ class StrategyComparisonRecord(BaseModel):
     diff_from_previous: Optional[Dict[str, Any]] = None
     review_status: str = "draft"  # 'draft' | 'lawyer_reviewed' | 'lawyer_rejected'
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DisputedFactItem(BaseModel):
+    id: str
+    statement: str
+    is_disputed: bool = False
+    dispute_reason: Optional[str] = None
+    source_document: str = "Case Record"
+    source_page: int = 1
+
+
+class QueryExpansionResult(BaseModel):
+    original_issue: str
+    search_queries_en: List[str] = Field(default_factory=list)
+    search_queries_bn: List[str] = Field(default_factory=list)
+    extracted_section_numbers: List[str] = Field(default_factory=list)
+
+
+class LegalIssueAnalysisItem(BaseModel):
+    issue_id: str
+    issue_text: str
+    applicable_statutes: List[LegalCitationReference] = Field(default_factory=list)
+    relevant_precedents: List[PrecedentReference] = Field(default_factory=list)
+    legal_requirements: List[str] = Field(default_factory=list)
+    exceptions: List[str] = Field(default_factory=list)
+    supporting_fact_ids: List[str] = Field(default_factory=list)
+    uncertainties: List[str] = Field(default_factory=list)
+
+
+class LegalStrategyReportRecord(BaseModel):
+    """Comprehensive final Legal Strategy Report combining RAG evidence and LLM reasoning."""
+    id: UUID = Field(default_factory=uuid4)
+    case_id: str
+    organization_id: str = "default_org"
+    case_summary: str
+    disputed_facts: List[DisputedFactItem] = Field(default_factory=list)
+    undisputed_facts: List[DisputedFactItem] = Field(default_factory=list)
+    identified_issues: List[LegalIssueAnalysisItem] = Field(default_factory=list)
+    applicable_statutes: List[LegalCitationReference] = Field(default_factory=list)
+    relevant_precedents: List[PrecedentReference] = Field(default_factory=list)
+    candidate_strategies: List[StrategyRecord] = Field(default_factory=list)
+    comparison_matrix: Optional[StrategyComparisonRecord] = None
+    evidence_gaps: List[str] = Field(default_factory=list)
+    unresolved_risks: List[str] = Field(default_factory=list)
+    recommended_next_steps: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
