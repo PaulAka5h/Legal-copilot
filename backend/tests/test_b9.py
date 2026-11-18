@@ -64,7 +64,7 @@ def test_password_forgot_is_generic_and_reset_is_single_use(api_client) -> None:
         "/api/v1/auth/password/reset",
         headers=ORIGIN,
         json={
-            "token": "not-a-real-token",
+            "token": "not-a-real-reset-token-with-sufficient-length",
             "new_password": "another sufficiently long password",
         },
     )
