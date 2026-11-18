@@ -348,7 +348,7 @@ export default async function HearingSummaryPage({
 
   if (!matter || !hearingExists) notFound();
 
-  const summary = getHearingSummary(caseId, hearingId);
+  const summary = await getHearingSummary(caseId, hearingId);
 
   if (!summary) {
     return (
