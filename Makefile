@@ -18,6 +18,7 @@ help:
 	@echo "  make backend-test      Run the full backend test suite with pytest"
 	@echo "  make test-strategy     Run Chess Strategy Engine CLI verification"
 	@echo "  make test-report       Run RAG + LLM Full Legal Strategy Report verification"
+	@echo "  make test-gemini-live  Run Live Gemini API (gemini-2.5-flash) End-to-End Test"
 	@echo ""
 	@echo "  --- Frontend (Next.js) ---"
 	@echo "  make frontend-dev      Start Next.js frontend development server on http://localhost:3000"
@@ -113,6 +114,10 @@ print(f"\n[4] CANDIDATE STRATEGIES GENERATED: {len(rep.candidate_strategies)}");
 print(f"\n[5] RECOMMENDED NEXT STEPS ({len(rep.recommended_next_steps)}):"); \
 [print(f"  - {step}") for step in rep.recommended_next_steps]; \
 print("\nSUCCESS: RAG + LLM Legal Strategy Report verified!")'
+
+test-gemini-live:
+	@echo "Running Live Gemini API End-to-End Demonstration..."
+	cd backend && PYTHONPATH=.. uv run python scripts/live_gemini_demo.py
 
 # ------------------------------------------------------------------------------
 # Frontend (Next.js)

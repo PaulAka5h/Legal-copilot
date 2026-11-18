@@ -79,7 +79,7 @@ class LLMGateway:
             provider_type = os.getenv("LLM_PROVIDER", "mock").strip().lower()
             if provider_type == "gemini":
                 from backend.src.ai.providers.gemini import GeminiProvider
-                model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+                model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
                 self._provider = GeminiProvider(model_name=model_name)
             else:
                 from backend.src.ai.providers.mock import MockLLMProvider
