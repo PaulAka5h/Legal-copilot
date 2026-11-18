@@ -8,8 +8,8 @@
   --color-text: #212529;
   --color-muted: #6c757d;
   --color-border: #e7e9ee;
-  --color-surface: #f2f3f5;
-  --color-cream: #f6f2eb;
+  --color-surface: #f7f8fa;
+  --color-cream: #ffffff;
   --color-pale: #ebf7fc;
   --color-blue: #067beb;
   --shadow-card: 0 8px 30px rgba(20, 26, 29, 0.07);
@@ -283,7 +283,7 @@
   margin: -12px 0 24px;
   padding: 10px 12px;
   color: var(--color-muted);
-  background: #fbfaf6;
+  background: var(--color-surface);
   border: 1px dashed var(--color-border);
   border-radius: 8px;
   font-size: 11px;
@@ -321,7 +321,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: #8c959a;
@@ -652,7 +652,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  background: rgba(246, 242, 235, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid rgba(20, 26, 29, 0.06);
   backdrop-filter: blur(10px);
 }
@@ -787,7 +787,7 @@
 
 .stat-card,
 .panel {
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid rgba(20, 26, 29, 0.055);
   border-radius: 12px;
   box-shadow: var(--shadow-card);
@@ -1050,7 +1050,7 @@
   padding: 8px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: 0 12px 35px rgba(20, 26, 29, 0.16);
   animation: pop-in 0.2s both;
 }
@@ -1341,7 +1341,7 @@
   gap: 15px;
   border: 0;
   border-bottom: 1px solid var(--color-border);
-  background: #fff;
+  background: var(--color-surface);
   color: #525a5e;
   text-align: left;
   font-size: 8px;
@@ -1350,7 +1350,7 @@
 .table-header {
   min-height: 37px;
   color: #959ca0;
-  background: #fafafa;
+  background: var(--color-surface);
   font-size: 7px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1476,7 +1476,7 @@
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  background: #fff;
+  background: var(--color-surface);
   outline: 0;
   font-size: 10px;
 }
@@ -1607,7 +1607,7 @@
   align-items: center;
   gap: 15px;
   border-bottom: 1px solid var(--color-border);
-  background: #fff;
+  background: var(--color-surface);
   color: #525a5e;
   text-decoration: none;
   font-size: 9px;
@@ -1773,7 +1773,7 @@
   width: min(570px, 100%);
   padding: 38px;
   text-align: center;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
   animation: card-in 0.4s both;
@@ -2144,7 +2144,7 @@
   align-items: center;
   overflow: hidden;
   color: #fff;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 9px;
   box-shadow: 0 4px 10px rgba(20, 26, 29, 0.1);
 }

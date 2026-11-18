@@ -144,7 +144,7 @@ export function MatterWorkspace({
   return (
     <div className="col-span-full">
       <div
-        className="mb-3 inline-flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] bg-white p-1"
+        className="mb-3 inline-flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-1"
         role="tablist"
       >
         <button
@@ -194,7 +194,7 @@ export function MatterWorkspace({
             </span>
           </div>
 
-          <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[#fbfaf6] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+          <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
             {copy.documentsMock}
           </p>
 

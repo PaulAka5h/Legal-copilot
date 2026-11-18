@@ -40,7 +40,7 @@ const claimTone: Record<ClaimType, string> = {
 };
 
 const inputClass =
-  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-white px-3 py-2 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
+  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
 
 function hearingDateLabel(date: string, language: Language) {
   const label = new Intl.DateTimeFormat(language === "bn" ? "bn-BD" : "en-GB", {
@@ -157,7 +157,7 @@ function SummaryBody({
           return (
             <li
               key={claim.id}
-              className="rounded-lg border border-[color:var(--color-border)] bg-[#fcfcfa] px-4 py-3"
+              className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -234,7 +234,7 @@ function SummaryEditor({
       {summary.sections.map((section, index) => (
         <fieldset
           key={section.id}
-          className="mt-5 rounded-lg border border-[color:var(--color-border)] bg-[#fcfcfa] px-4 py-3"
+          className="mt-5 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3"
         >
           <legend className="px-1 text-[11px] font-bold text-[color:var(--color-ink)]">
             {numberFor(language, index + 1)}. {copy.sections[section.id]}
@@ -246,7 +246,7 @@ function SummaryEditor({
               return (
                 <div
                   key={claim.id}
-                  className="rounded-md border border-[color:var(--color-border)] bg-white px-3 py-3"
+                  className="rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-3"
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
@@ -479,7 +479,7 @@ export default async function HearingSummaryPage({
         ) : null}
         {download === "NOT_CONFIGURED" ? (
           <p
-            className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[#fbfaf6] px-3 py-2 text-[9px] font-semibold text-[color:var(--color-muted)]"
+            className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] font-semibold text-[color:var(--color-muted)]"
             role="status"
           >
             {copy.downloadNotConfigured}
@@ -492,7 +492,7 @@ export default async function HearingSummaryPage({
           </p>
         </aside>
 
-        <p className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[#fbfaf6] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+        <p className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
           {copy.mock}
         </p>
 
@@ -534,7 +534,7 @@ export default async function HearingSummaryPage({
               return (
                 <li
                   key={version.id}
-                  className="rounded-lg border border-[color:var(--color-border)] bg-[#fcfcfa] px-4 py-3"
+                  className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <b className="text-[10px] text-[color:var(--color-ink)]">

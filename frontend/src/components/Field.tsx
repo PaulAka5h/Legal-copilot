@@ -6,11 +6,15 @@ export function Field({
   icon,
   children,
   action,
+  error,
+  errorId,
 }: {
   label: ReactNode;
   icon?: IconName;
   children: ReactNode;
   action?: ReactNode;
+  error?: string;
+  errorId?: string;
 }) {
   return (
     <label className="field">
@@ -20,6 +24,11 @@ export function Field({
         {children}
         {action}
       </span>
+      {error ? (
+        <span className="field-error" id={errorId}>
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

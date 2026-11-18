@@ -10,12 +10,20 @@ export function PasswordField({
   defaultValue,
   showLabel,
   hideLabel,
+  name = "password",
+  autoComplete = "current-password",
+  error,
+  errorId,
 }: {
   label: string;
   ariaLabel: string;
   defaultValue: string;
   showLabel: string;
   hideLabel: string;
+  name?: string;
+  autoComplete?: string;
+  error?: string;
+  errorId?: string;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -23,6 +31,8 @@ export function PasswordField({
     <Field
       label={label}
       icon="lock"
+      error={error}
+      errorId={errorId}
       action={
         <button
           type="button"
@@ -36,10 +46,12 @@ export function PasswordField({
     >
       <input
         type={visible ? "text" : "password"}
-        name="password"
+        name={name}
         defaultValue={defaultValue}
         aria-label={ariaLabel}
-        autoComplete="current-password"
+        autoComplete={autoComplete}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
       />
     </Field>
   );

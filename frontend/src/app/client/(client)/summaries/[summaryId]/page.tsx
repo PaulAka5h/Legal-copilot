@@ -83,7 +83,7 @@ export default async function ClientSummaryPage({
 
         {download === "NOT_CONFIGURED" ? (
           <p
-            className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[#fbfaf6] px-3 py-2 text-[9px] font-semibold text-[color:var(--color-muted)]"
+            className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] font-semibold text-[color:var(--color-muted)]"
             role="status"
           >
             {copy.clientSummaries.downloadNotConfigured}

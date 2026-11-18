@@ -33,7 +33,11 @@ export default async function LawyerLoginPage() {
       language={language}
       switcher={
         <>
-          {copy.switchPrompt} <Link href="/client/login">{copy.switchAction}</Link>
+          <Link href="/client/login">{copy.switchAction}</Link>
+          <span className="mt-3 block">
+            {copy.newHere}{" "}
+            <Link href="/lawyer/signup">{copy.createAccount}</Link>
+          </span>
         </>
       }
     >
