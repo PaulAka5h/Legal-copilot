@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 
 from app.auth.dependencies import (
     LawyerDep,
@@ -36,6 +37,7 @@ from app.cases.schemas import (
     CaseResponse,
     InvitationCreate,
     InvitationResponse,
+    CaseCloseRequest,
 )
 from app.errors import problem_responses
 
@@ -155,6 +157,18 @@ async def patch_case_endpoint(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Case edit permission is required.",
+        )
+    existing = await get_case(
+        session,
+        acting_user_id=user.id,
+        case_id=case_id,
+    )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Case was not found.")
+    if existing.status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed cases are read-only.",
         )
     try:
         case = await patch_case(
@@ -383,6 +397,127 @@ async def create_invitation_endpoint(
         details={"client_profile_id": str(invitation.client_profile_id)},
     )
     return invitation
+
+
+@router.post(
+    "/{case_id}/close",
+    summary="Close a case",
+    description="Marks a case closed and removes client-visible access.",
+    response_model=CaseResponse,
+    responses=problem_responses(401, 403, 404, 409, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def close_case_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+    payload: Annotated[CaseCloseRequest, Body(description="Closure reason")],
+) -> CaseResponse:
+    if not (
+        case_access.role == "lead_lawyer"
+        or case_access.permissions.get("can_close_case", False)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Case close permission is required.",
+        )
+    row = (
+        await session.execute(
+            text(
+                """
+                UPDATE public.cases
+                SET status = 'closed',
+                    closed_at = now(),
+                    closed_by = :user_id,
+                    updated_at = now()
+                WHERE id = :case_id
+                  AND status != 'closed'
+                RETURNING id
+                """
+            ),
+            {"case_id": case_id, "user_id": user.id},
+        )
+    ).mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case was not found or already closed.")
+    case = await get_case(session, acting_user_id=user.id, case_id=case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case was not found.")
+    await write_audit_event(
+        session,
+        action="case.closed",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="case",
+        object_id=case.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        organization_id=case.organization_id,
+        case_id=case.id,
+        details={"reason": payload.reason} if payload.reason else {},
+    )
+    return case
+
+
+@router.post(
+    "/{case_id}/reopen",
+    summary="Reopen a case",
+    description="Restores lawyer access and published client-visible data.",
+    response_model=CaseResponse,
+    responses=problem_responses(401, 403, 404, 409, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def reopen_case_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+) -> CaseResponse:
+    if not (
+        case_access.role == "lead_lawyer"
+        or case_access.permissions.get("can_close_case", False)
+    ):
+        raise HTTPException(status_code=403, detail="Case reopen permission is required.")
+    row = (
+        await session.execute(
+            text(
+                """
+                UPDATE public.cases
+                SET status = 'open',
+                    closed_at = NULL,
+                    closed_by = NULL,
+                    updated_at = now()
+                WHERE id = :case_id
+                  AND status = 'closed'
+                RETURNING id
+                """
+            ),
+            {"case_id": case_id},
+        )
+    ).mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case was not found or already open.")
+    case = await get_case(session, acting_user_id=user.id, case_id=case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case was not found.")
+    await write_audit_event(
+        session,
+        action="case.reopened",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="case",
+        object_id=case.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        organization_id=case.organization_id,
+        case_id=case.id,
+    )
+    return case
 
 
 @router.delete(

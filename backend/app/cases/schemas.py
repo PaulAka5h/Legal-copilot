@@ -120,3 +120,50 @@ class InvitationResponse(BaseModel):
     accepted_at: datetime | None = None
     revoked_at: datetime | None = None
     development_token: str | None = None
+
+
+class ClientUpdateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    title: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=10000)
+    language: Literal["en", "bn"] = "en"
+
+
+class ClientUpdateResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    version: int
+    title: str
+    body: str
+    language: Literal["en", "bn"]
+    status: Literal["draft", "published", "withdrawn"]
+
+
+class CaseCloseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class SharedDocumentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    document_id: UUID
+    display_name: str = Field(min_length=1, max_length=300)
+
+
+class ClientTaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    title: str = Field(min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=10000)
+    due_date: date | None = None
+
+
+class VisibilityPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status_label: str | None = Field(default=None, max_length=200)
+    stage_label: str | None = Field(default=None, max_length=200)
+    plain_explanation: str | None = Field(default=None, max_length=10000)
+
+
+class ClientTaskPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status: Literal["open", "done", "cancelled"]
