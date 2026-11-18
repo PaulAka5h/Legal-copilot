@@ -2,7 +2,7 @@ import {
   MAX_DOCUMENT_BYTES,
   isAllowedDocument,
 } from "@/lib/documents";
-import { queryLegalKnowledgeBase } from "@/lib/api/backendClient";
+import { fetchCaseAnalysis, queryLegalKnowledgeBase } from "@/lib/api/backendClient";
 import { pick } from "@/lib/i18n";
 import { storedSummaries } from "@/lib/mock/client";
 import {
@@ -301,34 +301,81 @@ export async function getHearingSummary(
 
   const baseSummary = buildHearingSummary(matter, hearing);
 
-  // Connect to live Backend Hybrid RAG pipeline if laws section is unverified
+  // Connect to live Backend Hybrid RAG & Case Analysis pipeline
   try {
-    const query = `${pick(matter.caseType, "en")} ${pick(matter.title, "en")} hearing`;
-    const ragResponse = await queryLegalKnowledgeBase(query, 3);
+    const analysis = await fetchCaseAnalysis(caseId);
+    if (analysis) {
+      // 1. Laws section populated with verified statutory citations
+      if (analysis.citations && analysis.citations.length > 0) {
+        const topCitation = analysis.citations[0];
+        const statuteCitation = `${topCitation.act_name}, Section ${topCitation.section}`;
+        const lawsSection = baseSummary.sections.find((s) => s.id === "laws");
+        if (lawsSection && lawsSection.claims.length > 0) {
+          lawsSection.claims[0] = {
+            id: `law-cit-${topCitation.act_id}-${topCitation.section}`,
+            type: "document",
+            verification: "verified",
+            text: {
+              en: `Relevant Bangladesh Statute: ${statuteCitation} (${topCitation.section_title}). ${topCitation.relevance_reason}`,
+              bn: `সম্পর্কিত বাংলাদেশ আইন: ${statuteCitation} (${topCitation.section_title})। ${topCitation.relevance_reason}`,
+            },
+            source: {
+              en: topCitation.source_url || `bdlaws.minlaw.gov.bd (${topCitation.act_name})`,
+              bn: topCitation.source_url || `bdlaws.minlaw.gov.bd (${topCitation.act_name})`,
+            },
+          };
+        }
+      }
 
-    if (ragResponse && ragResponse.results.length > 0) {
-      const topHit = ragResponse.results[0];
-      const statuteCitation = `${topHit.act_name}${topHit.section ? `, Section ${topHit.section}` : ""}`;
+      // 2. Risks section populated with cross-document contradictions & statutory gaps
+      if (analysis.contradictions && analysis.contradictions.length > 0) {
+        const contra = analysis.contradictions[0];
+        const risksSection = baseSummary.sections.find((s) => s.id === "risks");
+        if (risksSection && risksSection.claims.length > 0) {
+          risksSection.claims[0] = {
+            id: `contra-${contra.id.slice(0, 8)}`,
+            type: "ai",
+            verification: "unverified",
+            text: {
+              en: `Contradiction Detected: ${contra.issue}. ${contra.statement_a} vs ${contra.statement_b} (${contra.analysis})`,
+              bn: `বিরোধ সনাক্ত করা হয়েছে: ${contra.issue}। ${contra.statement_a} বনাম ${contra.statement_b}`,
+            },
+            source: {
+              en: `${contra.source_a_document} (p. ${contra.source_a_page}) & ${contra.source_b_document} (p. ${contra.source_b_page})`,
+              bn: `${contra.source_a_document} (পৃষ্ঠা ${contra.source_a_page}) এবং ${contra.source_b_document} (পৃষ্ঠা ${contra.source_b_page})`,
+            },
+          };
+        }
+      }
+    } else {
+      // Fallback to legal knowledge base search if full analysis not ready
+      const query = `${pick(matter.caseType, "en")} ${pick(matter.title, "en")} hearing`;
+      const ragResponse = await queryLegalKnowledgeBase(query, 3);
 
-      const lawsSection = baseSummary.sections.find((s) => s.id === "laws");
-      if (lawsSection && lawsSection.claims.length > 0) {
-        lawsSection.claims[0] = {
-          id: `law-rag-${topHit.chunk_id.slice(0, 8)}`,
-          type: "document",
-          verification: "verified",
-          text: {
-            en: `Relevant Bangladesh Statute retrieved: ${statuteCitation}. Verified against official legal gazette database.`,
-            bn: `সম্পর্কিত আইন উদ্ধার করা হয়েছে: ${statuteCitation}। সরকারি আইনের ডাটাবেজ থেকে যাচাইকৃত।`,
-          },
-          source: {
-            en: topHit.source_url || `bdlaws.minlaw.gov.bd (${topHit.act_name})`,
-            bn: topHit.source_url || `bdlaws.minlaw.gov.bd (${topHit.act_name})`,
-          },
-        };
+      if (ragResponse && ragResponse.results.length > 0) {
+        const topHit = ragResponse.results[0];
+        const statuteCitation = `${topHit.act_name}${topHit.section ? `, Section ${topHit.section}` : ""}`;
+
+        const lawsSection = baseSummary.sections.find((s) => s.id === "laws");
+        if (lawsSection && lawsSection.claims.length > 0) {
+          lawsSection.claims[0] = {
+            id: `law-rag-${topHit.chunk_id.slice(0, 8)}`,
+            type: "document",
+            verification: "verified",
+            text: {
+              en: `Relevant Bangladesh Statute retrieved: ${statuteCitation}. Verified against official legal gazette database.`,
+              bn: `সম্পর্কিত আইন উদ্ধার করা হয়েছে: ${statuteCitation}। সরকারি আইনের ডাটাবেজ থেকে যাচাইকৃত।`,
+            },
+            source: {
+              en: topHit.source_url || `bdlaws.minlaw.gov.bd (${topHit.act_name})`,
+              bn: topHit.source_url || `bdlaws.minlaw.gov.bd (${topHit.act_name})`,
+            },
+          };
+        }
       }
     }
   } catch (err) {
-    // Graceful fallback to default verified records if backend is offline
+    // Graceful fallback to default records if backend is offline
   }
 
   return baseSummary;
