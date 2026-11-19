@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 
@@ -16,6 +16,15 @@ from app.auth.dependencies import (
 from app.auth.repository import write_audit_event
 from app.auth.security import hash_token, new_session_token
 from app.cases.dependencies import CaseAccessDep
+from app.cases.etag import case_etag, parse_case_etag
+from app.pagination import (
+    DEFAULT_PAGE_SIZE,
+    CursorPage,
+    CursorQuery,
+    LimitQuery,
+    build_page,
+    decode_cursor,
+)
 from app.cases.repository import (
     MemberConflictError,
     add_case_member,
@@ -52,15 +61,26 @@ router = APIRouter(
 @router.get(
     "",
     summary="List cases",
-    description="Lists cases with an active membership for the authenticated lawyer.",
-    response_model=list[CaseResponse],
-    responses=problem_responses(401, 403, 503),
+    description=(
+        "Lists cases with an active membership for the authenticated lawyer, newest "
+        "first, using cursor pagination."
+    ),
+    response_model=CursorPage[CaseResponse],
+    responses=problem_responses(400, 401, 403, 422, 503),
 )
 async def list_cases_endpoint(
     user: LawyerDep,
     session: UserSessionDep,
-) -> list[CaseResponse]:
-    return await list_cases(session, acting_user_id=user.id)
+    cursor: CursorQuery = None,
+    limit: LimitQuery = DEFAULT_PAGE_SIZE,
+) -> CursorPage[CaseResponse]:
+    rows = await list_cases(
+        session,
+        acting_user_id=user.id,
+        limit=limit + 1,
+        after=decode_cursor(cursor, UUID),
+    )
+    return build_page(rows, limit, key=lambda case: (case.created_at, case.id))
 
 
 @router.post(
@@ -117,6 +137,7 @@ async def create_case_endpoint(
     responses=problem_responses(401, 403, 404, 422, 503),
 )
 async def get_case_endpoint(
+    response: Response,
     case_id: Annotated[UUID, Path(description="Case ID")],
     user: LawyerDep,
     session: UserSessionDep,
@@ -132,6 +153,7 @@ async def get_case_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Case was not found.",
         )
+    response.headers["ETag"] = case_etag(case.updated_at)
     return case
 
 
@@ -140,16 +162,24 @@ async def get_case_endpoint(
     summary="Update a case",
     description="Updates case details for a lawyer with case-edit permission.",
     response_model=CaseResponse,
-    responses=problem_responses(401, 403, 404, 409, 422, 503),
+    responses=problem_responses(401, 403, 404, 409, 412, 422, 428, 503),
     dependencies=[Depends(require_same_origin)],
 )
 async def patch_case_endpoint(
     request: Request,
+    response: Response,
     case_id: Annotated[UUID, Path(description="Case ID")],
     user: LawyerDep,
     session: UserSessionDep,
     case_access: CaseAccessDep,
     payload: Annotated[CasePatch, Body(description="Case fields to update")],
+    if_match: Annotated[
+        str | None,
+        Header(
+            alias="If-Match",
+            description="The case `ETag` from the last read. Required; a stale tag returns 412.",
+        ),
+    ] = None,
 ) -> CaseResponse:
     if not (
         case_access.role == "lead_lawyer"
@@ -171,12 +201,24 @@ async def patch_case_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             detail="Closed cases are read-only.",
         )
+    if if_match is None:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail="If-Match with the case ETag is required.",
+        )
+    expected_updated_at = parse_case_etag(if_match)
+    if expected_updated_at is None or expected_updated_at != existing.updated_at:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="The case was changed since it was read.",
+        )
     try:
         case = await patch_case(
             session,
             acting_user_id=user.id,
             case_id=case_id,
             payload=payload,
+            expected_updated_at=expected_updated_at,
         )
     except IntegrityError as exc:
         raise HTTPException(
@@ -184,9 +226,10 @@ async def patch_case_endpoint(
             detail="Case conflicts with existing data.",
         ) from exc
     if case is None:
+        # The row changed between the read above and the guarded UPDATE.
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Case was not found.",
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="The case was changed since it was read.",
         )
     await write_audit_event(
         session,
@@ -202,6 +245,7 @@ async def patch_case_endpoint(
         case_id=case.id,
         details={"fields": sorted(payload.model_fields_set)},
     )
+    response.headers["ETag"] = case_etag(case.updated_at)
     return case
 
 
@@ -331,16 +375,24 @@ async def revoke_case_member_endpoint(
 @router.get(
     "/{case_id}/audit",
     summary="List case audit events",
-    description="Returns the most recent audit events visible to this case member.",
-    response_model=list[AuditLogResponse],
-    responses=problem_responses(401, 403, 404, 422, 503),
+    description="Returns audit events for this case, newest first, using cursor pagination.",
+    response_model=CursorPage[AuditLogResponse],
+    responses=problem_responses(400, 401, 403, 404, 422, 503),
 )
 async def list_case_audit_endpoint(
     case_id: Annotated[UUID, Path(description="Case ID")],
     case_access: CaseAccessDep,
     session: UserSessionDep,
-) -> list[AuditLogResponse]:
-    return await list_case_audit(session, case_id=case_access.case_id)
+    cursor: CursorQuery = None,
+    limit: LimitQuery = DEFAULT_PAGE_SIZE,
+) -> CursorPage[AuditLogResponse]:
+    rows = await list_case_audit(
+        session,
+        case_id=case_access.case_id,
+        limit=limit + 1,
+        after=decode_cursor(cursor, int),
+    )
+    return build_page(rows, limit, key=lambda event: (event.occurred_at, event.id))
 
 
 @router.post(

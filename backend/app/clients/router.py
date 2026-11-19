@@ -20,6 +20,14 @@ from app.clients.repository import (
 )
 from app.clients.schemas import ClientCreate, ClientPatch, ClientResponse
 from app.errors import problem_responses
+from app.pagination import (
+    DEFAULT_PAGE_SIZE,
+    CursorPage,
+    CursorQuery,
+    LimitQuery,
+    build_page,
+    decode_cursor,
+)
 
 router = APIRouter(
     prefix="/api/v1/clients",
@@ -31,15 +39,26 @@ router = APIRouter(
 @router.get(
     "",
     summary="List clients",
-    description="Lists client profiles in the lawyer's active organizations.",
-    response_model=list[ClientResponse],
-    responses=problem_responses(401, 403, 503),
+    description=(
+        "Lists client profiles in the lawyer's active organizations, newest first, "
+        "using cursor pagination."
+    ),
+    response_model=CursorPage[ClientResponse],
+    responses=problem_responses(400, 401, 403, 422, 503),
 )
 async def list_clients_endpoint(
     user: LawyerDep,
     session: UserSessionDep,
-) -> list[ClientResponse]:
-    return await list_clients(session, acting_user_id=user.id)
+    cursor: CursorQuery = None,
+    limit: LimitQuery = DEFAULT_PAGE_SIZE,
+) -> CursorPage[ClientResponse]:
+    rows = await list_clients(
+        session,
+        acting_user_id=user.id,
+        limit=limit + 1,
+        after=decode_cursor(cursor, UUID),
+    )
+    return build_page(rows, limit, key=lambda client: (client.created_at, client.id))
 
 
 @router.post(

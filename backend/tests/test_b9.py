@@ -102,5 +102,5 @@ def test_case_member_list_remove_and_audit_are_isolated(api_client) -> None:
     assert members.status_code == 200
     assert any(item["role"] == "lead_lawyer" for item in members.json())
     assert audit.status_code == 200
-    assert isinstance(audit.json(), list)
+    assert isinstance(audit.json()["items"], list)
     assert unknown_members.status_code == 422

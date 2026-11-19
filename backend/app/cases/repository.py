@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
@@ -39,7 +40,14 @@ async def list_cases(
     session: AsyncSession,
     *,
     acting_user_id: UUID,
+    limit: int,
+    after: tuple[datetime, UUID] | None = None,
 ) -> list[CaseResponse]:
+    """Newest first by (created_at, id); fetches ``limit`` rows after the keyset.
+
+    created_at is used instead of updated_at so edits never move a case between
+    pages while a lawyer is paging.
+    """
     result = await session.execute(
         text(
             f"""
@@ -50,10 +58,18 @@ async def list_cases(
               WHERE cm.case_id = c.id
                 AND cm.user_id = :acting_user_id
                 AND cm.status = 'active')
-            ORDER BY c.updated_at DESC, c.id
+              AND (CAST(:after_at AS timestamptz) IS NULL
+                   OR (c.created_at, c.id) < (:after_at, :after_id))
+            ORDER BY c.created_at DESC, c.id DESC
+            LIMIT :limit
             """
         ),
-        {"acting_user_id": acting_user_id},
+        {
+            "acting_user_id": acting_user_id,
+            "limit": limit,
+            "after_at": after[0] if after else None,
+            "after_id": after[1] if after else None,
+        },
     )
     return [
         CaseResponse.model_validate(dict(row))
@@ -255,6 +271,8 @@ async def list_case_audit(
     session: AsyncSession,
     *,
     case_id: UUID,
+    limit: int,
+    after: tuple[datetime, int] | None = None,
 ) -> list[AuditLogResponse]:
     result = await session.execute(
         text(
@@ -263,11 +281,18 @@ async def list_case_audit(
                    object_type, object_id, request_id
             FROM public.audit_logs
             WHERE case_id = :case_id
+              AND (CAST(:after_at AS timestamptz) IS NULL
+                   OR (occurred_at, id) < (:after_at, :after_id))
             ORDER BY occurred_at DESC, id DESC
-            LIMIT 200
+            LIMIT :limit
             """
         ),
-        {"case_id": case_id},
+        {
+            "case_id": case_id,
+            "limit": limit,
+            "after_at": after[0] if after else None,
+            "after_id": after[1] if after else None,
+        },
     )
     return [
         AuditLogResponse.model_validate(dict(row))
@@ -464,7 +489,9 @@ async def patch_case(
     acting_user_id: UUID,
     case_id: UUID,
     payload: CasePatch,
+    expected_updated_at: datetime,
 ) -> CaseResponse | None:
+    """Apply the patch only if the case still has ``expected_updated_at`` (If-Match)."""
     updates = payload.model_dump(exclude_unset=True)
     columns = {
         "reference_no": "reference_no",
@@ -483,8 +510,9 @@ async def patch_case(
         text(
             f"""
             UPDATE public.cases AS c
-            SET {assignments}, updated_at = now()
+            SET {assignments}, updated_at = clock_timestamp()
             WHERE c.id = :case_id
+              AND c.updated_at = :expected_updated_at
               AND EXISTS (
                 SELECT 1 FROM public.case_members AS cm
                 WHERE cm.case_id = :case_id
@@ -497,6 +525,7 @@ async def patch_case(
             **updates,
             "acting_user_id": acting_user_id,
             "case_id": case_id,
+            "expected_updated_at": expected_updated_at,
         },
     )
     row = result.mappings().one_or_none()

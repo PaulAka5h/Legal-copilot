@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
@@ -16,6 +17,8 @@ async def list_clients(
     session: AsyncSession,
     *,
     acting_user_id: UUID,
+    limit: int,
+    after: tuple[datetime, UUID] | None = None,
 ) -> list[ClientResponse]:
     result = await session.execute(
         text(
@@ -28,10 +31,18 @@ async def list_clients(
                 AND om.user_id = :acting_user_id
                 AND om.status = 'active'
                 AND om.org_role IN ('owner', 'lawyer'))
-            ORDER BY cp.created_at DESC, cp.id
+              AND (CAST(:after_at AS timestamptz) IS NULL
+                   OR (cp.created_at, cp.id) < (:after_at, :after_id))
+            ORDER BY cp.created_at DESC, cp.id DESC
+            LIMIT :limit
             """
         ),
-        {"acting_user_id": acting_user_id},
+        {
+            "acting_user_id": acting_user_id,
+            "limit": limit,
+            "after_at": after[0] if after else None,
+            "after_id": after[1] if after else None,
+        },
     )
     return [
         ClientResponse.model_validate(dict(row))

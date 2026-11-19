@@ -388,3 +388,24 @@ Not built: password-change endpoint (not in TRD §3.2). New Dev 2 request R18 (G
 run AI on a cache miss).
 
 Full suite as `app_user`: **147 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.
+
+---
+
+## 12. Batch 4: case creation and case API contract (2026-11-19)
+
+No migration.
+
+| Requirement | State | Test |
+|---|---|---|
+| Create/get/list/patch; atomic case + lead membership + default stages; `case.created` audit | Verified (existing tests; audit action is named `case.created`, matching the past-tense convention of all other actions) | `test_domains` |
+| Closed-case write denial | 409 on PATCH and on all client-visible writes | `test_b14`, `test_b13_gaps` |
+| ETag / If-Match (TRD §3.1) | Strong ETag from `updated_at` (exact microseconds) on GET and PATCH. PATCH: 403 permission → 404 → 409 closed → **428** missing If-Match → **412** stale or malformed; the UPDATE also re-checks `updated_at`, so a concurrent edit between read and write still returns 412 | `test_case_patch_requires_a_matching_if_match` |
+| Cursor pagination (TRD §3.1) | `GET /cases`, `GET /clients`, `GET /cases/{id}/audit` return `{items, next_cursor}`; limit 1–100 (default 50); opaque keyset cursors; bad cursor → 400; a cursor never reveals another tenant's rows (RLS still applies) | `test_case_list_is_cursor_paginated_without_gaps_or_duplicates`, `test_client_list_and_case_audit_are_cursor_paginated`, `test_pagination_rejects_bad_input`, `test_a_cursor_never_reveals_another_tenants_rows` |
+| Stage templates per case type (CASE-4, P1) | **Not built**: needs a template table and admin flow; default six-stage list kept | — |
+
+Breaking change for API consumers: the three list endpoints now return an envelope, and
+case PATCH needs `If-Match`. The frontend does not call them yet (Batch 6).
+Bounded lists (`/cases/{id}/members`, `/lawyer/team`) and client-portal lists are
+unpaginated for now.
+
+Full suite as `app_user`: **152 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.

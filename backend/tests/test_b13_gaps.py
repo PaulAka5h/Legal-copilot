@@ -49,7 +49,7 @@ def _invite(lawyer: TestClient, client: TestClient, case_id: str) -> None:
 def _audit_actions(lawyer: TestClient, case_id: str) -> set[str]:
     response = lawyer.get(f"/api/v1/cases/{case_id}/audit")
     assert response.status_code == 200
-    return {event["action"] for event in response.json()}
+    return {event["action"] for event in response.json()["items"]}
 
 
 def test_client_can_update_own_task_and_nothing_else(api_client) -> None:

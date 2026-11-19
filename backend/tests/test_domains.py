@@ -88,8 +88,8 @@ def test_client_and_case_endpoints_enforce_tenant_isolation(api_client) -> None:
         clients = api_client.get("/api/v1/clients")
         cases = api_client.get("/api/v1/cases")
         assert clients.status_code == cases.status_code == 200
-        assert {item["id"] for item in clients.json()} == {client_a_id}
-        assert {item["id"] for item in cases.json()} == {case_a_id}
+        assert {item["id"] for item in clients.json()["items"]} == {client_a_id}
+        assert {item["id"] for item in cases.json()["items"]} == {case_a_id}
 
         missing_client = str(uuid4())
         not_owned_client = api_client.get(f"/api/v1/clients/{client_b_id}")
