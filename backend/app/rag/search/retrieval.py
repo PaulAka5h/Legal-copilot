@@ -68,17 +68,18 @@ TSQUERY_SQL = """
 _HYBRID = text(
     f"""
     WITH q AS (
-      SELECT CAST(:qvec AS vector) AS v,
-             ({TSQUERY_SQL}) AS ts
+      SELECT ({TSQUERY_SQL}) AS ts
     ),
     dense AS (
       SELECT d.id, row_number() OVER (ORDER BY d.dist) AS r
       FROM (
-        SELECT c.id, c.embedding <=> q.v AS dist
-        FROM public.legal_chunks c, q
+        -- The query vector must be a bound parameter, not a joined column:
+        -- pgvector can only order by the HNSW index against a constant/parameter.
+        SELECT c.id, c.embedding <=> CAST(:qvec AS vector) AS dist
+        FROM public.legal_chunks c
         WHERE c.is_active AND c.embedding IS NOT NULL
           AND c.legal_source_version_id = ANY(CAST(:versions AS uuid[]))
-        ORDER BY c.embedding <=> q.v
+        ORDER BY c.embedding <=> CAST(:qvec AS vector)
         LIMIT {DENSE_K}
       ) d
     ),

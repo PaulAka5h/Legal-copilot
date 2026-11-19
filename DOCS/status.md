@@ -283,7 +283,8 @@ Test database setup (needed by `tests/rag/test_search.py`; it skips otherwise), 
 3. `uv run python -m app.seed_dev_lawyer --email test-reviewer@example.com --password-stdin` and approve the bdlaws versions with `app.rag.approve`.
 
 Open items:
-- [ ] Confirm with `EXPLAIN` on the full corpus that the dense query uses the HNSW index (with 691 chunks the planner uses a sequential scan).
+- [x] HNSW usability (2026-11-20): the original dense query took the query vector from a joined CTE, which pgvector cannot order by the index (forced plan: full scan + sort). Fixed to use the bound parameter directly; with seq/bitmap scans disabled the plan now uses `ix_legal_chunks_embedding_hnsw`, including the iterative filtered scan. Recall@10 unchanged (0.967, MRR 0.804).
+- [ ] Re-run `EXPLAIN (ANALYZE)` on the full corpus to confirm the planner picks HNSW unforced (local DB still holds only the 20 Acts on 2026-11-20).
 - [x] Chunking changes: `app.rag.ingest --force-rechunk [--act-id ID]` adds a new pending version with the same text and new chunks (amendment_note records it). Dev Act 16 re-chunked 2026-11-20 (v2 pending; repealed, so excluded from search either way).
 - [ ] Abstain threshold (`insufficient_information` below a reranker score) belongs with analysis (Step D).
 - [x] Bangla stopwords: curated list `app.rag.text.BANGLA_STOPWORDS` (function words only; legal terms kept) removed from the sparse query, tested.
