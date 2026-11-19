@@ -1,4 +1,4 @@
-# Project Status
+# PokkhoAI Project Status
 
 Last updated: 2026-11-18
 
@@ -129,6 +129,7 @@ Anything that depends on an outside service or dataset is listed here with its c
 
 | Date | Change |
 |---|---|
+| 2026-11-19 | Project renamed from Legal-copilot to PokkhoAI |
 | 2026-11-16 | Documentation set created: PRD, TRD, architecture, database, flows, agents, security, README, status, providers |
 | 2026-11-16 | Frontend Stage 1: Next.js 16.4 + Tailwind v4 app, theme tokens/fonts, cookie-backed EN/BN dictionaries, shared auth components, `/lawyer/login` and `/client/login`; dashboard routes are `NOT_CONFIGURED` stubs |
 | 2026-11-16 | Frontend Stage 1b: development-only mock sessions behind `MOCK_AUTH=true`, role-guarded `(lawyer)`/`(client)` route groups, sign-out, login redirects, and clean localized page titles |

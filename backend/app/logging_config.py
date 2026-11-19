@@ -26,7 +26,7 @@ class StructuredJSONFormatter(logging.Formatter):
 
 
 def configure_logging(level: str) -> logging.Logger:
-    logger = logging.getLogger("legal_copilot")
+    logger = logging.getLogger("pokkhoai")
     logger.setLevel(level)
     logger.propagate = False
     if not logger.handlers:

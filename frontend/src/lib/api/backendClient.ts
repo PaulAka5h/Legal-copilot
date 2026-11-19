@@ -1,4 +1,4 @@
-/** Client for communicating with Legal-Copilot FastAPI backend (port 8000). */
+/** Client for communicating with the PokkhoAI FastAPI backend (port 8000). */
 
 const BACKEND_URL = process.env.BACKEND_API_URL || "http://127.0.0.1:8000";
 

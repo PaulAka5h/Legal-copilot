@@ -1,11 +1,11 @@
 # ==============================================================================
-# Makefile for AI Legal Copilot for Bangladesh
+# Makefile for PokkhoAI for Bangladesh
 # ==============================================================================
 
 .PHONY: help infra-up infra-down infra-logs backend-dev backend-stop backend-test frontend-dev frontend-stop frontend-build scraper-run ingest-legal-kb db-status clean
 
 help:
-	@echo "Available commands for AI Legal Copilot:"
+	@echo "Available commands for PokkhoAI:"
 	@echo ""
 	@echo "  --- Infrastructure (Docker) ---"
 	@echo "  make infra-up          Start PostgreSQL (pgvector), Redis, and MinIO containers"

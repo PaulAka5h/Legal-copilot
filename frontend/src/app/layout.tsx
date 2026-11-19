@@ -37,7 +37,7 @@ const notoSerifBengali = Noto_Serif_Bengali({
 });
 
 export const metadata: Metadata = {
-  title: "Legal Copilot",
+  title: "PokkhoAI",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

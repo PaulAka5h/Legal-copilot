@@ -68,7 +68,7 @@ def _http_title(status_code: int) -> str:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    logger = logging.getLogger("legal_copilot")
+    logger = logging.getLogger("pokkhoai")
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(

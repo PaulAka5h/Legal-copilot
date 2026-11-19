@@ -1,12 +1,12 @@
 # Product Requirements Document (PRD)
 
-Working title: the Platform (name to be decided).
+Working title: PokkhoAI
 Event: AI Builders Congress.
 Status: Draft 1.
 
 ## 1. Summary
 
-The Platform is an AI decision-support tool for lawyers in Bangladesh. A lawyer uploads a client's documents, and the Platform reads them, builds a sourced picture of the case, retrieves relevant Bangladesh law, and compares possible legal strategies using a chess-inspired method: propose a move, explore the opponent's likely replies, weigh counters and risks, then compare the lines. After each hearing the lawyer records what happened and the Platform reassesses the strategy.
+PokkhoAI is an AI decision-support tool for lawyers in Bangladesh. A lawyer uploads a client's documents, and PokkhoAI reads them, builds a sourced picture of the case, retrieves relevant Bangladesh law, and compares possible legal strategies using a chess-inspired method: propose a move, explore the opponent's likely replies, weigh counters and risks, then compare the lines. After each hearing the lawyer records what happened and PokkhoAI reassesses the strategy.
 
 One application serves two roles: a full lawyer workspace and a simplified client dashboard that shows only what the lawyer has approved.
 

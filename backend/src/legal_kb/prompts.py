@@ -47,7 +47,7 @@ def build_legal_rag_prompt(
     """Builds an evidence-grounded prompt for the LLM."""
     if not retrieved_results:
         return (
-            "System: You are an AI Legal Copilot for Bangladesh Law.\n"
+            "System: You are PokkhoAI for Bangladesh law.\n"
             "There is INSUFFICIENT EVIDENCE in the retrieved knowledge base to answer this question. "
             "State clearly that no relevant statutory provisions were found in the database. "
             "Do NOT invent or guess any section numbers, acts, or penalties."
@@ -68,7 +68,7 @@ def build_legal_rag_prompt(
 
     context_str = "\n".join(context_blocks)
 
-    prompt = f"""You are the official Bangladesh AI Legal Decision-Support Copilot.
+    prompt = f"""You are PokkhoAI, a Bangladesh AI legal decision-support assistant.
 You must answer the user's legal question strictly using the provided EVIDENCE blocks below.
 
 LEGAL GROUNDING RULES:

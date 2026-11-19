@@ -431,7 +431,7 @@ async def mfa_setup(
         user_agent=request.headers.get("user-agent", "")[:512] or None,
         request_id=getattr(request.state, "request_id", None),
     )
-    issuer = "Legal-Copilot"
+    issuer = "PokkhoAI"
     uri = (
         f"otpauth://totp/{issuer}:{user.email}"
         f"?secret={secret}&issuer={issuer}&digits=6&period=30"

@@ -1,4 +1,4 @@
-"""FastAPI application server for Legal-Copilot backend.
+"""FastAPI application server for the PokkhoAI backend.
 
 Provides:
 - Health check
@@ -28,9 +28,9 @@ from backend.src.legal_kb.schemas import LegalChunkPayload
 from backend.src.legal_kb.vector_store import PgVectorStore, VectorSearchResult
 
 app = FastAPI(
-    title="AI Legal Copilot for Bangladesh",
+    title="PokkhoAI for Bangladesh",
     version="1.0.0",
-    description="Legal Decision-Support API with Hybrid RAG & Document Processing.",
+    description="PokkhoAI legal decision-support API with hybrid RAG and document processing.",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -84,7 +84,7 @@ app.include_router(strategy_router, prefix="/api/v1")
 @app.get("/health", tags=["System"])
 def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "legal-copilot-backend"}
+    return {"status": "healthy", "service": "pokkhoai-backend"}
 
 
 @app.get(
