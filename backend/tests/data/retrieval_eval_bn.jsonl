@@ -1,0 +1,3 @@
+{"label": "SAMPLE_DATA_NOT_REAL_LAW", "query": "SAMPLE_DATA_NOT_REAL_LAW নমুনা প্রশ্ন: এখানে বাংলায় আইনজীবীর প্রশ্ন লিখুন", "act_id": "0", "section": "0", "note": "Template row, ignored by the test. Real rows: omit label; act_id = bdlaws Act ID; section = section_number exactly as stored (Bangla or English digits)."}
+{"label": "SAMPLE_DATA_NOT_REAL_LAW", "query": "SAMPLE_DATA_NOT_REAL_LAW নমুনা প্রশ্ন ২", "act_id": "0", "section": "0", "language": "bn", "note": "Optional: language bn|en restricts the search; omit to search both."}
+{"label": "SAMPLE_DATA_NOT_REAL_LAW", "query": "SAMPLE_DATA_NOT_REAL_LAW নমুনা প্রশ্ন ৩", "act_id": "0", "section": "0", "incident_date": "2024-01-15", "note": "Optional: incident_date YYYY-MM-DD for the in-force filter."}
