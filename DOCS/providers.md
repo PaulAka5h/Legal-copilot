@@ -10,7 +10,7 @@ Last updated: 2026-11-16
 |---|---|---|---|
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
 | (none yet) | LLM | None | No external provider has been reviewed or approved |
-| (none yet) | Embeddings | None | Prefer a self-hosted model; none chosen yet |
+| self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
 | (none yet) | OCR | None | Local Tesseract is the default; no cloud OCR approved |
 
 Until a provider passes the review below, the platform runs with the mock provider or with synthetic data only. Real client documents must not be uploaded to any environment that can reach an unapproved provider.
@@ -74,7 +74,7 @@ Run the evaluation set from `Skills and agents.md` section 7 for every candidate
 
 | Component | Candidates to test | Chosen | Reason |
 |---|---|---|---|
-| Embeddings | A multilingual model with Bangla support, such as BGE-M3 or multilingual-e5 | Not chosen | Test on a labelled Bangla and English legal retrieval set |
+| Embeddings | A multilingual model with Bangla support, such as BGE-M3 or multilingual-e5 | `intfloat/multilingual-e5-large`, self-hosted (2026-11-20, master prompt) | Runs locally via sentence-transformers; weights downloaded once from Hugging Face, no project data leaves the server. Retrieval quality on a labelled bn/en set is still to be measured (Step G eval) |
 | OCR | Tesseract with Bengali and English data; a cloud OCR only if local accuracy is not good enough | Not chosen | Test on real scanned papers; a cloud OCR needs a full review |
 
 ## Review records

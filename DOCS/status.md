@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-11-18
+Last updated: 2026-11-20
 
 The coding agent and the team update this file after every module. Be honest here. A feature is only "Done" when it is implemented, tested, and its authorization and isolation tests pass.
 
@@ -59,9 +59,9 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 3 Documents | PDF and Word extraction | Done | PyMuPDF & python-docx tests pass | Passed | Digital page-by-page extraction preserving exact physical page numbers and language classification (BN/EN). |
 | 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
 | 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
-| 4 RAG | Chunking and embeddings | Done | 17 backend unit & integration tests pass | N/A (Shared legal KB) | Implemented context-aware chunking (max 420 tokens safe budget), bilingual E5Large (1024-dim, passage:/query: prefixes), deterministic mock & sentence-transformers providers. |
-| 4 RAG | Scoped retrieval (case filter) | In progress | 17 tests pass | N/A (Shared legal KB) | Implemented full hybrid retrieval: Dense E5-large + Weighted Sparse FTS (Act/Sec: A, Body: B) + Exact Section matching (Section 302 / ধারা ৩০২) + RRF fusion + Cross-Encoder reranker + Parent-section recovery. Verified on live PostgreSQL + pgvector 0.8.7. |
-| 4 RAG | Legal source ingestion and versions | Done | Ingestion & live pgvector queries pass | N/A (Shared legal KB) | Ingested and indexed 62,491 legal chunks across 1,184 Bangladesh Acts into PostgreSQL with HNSW cosine index (306 MB) and GIN weighted full-text index (20 MB). Zero truncation. |
+| 4 RAG | Chunking and embeddings | In progress | `tests/rag`: chunking (e5 tokenizer, prefix counted, <=512, overlap, exact substrings), NFC/ZWJ, embed worker (resume, content-hash reuse) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A (master prompt). `app.rag.ingest` + `app.rag.embed` in `backend/app/`. Local dev: 20 Acts, 691 chunks, all embedded with self-hosted multilingual-e5-large on CPU (~132 s per 100 chunks). Full corpus not ingested. |
+| 4 RAG | Scoped retrieval (case filter) | Not started (in `app/`) | | | Step B. The earlier `src/legal_kb` retriever is unauthenticated and used mock embeddings; not reused as-is. |
+| 4 RAG | Legal source ingestion and versions | In progress | Migration 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest and version-on-change tests pass; approval CLI test passes (reviewer, time, audit event) | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced from this checkout (see 7.1 V8). Versions are `pending` until a person approves them with `app.rag.approve`; none approved locally. |
 | 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
 | 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
@@ -227,3 +227,14 @@ Notes for Step A:
 ### 7.6 TODO
 
 - [ ] Step E: when `app_user` gets grants on `strategies`, `strategy_scenarios`, and `strategy_comparisons`, strengthen check 2 in `backend/tests/test_strategy_client_isolation.py`: insert a strategy row as the case lawyer, then assert the client member sees 0 rows. Today the client is refused because the grants are missing, so check 2 does not yet test RLS.
+
+### 7.7 Step A progress (2026-11-20)
+
+| Item | State |
+|---|---|
+| Migrations | `0011_legal_knowledge_base`, `0012_legal_version_approval` applied to local `legal_copilot` and `legal_copilot_test`; both down/up checked. `0010` revision ID shortened to fit `alembic_version` (32 chars). |
+| Ingestion | `uv run python -m app.rag.ingest [--language bn\|en] [--limit N] [--dry-run]` as `app_admin_ingest`. Text stored NFC (ZWJ/ZWNJ kept); raw-text SHA-256 kept in `legal_sections.content_hash`. Header adds "(year)" only when the title lacks it. Full-dataset dry run: 1,176 Acts, 35,063 sections, 39,637 chunks, 0 errors. |
+| Embedding | `uv run python -m app.rag.embed [--device auto\|cpu\|cuda] [--batch-size N] [--limit N] [--dry-run]`. "passage: " + NFC text, normalized 1024-dim vectors, batched, resumable, reuses vectors by content_hash. `auto` uses CUDA only when the torch build supports the GPU (the local MX350, sm_61, is not supported by torch cu132, so CPU). Local: 691/691 chunks embedded, ~132 s per 100 chunks on 8 CPU cores; the full corpus would take ~14.5 h on this machine. |
+| Approval | `uv run python -m app.rag.approve (--version-id ID ... \| --all-pending) --reviewer-email EMAIL [--note] [--dry-run]`. Reviewer must be an active lawyer or admin; sets `reviewed_by`/`reviewed_at`; audit event `legal_source_version.approved`. No auto-approve. |
+| Not done | Retrieval (Step B), query-side NFC is in `app.rag.text` but no search uses it yet; citation verifier (Step D) will use `app.rag.text.quote_in_text`. `tests/legal_kb/test_pgvector_live.py` targets the old raw-SQL schema and stays skipped; remove or port in Step B. |
+
