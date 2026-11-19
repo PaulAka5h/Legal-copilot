@@ -4,7 +4,8 @@
 2. Eligible versions: review_status 'approved', is_current, source language filter,
    and not out of force on the incident date at source/version level.
 3. Dense: HNSW cosine (pgvector, iterative scan) within those versions.
-   Sparse: 'simple' full-text, query lexemes OR-ed with English stopwords removed,
+   Sparse: 'simple' full-text, query lexemes OR-ed with English and Bangla
+   (app.rag.text.BANGLA_STOPWORDS) stopwords removed,
    ranked by length-normalized ts_rank_cd.
 4. Reciprocal Rank Fusion, k = 60, over both ranked lists.
 5. Section-level in-force check on the incident date; `unknown` status is
@@ -26,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.rag.embed.worker import vector_literal
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.text import nfc
+from app.rag.text import BANGLA_STOPWORDS, nfc
 
 RRF_K = 60
 DENSE_K = 50
@@ -35,6 +36,7 @@ FUSED_K = 60
 RERANK_POOL = 30
 EF_SEARCH = 100
 
+BN_STOPWORDS = sorted(BANGLA_STOPWORDS)
 INCLUDED_STATUSES = {"in_force", "unknown", "amended", "partly_repealed"}
 
 _ELIGIBLE_VERSIONS = text(
@@ -54,14 +56,20 @@ _ELIGIBLE_VERSIONS = text(
     """
 )
 
+# Full-text query: 'simple' lexemes OR-ed, minus English stopwords (english_stem
+# returns an empty array for them) and the curated Bangla stopwords.
+TSQUERY_SQL = """
+    SELECT to_tsquery('simple', string_agg(quote_literal(l), ' | '))
+    FROM unnest(tsvector_to_array(to_tsvector('simple', :qtext))) AS l
+    WHERE cardinality(ts_lexize('english_stem', l)) > 0
+      AND NOT (l = ANY(CAST(:bn_stopwords AS text[])))
+"""
+
 _HYBRID = text(
     f"""
     WITH q AS (
       SELECT CAST(:qvec AS vector) AS v,
-             (SELECT to_tsquery('simple', string_agg(quote_literal(l), ' | '))
-              FROM unnest(tsvector_to_array(to_tsvector('simple', :qtext))) AS l
-              -- 'simple' keeps stopwords; drop English ones (english_stem returns an empty array for them)
-              WHERE cardinality(ts_lexize('english_stem', l)) > 0) AS ts
+             ({TSQUERY_SQL}) AS ts
     ),
     dense AS (
       SELECT d.id, row_number() OVER (ORDER BY d.dist) AS r
@@ -205,7 +213,12 @@ async def hybrid_search(
                             embedder.model_name, 0)
 
     qvec = vector_literal(embedder.embed_query(query))
-    rows = (await session.execute(_HYBRID, {"qvec": qvec, "qtext": query, "versions": versions})).mappings().all()
+    rows = (
+        await session.execute(
+            _HYBRID,
+            {"qvec": qvec, "qtext": query, "versions": versions, "bn_stopwords": BN_STOPWORDS},
+        )
+    ).mappings().all()
 
     merged: dict[UUID, SearchHit] = {}
     for row in rows:

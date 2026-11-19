@@ -50,3 +50,13 @@ def test_header_year_added_only_when_title_lacks_it():
     assert section_header("SAMPLE Act, 1850", "1850", "1", "Title") == "SAMPLE Act, 1850 — Section 1: Title\n"
     assert section_header("SAMPLE Act", "1850", "1", "Title") == "SAMPLE Act (1850) — Section 1: Title\n"
     assert section_header("SAMPLE আইন, ১৯৮০", "১৯৮০", "১", None) == "SAMPLE আইন, ১৯৮০ — Section ১\n"
+
+
+def test_bangla_stopwords_are_nfc_and_exclude_legal_terms():
+    from app.rag.text import BANGLA_STOPWORDS
+
+    assert len(BANGLA_STOPWORDS) > 50
+    assert all(unicodedata.is_normalized("NFC", w) and w.strip() == w for w in BANGLA_STOPWORDS)
+    assert {"এবং", "ও", "বা", "জন্য", nfc("হয়")} <= BANGLA_STOPWORDS
+    legal_terms = {"ধারা", "আইন", "আদালত", "মামলা", "শাস্তি", "অপরাধ", "জামিন", "দণ্ড", "বিবাহ"}
+    assert not legal_terms & BANGLA_STOPWORDS

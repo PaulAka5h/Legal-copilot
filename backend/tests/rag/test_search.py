@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.database import create_database_engine, user_transaction
 from app.main import create_app
-from app.rag.search.retrieval import in_force
+from app.rag.search.retrieval import BN_STOPWORDS, TSQUERY_SQL, in_force
 from tests.test_phase2_exit import create_case, create_invite_and_accept, register_login
 
 ORIGIN = {"Origin": "http://localhost:3000"}
@@ -185,3 +185,89 @@ def test_access_control_and_audit(lawyer_case):
 
     details = asyncio.run(audit())
     assert details and all(query not in d for d in details)  # counts only, never the query
+
+
+def test_bangla_stopwords_are_dropped_from_full_text(lawyer_case):
+    client, case_id, user_id, settings = lawyer_case
+
+    async def lexemes():
+        engine = create_database_engine(settings.database_url)
+        try:
+            async with user_transaction(async_sessionmaker(engine), user_id) as session:
+                return await session.scalar(
+                    text("SELECT tsvector_to_array(to_tsvector('simple', :q))"), {"q": "এবং ধারা জন্য"}
+                )
+        finally:
+            await engine.dispose()
+
+    assert set(asyncio.run(lexemes())) == {"এবং", "ধারা", "জন্য"}  # whole-word lexemes, so filtering applies
+
+    async def tsquery(q):
+        engine = create_database_engine(settings.database_url)
+        try:
+            async with user_transaction(async_sessionmaker(engine), user_id) as session:
+                value = await session.scalar(text(TSQUERY_SQL), {"qtext": q, "bn_stopwords": BN_STOPWORDS})
+                return None if value is None else str(value)
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(tsquery("এবং যে বা জন্য")) is None  # nothing left to match
+    assert asyncio.run(tsquery("ইসলামী বিশ্ববিদ্যালয় এবং")) == asyncio.run(tsquery("ইসলামী বিশ্ববিদ্যালয়"))
+    assert asyncio.run(tsquery("the punishment of the offence")) == asyncio.run(tsquery("punishment offence"))
+
+    only_stopwords = _search(client, case_id, query="এবং যে বা জন্য", language="bn")
+    assert all(h["sparse_rank"] is None for h in only_stopwords["results"])
+
+
+BN_EVAL = Path(__file__).resolve().parents[1] / "data" / "retrieval_eval_bn.jsonl"
+BN_RECALL_FLOOR = 0.90
+
+
+def load_bn_eval() -> list[dict]:
+    rows = [json.loads(line) for line in BN_EVAL.read_text("utf-8").splitlines() if line.strip()]
+    return [r for r in rows if r.get("label") != "SAMPLE_DATA_NOT_REAL_LAW"]
+
+
+def test_bn_eval_template_is_valid():
+    rows = [json.loads(line) for line in BN_EVAL.read_text("utf-8").splitlines() if line.strip()]
+    for row in rows:
+        assert {"query", "act_id", "section"} <= set(row), row
+        assert row.get("language") in (None, "bn", "en")
+        if row.get("incident_date"):
+            date.fromisoformat(row["incident_date"])
+
+
+def test_recall_at_10_on_bangla_eval(lawyer_case):
+    rows = load_bn_eval()
+    if not rows:
+        pytest.skip(f"No real queries yet in {BN_EVAL.name} (only SAMPLE_DATA_NOT_REAL_LAW rows)")
+    client, case_id, user_id, settings = lawyer_case
+
+    async def approved_sections():
+        engine = create_database_engine(settings.database_url)
+        try:
+            async with user_transaction(async_sessionmaker(engine), user_id) as session:
+                result = await session.execute(text(
+                    "SELECT s.external_id, sec.section_number FROM legal_sections sec "
+                    "JOIN legal_source_versions v ON v.id = sec.legal_source_version_id "
+                    "JOIN legal_sources s ON s.id = v.legal_source_id "
+                    "WHERE v.review_status = 'approved' AND v.is_current"
+                ))
+                return {(a, n) for a, n in result}
+        finally:
+            await engine.dispose()
+
+    known = asyncio.run(approved_sections())
+    unknown = [(r["act_id"], r["section"]) for r in rows if (r["act_id"], r["section"]) not in known]
+    assert not unknown, f"Expected sections not approved in the test database: {unknown}"
+
+    ranks = []
+    for row in rows:
+        body = {"query": row["query"], "k": 10}
+        body.update({key: row[key] for key in ("language", "incident_date") if row.get(key)})
+        ranks.append(_rank(_search(client, case_id, **body)["results"], row["act_id"], row["section"]))
+    hits = [r for r in ranks if r is not None]
+    recall, mrr = len(hits) / len(rows), sum(1 / r for r in hits) / len(rows)
+    misses = [row["query"][:60] for row, r in zip(rows, ranks) if r is None]
+    print(f"\nBangla Recall@10 = {recall:.3f} ({len(hits)}/{len(rows)}), MRR@10 = {mrr:.3f}, misses = {misses}")
+    assert recall >= BN_RECALL_FLOOR, misses
