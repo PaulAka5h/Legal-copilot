@@ -1,4 +1,5 @@
-"""CLI: uv run python -m app.rag.ingest --input PATH [--language bn|en] [--limit N] [--dry-run]
+"""CLI: uv run python -m app.rag.ingest --input PATH [--language bn|en] [--limit N]
+                                      [--act-id ID ...] [--force-rechunk] [--dry-run]
 
 --limit counts Acts (one Act in one language), not sections, so no partial
 source version is ever written. Writes need LEGAL_INGEST_DATABASE_URL
@@ -29,6 +30,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT, help="sections.jsonl from the scraper")
     parser.add_argument("--language", choices=("bn", "en"), help="Only ingest this language")
     parser.add_argument("--limit", type=int, help="Maximum number of Acts to process")
+    parser.add_argument("--act-id", action="append", help="Only this bdlaws Act ID (repeatable)")
+    parser.add_argument(
+        "--force-rechunk", action="store_true",
+        help="Create a new version even if the text is unchanged (after a chunking change); needs re-approval",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Validate and chunk only; no database writes")
     parser.add_argument("--reject-report", type=Path, default=DEFAULT_REJECTS)
     args = parser.parse_args()
@@ -48,10 +54,14 @@ async def run(args: argparse.Namespace) -> dict:
     rejects = Rejects()
     try:
         summary = await ingest_batches(
-            iter_act_batches(args.input, rejects, language=args.language),
+            iter_act_batches(
+                args.input, rejects, language=args.language,
+                act_ids=set(args.act_id) if args.act_id else None,
+            ),
             load_counter(),
             engine,
             limit=args.limit,
+            force_rechunk=args.force_rechunk,
         )
     finally:
         if engine is not None:

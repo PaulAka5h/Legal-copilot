@@ -48,6 +48,7 @@ def iter_act_batches(
     rejects: Rejects,
     language: str | None = None,
     validator: Any = None,
+    act_ids: set[str] | None = None,
 ) -> Iterator[ActBatch]:
     """Yield one ActBatch per consecutive run of (act_id, language) records.
 
@@ -70,6 +71,8 @@ def iter_act_batches(
                 rejects.add(line_no, None, ["Invalid JSON"])
                 continue
             if language and record.get("language") != language:
+                continue
+            if act_ids and str(record.get("act_id")) not in act_ids:
                 continue
             issues = validator.validate_section_record(record)
             if record.get("language") not in ("bn", "en"):

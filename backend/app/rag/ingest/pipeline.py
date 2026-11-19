@@ -30,6 +30,7 @@ from app.rag.ingest.records import ActBatch
 from app.rag.text import nfc
 
 SOURCE_NAME = "bdlaws.minlaw.gov.bd"
+RECHUNK_NOTE = "Re-chunked: text unchanged, chunking changed (--force-rechunk)"
 INGESTED_BY = "app.rag.ingest"
 # Fixed namespace so bn and en records of the same section get the same canonical id.
 CANONICAL_NAMESPACE = uuid.UUID("5b0f6a3e-7c1d-4f2a-9e8b-2d4c6a8e0f13")
@@ -43,6 +44,7 @@ class IngestSummary:
     acts_seen: int = 0
     acts_new_version: int = 0
     acts_unchanged: int = 0
+    acts_rechunked: int = 0
     acts_skipped_chunk_error: int = 0
     sections: int = 0
     chunks: int = 0
@@ -153,8 +155,14 @@ async def ingest_batches(
     engine: AsyncEngine | None,
     limit: int | None = None,
     source_name: str = SOURCE_NAME,
+    force_rechunk: bool = False,
 ) -> IngestSummary:
-    """Ingest up to `limit` Acts. With engine=None this is a dry run (plan and count only)."""
+    """Ingest up to `limit` Acts. With engine=None this is a dry run (plan and count only).
+
+    force_rechunk adds a new version even when the text is unchanged, so a
+    chunking change (header, token budget) reaches the stored chunks. The new
+    version starts pending and needs approval like any other.
+    """
     summary = IngestSummary()
     for batch in batches:
         if limit is not None and summary.acts_seen >= limit:
@@ -172,15 +180,18 @@ async def ingest_batches(
         async with engine.begin() as conn:
             source_id = await repo.upsert_source(conn, source_row(batch, source_name))
             previous = await repo.current_version(conn, source_id)
-            if previous is not None and previous[2] == sha:
+            rechunk = previous is not None and previous[2] == sha
+            if rechunk and not force_rechunk:
                 summary.acts_unchanged += 1
                 continue
-            version_id = await repo.insert_version(conn, source_id, previous, sha, INGESTED_BY)
+            note = RECHUNK_NOTE if rechunk else None
+            version_id = await repo.insert_version(conn, source_id, previous, sha, INGESTED_BY, note)
             for section, chunks in planned:
                 section_id = await repo.insert_section(conn, version_id, section)
                 await repo.insert_chunks(
                     conn, [{**c, "version_id": version_id, "section_id": section_id} for c in chunks]
                 )
         summary.acts_new_version += 1
+        summary.acts_rechunked += rechunk
         _count(summary, planned)
     return summary

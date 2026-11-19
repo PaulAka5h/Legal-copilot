@@ -164,3 +164,52 @@ def test_act_title_repealed_marker_sets_source_status():
     assert (row["current_status"], row["status_note"]) == ("repealed", "bdlaws title marker [Repealed]")
     assert source_row(ActBatch("9004", "en", (record(act_id="9004", lang="en"),)))["current_status"] == "unknown"
     assert section_header(f"{SAMPLE} Act, 1867  [Repealed]", "1867", "1", None) == f"{SAMPLE} Act, 1867  [Repealed] — Section 1\n"
+
+
+def test_force_rechunk_adds_version_for_unchanged_text(counter, tmp_path):
+    url = os.getenv("LEGAL_INGEST_TEST_DATABASE_URL")
+    if not url or not url.endswith("/legal_copilot_test"):
+        pytest.skip("LEGAL_INGEST_TEST_DATABASE_URL must point at legal_copilot_test")
+    from app.rag.ingest.pipeline import RECHUNK_NOTE
+
+    act_id = f"sample-{secrets.token_hex(6)}"
+    path = tmp_path / "sections.jsonl"
+    write_jsonl(path, [record(act_id=act_id)])
+
+    async def ingest(force):
+        engine = create_ingest_engine(url)
+        try:
+            return await ingest_batches(
+                iter_act_batches(path, Rejects(), act_ids={act_id}), counter, engine,
+                source_name=SAMPLE, force_rechunk=force,
+            )
+        finally:
+            await engine.dispose()
+
+    async def versions():
+        engine = create_ingest_engine(url)
+        try:
+            async with engine.connect() as conn:
+                rows = await conn.execute(
+                    text(
+                        """
+                        SELECT v.version_no, v.is_current, v.review_status, v.amendment_note,
+                               (SELECT count(*) FROM legal_chunks c WHERE c.legal_source_version_id = v.id)
+                        FROM legal_sources s JOIN legal_source_versions v ON v.legal_source_id = s.id
+                        WHERE s.source_name = :name AND s.external_id = :act ORDER BY v.version_no
+                        """
+                    ),
+                    {"name": SAMPLE, "act": act_id},
+                )
+                return [tuple(r) for r in rows]
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(ingest(False)).acts_new_version == 1
+    assert asyncio.run(ingest(False)).acts_unchanged == 1
+    summary = asyncio.run(ingest(True))
+    assert (summary.acts_new_version, summary.acts_rechunked) == (1, 1)
+    assert asyncio.run(versions()) == [
+        (1, False, "pending", None, 1),
+        (2, True, "pending", RECHUNK_NOTE, 1),
+    ]

@@ -70,6 +70,7 @@ async def insert_version(
     previous: tuple[UUID, int, bytes] | None,
     content_sha256: bytes,
     ingested_by: str,
+    amendment_note: str | None = None,
 ) -> UUID:
     """Add a new current version; the previous one is kept and marked not current."""
     if previous is not None:
@@ -81,8 +82,8 @@ async def insert_version(
         text(
             """
             INSERT INTO public.legal_source_versions
-              (legal_source_id, version_no, content_sha256, ingested_by, is_current)
-            VALUES (:source_id, :version_no, :sha, :ingested_by, true)
+              (legal_source_id, version_no, content_sha256, ingested_by, is_current, amendment_note)
+            VALUES (:source_id, :version_no, :sha, :ingested_by, true, :note)
             RETURNING id
             """
         ),
@@ -91,6 +92,7 @@ async def insert_version(
             "version_no": (previous[1] + 1) if previous else 1,
             "sha": content_sha256,
             "ingested_by": ingested_by,
+            "note": amendment_note,
         },
     )
 
