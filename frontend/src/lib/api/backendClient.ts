@@ -136,3 +136,58 @@ export async function fetchCaseTimeline(caseId: string): Promise<BackendTimeline
     return [];
   }
 }
+
+export type BackendBranchDiff = {
+  branch_id: string;
+  opponent_argument: string;
+  rebuttal_text: string;
+  previous_plausibility: string;
+  updated_plausibility: string;
+  is_pruned: boolean;
+  diff_reason: string;
+  previous_residual_risk: string;
+  updated_residual_risk: string;
+};
+
+export type BackendRubricDiff = {
+  dimension: string;
+  previous_rating: string;
+  updated_rating: string;
+  justification: string;
+};
+
+export type BackendHearingReassessment = {
+  id: string;
+  case_id: string;
+  hearing_id: string;
+  recommendation: "maintain" | "review" | "change_suggested";
+  recommendation_reason: string;
+  tree_diff: BackendBranchDiff[];
+  rubric_diff: BackendRubricDiff[];
+  new_risks: string[];
+  new_evidence_needs: string[];
+  draft_client_update: {
+    id: string;
+    hearing_id: string;
+    title: string;
+    plain_language_summary: string;
+    next_hearing_info?: string;
+    client_action_required?: string;
+    is_approved_by_lawyer: boolean;
+  };
+  review_status: string;
+};
+
+export async function fetchHearingReassessment(hearingId: string): Promise<BackendHearingReassessment | null> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/hearings/${encodeURIComponent(hearingId)}/reassessment`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as BackendHearingReassessment;
+  } catch (err) {
+    console.error("Failed to fetch backend hearing reassessment:", err);
+    return null;
+  }
+}

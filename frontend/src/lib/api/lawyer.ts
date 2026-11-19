@@ -2,7 +2,7 @@ import {
   MAX_DOCUMENT_BYTES,
   isAllowedDocument,
 } from "@/lib/documents";
-import { fetchCaseAnalysis, queryLegalKnowledgeBase } from "@/lib/api/backendClient";
+import { fetchCaseAnalysis, fetchHearingReassessment, queryLegalKnowledgeBase } from "@/lib/api/backendClient";
 import { pick } from "@/lib/i18n";
 import { storedSummaries } from "@/lib/mock/client";
 import {
@@ -312,7 +312,7 @@ export async function getHearingSummary(
           keyNotesSection.claims[0] = {
             id: `ai-pos-${caseId}`,
             type: "ai",
-            verification: "verified",
+            verification: "unverified",
             text: {
               en: analysis.client_position,
               bn: `মক্কেলের অবস্থান: ${analysis.client_position}`,
@@ -325,7 +325,7 @@ export async function getHearingSummary(
         }
       }
 
-      // 2. Laws section populated with verified statutory citations
+      // 2. Laws section populated with retrieved (unverified) statutory citations
       if (analysis.citations && analysis.citations.length > 0) {
         const topCitation = analysis.citations[0];
         const statuteCitation = `${topCitation.act_name}, Section ${topCitation.section}`;
@@ -333,8 +333,8 @@ export async function getHearingSummary(
         if (lawsSection && lawsSection.claims.length > 0) {
           lawsSection.claims[0] = {
             id: `law-cit-${topCitation.act_id}-${topCitation.section}`,
-            type: "document",
-            verification: "verified",
+            type: "ai",
+            verification: "unverified",
             text: {
               en: `Relevant Bangladesh Statute: ${statuteCitation} (${topCitation.section_title}). ${topCitation.relevance_reason}`,
               bn: `সম্পর্কিত বাংলাদেশ আইন: ${statuteCitation} (${topCitation.section_title})। ${topCitation.relevance_reason}`,
@@ -375,11 +375,11 @@ export async function getHearingSummary(
         if (rightsSection && rightsSection.claims.length > 0) {
           rightsSection.claims[0] = {
             id: `rights-${caseId}`,
-            type: "document",
-            verification: "verified",
+            type: "ai",
+            verification: "unverified",
             text: {
-              en: `Statutory Remedies under ${cit.act_name}: Right to seek compensation up to twice the cheque amount or penal conviction under Section ${cit.section}.`,
-              bn: `${cit.act_name}-এর অধীন আইনি অধিকার ও প্রতিকার: চেক মূল্যের দ্বিগুণ পর্যন্ত ক্ষতিপূরণ দাবি এবং ধারা ${cit.section} মোতাবেক ফৌজদারি প্রতিকারের অধিকার।`,
+              en: `Retrieved provision: ${cit.act_name}, Section ${cit.section}. Rights and remedies have not been analysed or verified.`,
+              bn: `উদ্ধারকৃত বিধান: ${cit.act_name}, ধারা ${cit.section}। অধিকার ও প্রতিকার বিশ্লেষণ বা যাচাই করা হয়নি।`,
             },
             source: {
               en: `${cit.act_name}, Section ${cit.section}`,
@@ -396,8 +396,8 @@ export async function getHearingSummary(
         if (nextStepsSection && nextStepsSection.claims.length > 0) {
           nextStepsSection.claims[0] = {
             id: `step-${caseId}`,
-            type: "lawyer",
-            verification: "verified",
+            type: "ai",
+            verification: "unverified",
             text: {
               en: topStep,
               bn: `প্রস্তাবিত পদক্ষেপ: ${topStep}`,
@@ -422,11 +422,11 @@ export async function getHearingSummary(
         if (lawsSection && lawsSection.claims.length > 0) {
           lawsSection.claims[0] = {
             id: `law-rag-${topHit.chunk_id.slice(0, 8)}`,
-            type: "document",
-            verification: "verified",
+            type: "ai",
+            verification: "unverified",
             text: {
-              en: `Relevant Bangladesh Statute retrieved: ${statuteCitation}. Verified against official legal gazette database.`,
-              bn: `সম্পর্কিত আইন উদ্ধার করা হয়েছে: ${statuteCitation}। সরকারি আইনের ডাটাবেজ থেকে যাচাইকৃত।`,
+              en: `Statute retrieved by search: ${statuteCitation}. Not verified.`,
+              bn: `অনুসন্ধানে উদ্ধারকৃত আইন: ${statuteCitation}। যাচাই করা হয়নি।`,
             },
             source: {
               en: topHit.source_url || `bdlaws.minlaw.gov.bd (${topHit.act_name})`,
@@ -438,6 +438,73 @@ export async function getHearingSummary(
     }
   } catch (err) {
     // Graceful fallback to default records if backend is offline
+  }
+
+  // Connect to Phase 7 Continuous Hearing Reassessment Engine
+  try {
+    const reassessment = await fetchHearingReassessment(hearingId);
+    if (reassessment) {
+      // 1. Posture Recommendation & Reason in Key Notes
+      const keyNotesSection = baseSummary.sections.find((s) => s.id === "keyNotes");
+      if (keyNotesSection) {
+        keyNotesSection.claims.unshift({
+          id: `reassess-rec-${reassessment.id.slice(0, 8)}`,
+          type: "ai",
+          verification: "unverified",
+          text: {
+            en: `Phase 7 Strategy Posture: ${reassessment.recommendation.toUpperCase()} — ${reassessment.recommendation_reason}`,
+            bn: `পর্যায় ৭ কৌশলগত সুপারিশ: ${reassessment.recommendation.toUpperCase()} — ${reassessment.recommendation_reason}`,
+          },
+          source: {
+            en: "Continuous 2-Ply Strategy Reassessment Engine",
+            bn: "চলমান ২-প্লাই কৌশল পুনর্মূল্যায়ন ইঞ্জিন",
+          },
+        });
+      }
+
+      // 2. Scenario Tree Branch Diffs in Risks
+      if (reassessment.tree_diff && reassessment.tree_diff.length > 0) {
+        const topDiff = reassessment.tree_diff[0];
+        const risksSection = baseSummary.sections.find((s) => s.id === "risks");
+        if (risksSection) {
+          risksSection.claims.unshift({
+            id: `diff-${topDiff.branch_id.slice(0, 8)}`,
+            type: "ai",
+            verification: "unverified",
+            text: {
+              en: `Adversarial Tree Diff: Opponent argument "${topDiff.opponent_argument}" plausibility adjusted from ${topDiff.previous_plausibility} to ${topDiff.updated_plausibility}. ${topDiff.diff_reason}`,
+              bn: `প্রতিদ্বন্দ্বী কৌশলের পরিবর্তন: প্রতিপক্ষের যুক্তি "${topDiff.opponent_argument}" এর সম্ভাব্যতা ${topDiff.previous_plausibility} থেকে ${topDiff.updated_plausibility}-এ পুনর্নির্ধারণ করা হয়েছে।`,
+            },
+            source: {
+              en: "Hearing Courtroom Development Diffing (2-Ply Tree)",
+              bn: "আদালতি কার্যক্রমের পর ২-প্লাই দৃশ্যকল্প বিশ্লেষণ",
+            },
+          });
+        }
+      }
+
+      // 3. New Evidence Needs in Notes
+      if (reassessment.new_evidence_needs && reassessment.new_evidence_needs.length > 0) {
+        const notesSection = baseSummary.sections.find((s) => s.id === "notes");
+        if (notesSection) {
+          notesSection.claims.unshift({
+            id: `ev-needs-${reassessment.id.slice(0, 8)}`,
+            type: "ai",
+            verification: "unverified",
+            text: {
+              en: `Reassessed Evidential Needs: ${reassessment.new_evidence_needs.join("; ")}`,
+              bn: `নতুন প্রয়োজনীয় সাক্ষ্য-প্রমাণ: ${reassessment.new_evidence_needs.join("; ")}`,
+            },
+            source: {
+              en: "Continuous Strategy Reassessment Engine",
+              bn: "চলমান কৌশল পুনর্মূল্যায়ন ইঞ্জিন",
+            },
+          });
+        }
+      }
+    }
+  } catch (err) {
+    // Graceful fallback if reassessment is unavailable
   }
 
   return baseSummary;
