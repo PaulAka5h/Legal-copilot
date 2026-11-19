@@ -359,3 +359,32 @@ Migration `0011_dev1_client_task_audit`: 0010 → 0011 → 0010 → 0011 passes,
 
 Full suite as `app_user`: **138 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.
 Still open: shared-document existence is not checked until Dev 2's `documents` table exists (R12).
+
+---
+
+## 11. Batch 3: authentication, roles and membership (2026-11-19)
+
+Migration `0012_dev1_auth_rate_limits`: 0011 → 0012 → 0011 → 0012 passes, and so does base → head.
+
+| Requirement | State | Test |
+|---|---|---|
+| TRD auth endpoints | All present: register, login, logout, logout-all, forgot, reset, MFA setup/verify, invitation accept, `/me` | existing + new |
+| Forgot: identical response | Yes; limits apply equally to unknown emails, so 429 leaks nothing | `test_password_forgot_is_rate_limited_per_account_without_leaking_existence` |
+| Reset: single-use, short-lived, revokes sessions | Yes (30 min; DB function revokes all sessions) | `test_b9` |
+| Rate limits | Login: per IP + account lockout (existing). Forgot: 10/IP, 3/account per 15 min. Reset: 10/IP. MFA verify: 5/user. Invitation accept: per IP | new tests |
+| Session rotation | On login (existing) and on MFA enable: all sessions revoked, new cookie with the same absolute expiry, audited `auth.session_rotated` | `test_enabling_mfa_rotates_the_session_and_revokes_other_sessions` |
+| Idle + absolute timeout | Both enforced | `test_idle_session_is_rejected`, `test_expired_session_is_rejected` |
+| CSRF | Every write needs the Origin check (route guard); missing/wrong Origin → 403 | `test_route_guards`, `test_domains` |
+| Permission flags | `can_close_case`, `can_edit_case`, `can_manage_members`, `can_publish_updates`, `can_run_ai` (Dev 2 AI-run POSTs). **`can_upload` has no route yet** (no document upload in the app). Lead lawyer holds all | `test_ai_runs_require_can_run_ai`, Batch 2b tests |
+| Client has no lawyer flags | Clients never reach CaseAccess; every lawyer route returns 403 to a real client session | matrix, `test_real_client_session_is_confined_to_the_client_namespace` |
+| Revoked member | 404 on the next request | matrix, `test_domains` |
+| `read_only` membership | **Grants nothing** (RLS helpers accept only `active`); documented as equivalent to revoked | matrix |
+| Authorization matrix | `tests/test_authorization_matrix.py`: every route × {anonymous, client, other-org lawyer, read_only, revoked, owner GET}; removing a guard produced 69 failures | yes |
+| Audit events | Registered, login success/failure, logout, MFA setup/enable, session rotation, member add/revoke | `test_auth_and_membership_events_are_audited` |
+
+Bugs found and fixed: second `/password/forgot` for an account → 500 (RLS SELECT policy vs
+UPDATE); TOTP accepted only codes from exactly ±15 minutes instead of ±30 s.
+Not built: password-change endpoint (not in TRD §3.2). New Dev 2 request R18 (GET routes
+run AI on a cache miss).
+
+Full suite as `app_user`: **147 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.

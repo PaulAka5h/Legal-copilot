@@ -1,16 +1,11 @@
 import json
 import logging
-from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, get_user_session
-from app.auth.schemas import CurrentUser
 from app.config import Settings
 from app.logging_config import StructuredJSONFormatter
 from app.main import create_app
@@ -202,29 +197,3 @@ def test_domain_openapi_operations_include_summaries_and_problem_responses() -> 
     assert next(item for item in case_parameters if item["name"] == "case_id")[
         "description"
     ]
-
-
-def test_client_role_is_blocked_from_lawyer_endpoints() -> None:
-    app = create_app(Settings(app_env="test"))
-    client_user = CurrentUser(
-        id=uuid4(),
-        email="client@example.com",
-        role="client",
-        full_name="Sample Client",
-        preferred_language="en",
-        session_id=uuid4(),
-    )
-
-    async def unused_session() -> AsyncIterator[AsyncSession]:
-        yield AsyncMock(spec=AsyncSession)
-
-    app.dependency_overrides[get_current_user] = lambda: client_user
-    app.dependency_overrides[get_user_session] = unused_session
-    client = TestClient(app)
-
-    for path in ("/api/v1/cases", "/api/v1/clients"):
-        response = client.get(path)
-        assert response.status_code == 403
-        assert response.headers["content-type"].startswith(
-            "application/problem+json"
-        )

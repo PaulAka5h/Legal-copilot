@@ -5,7 +5,8 @@ their own. They are mounted here only with router-level dependencies that requir
 
 - an authenticated lawyer session (via ``get_case_access`` -> ``LawyerDep``),
 - active membership of the case in the path (404 for unknown or not-owned cases),
-- a same-origin ``Origin`` header on state-changing requests (CSRF).
+- a same-origin ``Origin`` header on state-changing requests (CSRF),
+- ``can_run_ai`` (or the lead-lawyer role) for requests that start an AI run.
 
 Dev 2 handler code is unchanged. See ``DOCS/dev1-to-dev2-requests.md`` R4/R5.
 """
@@ -13,15 +14,26 @@ Dev 2 handler code is unchanged. See ``DOCS/dev1-to-dev2-requests.md`` R4/R5.
 import sys
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from app.auth.dependencies import require_same_origin_for_writes
-from app.cases.dependencies import get_case_access
+from app.cases.dependencies import CaseAccessDep, require_case_permission
 
 API_PREFIX = "/api/v1"
+AI_RUN_PERMISSION = "can_run_ai"
+# POST endpoints that start a model run. GET endpoints that generate output on a
+# cache miss are a Dev 2 issue (request R18), not covered here.
+AI_RUN_PATH_SUFFIXES = ("/analysis-runs", "/strategies/generate", "/strategies/report")
+
+
+async def require_ai_run_permission(request: Request, case_access: CaseAccessDep) -> None:
+    if request.method == "POST" and request.url.path.endswith(AI_RUN_PATH_SUFFIXES):
+        require_case_permission(case_access, AI_RUN_PERMISSION)
+
+
 CASE_GUARDS = [
     Depends(require_same_origin_for_writes),
-    Depends(get_case_access),
+    Depends(require_ai_run_permission),
 ]
 
 

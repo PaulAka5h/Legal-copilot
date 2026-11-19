@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import (
     CurrentUserDep,
@@ -24,6 +25,13 @@ from app.auth.repository import (
     find_session,
     record_login_result,
     write_audit_event,
+)
+from app.auth.rate_limits import (
+    MFA_VERIFY_PER_USER,
+    PASSWORD_FORGOT_PER_ACCOUNT,
+    PASSWORD_FORGOT_PER_IP,
+    PASSWORD_RESET_PER_IP,
+    enforce_rate_limit,
 )
 from app.auth.schemas import (
     CurrentUser,
@@ -274,7 +282,7 @@ async def login(
     summary="Request a password reset",
     description="Returns the same response whether or not the email is registered.",
     response_model=MessageResponse,
-    responses=problem_responses(403, 422, 503),
+    responses=problem_responses(403, 422, 429, 503),
 )
 async def password_forgot(
     request: Request,
@@ -285,6 +293,9 @@ async def password_forgot(
     ],
 ) -> MessageResponse:
     email = str(payload.email).lower()
+    # Both limits apply to known and unknown emails alike, so 429 reveals nothing.
+    await enforce_rate_limit(session_factory, PASSWORD_FORGOT_PER_IP, str(request_ip(request)))
+    await enforce_rate_limit(session_factory, PASSWORD_FORGOT_PER_ACCOUNT, email)
     login_user = await find_login_user(session_factory, email)
     if login_user is not None:
         token = new_session_token()
@@ -326,7 +337,7 @@ async def password_forgot(
     summary="Reset a password",
     description="Consumes a single-use, unexpired password reset token.",
     response_model=MessageResponse,
-    responses=problem_responses(400, 403, 422, 503),
+    responses=problem_responses(400, 403, 422, 429, 503),
 )
 async def password_reset(
     request: Request,
@@ -336,6 +347,7 @@ async def password_reset(
         Body(description="Reset token and new password"),
     ],
 ) -> MessageResponse:
+    await enforce_rate_limit(session_factory, PASSWORD_RESET_PER_IP, str(request_ip(request)))
     password_hash = await asyncio.to_thread(hash_password, payload.new_password)
     async with session_factory() as session:
         async with session.begin():
@@ -442,12 +454,18 @@ async def mfa_setup(
 @auth_router.post(
     "/mfa/verify",
     summary="Verify and enable TOTP MFA",
-    description="Verifies the current TOTP code and creates hashed recovery codes.",
+    description=(
+        "Verifies the current TOTP code, creates hashed recovery codes, revokes every "
+        "existing session of the account and issues a fresh session cookie. Limited "
+        "to 5 attempts per user per 15 minutes."
+    ),
     response_model=MfaVerifyResponse,
-    responses=problem_responses(400, 401, 403, 422, 503),
+    responses=problem_responses(400, 401, 403, 422, 429, 503),
 )
 async def mfa_verify(
     request: Request,
+    response: Response,
+    session_factory: SessionFactoryDep,
     user: CurrentUserDep,
     session: UserSessionDep,
     payload: Annotated[
@@ -457,6 +475,7 @@ async def mfa_verify(
 ) -> MfaVerifyResponse:
     from app.auth.mfa import verify_totp
 
+    await enforce_rate_limit(session_factory, MFA_VERIFY_PER_USER, str(user.id))
     row = (
         await session.execute(
             text(
@@ -512,7 +531,50 @@ async def mfa_verify(
         user_agent=request.headers.get("user-agent", "")[:512] or None,
         request_id=getattr(request.state, "request_id", None),
     )
+    await _rotate_all_sessions(request, response, user, session)
     return MfaVerifyResponse(enabled=True, recovery_codes=recovery_codes)
+
+
+async def _rotate_all_sessions(
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    session: AsyncSession,
+) -> None:
+    """Privilege change: revoke every session of the account and issue a new one.
+
+    The new session keeps the current absolute expiry so rotation never extends it.
+    """
+    expires_at = (
+        await session.execute(
+            text("SELECT expires_at FROM public.sessions WHERE id = :session_id"),
+            {"session_id": user.session_id},
+        )
+    ).scalar_one()
+    await session.execute(text("SELECT app.revoke_sessions(NULL)"))
+    token = new_session_token()
+    await create_session(
+        session,
+        user_id=user.id,
+        token=token,
+        user_role=user.role,
+        expires_at=expires_at,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        audit_action="auth.session_rotated",
+    )
+    remaining = max(int((expires_at - datetime.now(UTC)).total_seconds()), 1)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=remaining,
+        httponly=True,
+        secure=request.app.state.settings.secure_session_cookie,
+        samesite="lax",
+        path="/",
+    )
+    response.headers["Cache-Control"] = "no-store"
 
 
 @auth_router.post(

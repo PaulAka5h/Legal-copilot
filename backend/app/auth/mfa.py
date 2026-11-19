@@ -40,5 +40,5 @@ def verify_totp(secret: str, code: str) -> bool:
     now = int(time.time())
     return any(
         hmac.compare_digest(totp_code(secret, now + step * 30), code)
-        for step in (-30, 0, 30)
+        for step in (-1, 0, 1)
     )

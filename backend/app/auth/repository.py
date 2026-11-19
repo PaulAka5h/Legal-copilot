@@ -151,6 +151,7 @@ async def create_session(
     ip_address: IpAddress,
     user_agent: str | None,
     request_id: str | None,
+    audit_action: str = "auth.login_succeeded",
 ) -> UUID:
     session_id = uuid4()
     await session.execute(
@@ -173,7 +174,7 @@ async def create_session(
     )
     await write_audit_event(
         session,
-        action="auth.login_succeeded",
+        action=audit_action,
         actor_user_id=user_id,
         actor_role=user_role,
         object_type="session",
