@@ -153,3 +153,14 @@ def test_rerun_is_idempotent_and_change_adds_version(counter, tmp_path):
     write_jsonl(path, [record(act_id=act_id, body=BANGLA_BODY + " পরিবর্তিত।")])
     assert asyncio.run(ingest()).acts_new_version == 1
     assert asyncio.run(versions()) == [(1, False, "pending", 2), (2, True, "pending", 1)]
+
+
+def test_act_title_repealed_marker_sets_source_status():
+    from app.rag.ingest.pipeline import source_row
+    from app.rag.ingest.records import ActBatch
+
+    repealed = ActBatch("9003", "en", (record(act_id="9003", lang="en", title="x") | {"act_name": f"{SAMPLE} Act, 1867  [Repealed]"},))
+    row = source_row(repealed)
+    assert (row["current_status"], row["status_note"]) == ("repealed", "bdlaws title marker [Repealed]")
+    assert source_row(ActBatch("9004", "en", (record(act_id="9004", lang="en"),)))["current_status"] == "unknown"
+    assert section_header(f"{SAMPLE} Act, 1867  [Repealed]", "1867", "1", None) == f"{SAMPLE} Act, 1867  [Repealed] — Section 1\n"

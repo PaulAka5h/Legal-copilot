@@ -22,9 +22,14 @@ async def upsert_source(conn: AsyncConnection, source: dict[str, Any]) -> UUID:
         text(
             """
             INSERT INTO public.legal_sources
-              (kind, title, number_year, language, source_url, source_name, external_id)
-            VALUES (:kind, :title, :number_year, :language, :source_url, :source_name, :external_id)
-            ON CONFLICT (source_name, external_id, language) DO NOTHING
+              (kind, title, number_year, language, source_url, source_name, external_id,
+               current_status, status_note)
+            VALUES (:kind, :title, :number_year, :language, :source_url, :source_name, :external_id,
+                    :current_status, :status_note)
+            ON CONFLICT (source_name, external_id, language) DO UPDATE
+              SET current_status = EXCLUDED.current_status, status_note = EXCLUDED.status_note
+              WHERE public.legal_sources.current_status = 'unknown'
+                AND EXCLUDED.current_status <> 'unknown'
             RETURNING id
             """
         ),

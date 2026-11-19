@@ -70,7 +70,10 @@ def source_row(batch: ActBatch, source_name: str = SOURCE_NAME) -> dict[str, Any
     first = batch.records[0]
     title = nfc(first["act_name"])
     number, year = first.get("act_number"), first.get("act_year")
+    repealed = bool(_REPEALED_MARKER.search(title))
     return {
+        "current_status": "repealed" if repealed else "unknown",
+        "status_note": "bdlaws title marker [Repealed]" if repealed else None,
         "kind": "ordinance" if _ORDINANCE.search(title) else "act",
         "title": title,
         "number_year": f"{number} of {year}" if number and year else None,

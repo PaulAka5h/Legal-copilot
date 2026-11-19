@@ -68,9 +68,13 @@ _BN_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 _TRAILING = " \t.,;:)]"
 
 
+_TRAILING_MARKER = re.compile(r"\s*\[[^\]]*\]\s*$")  # e.g. "Act, 1867 [Repealed]"
+
+
 def title_ends_with_year(title: str, year: str) -> bool:
-    """True if the title already ends with the year, in Bangla or English digits."""
-    return title.translate(_BN_DIGITS).rstrip(_TRAILING).endswith(year.translate(_BN_DIGITS).strip())
+    """True if the title already ends with the year (Bangla or English digits), ignoring a trailing [marker]."""
+    core = _TRAILING_MARKER.sub("", title).translate(_BN_DIGITS).rstrip(_TRAILING)
+    return core.endswith(year.translate(_BN_DIGITS).strip())
 
 
 def section_header(act_title: str, year: str | None, number: str | None, heading: str | None) -> str:
