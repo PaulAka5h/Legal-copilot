@@ -222,5 +222,8 @@ Notes for Step A:
 - `tests/test_phase2.py::test_live_client_fetch` calls the live bdlaws site and hangs without network.
 - `tests/legal_kb/test_pgvector_live.py` seeds hand-written section text that is not labelled `SAMPLE_DATA_NOT_REAL_LAW`; review in Step A.
 - `hearings/reassessment.py` still uses cheque-specific keyword heuristics (consideration, postal notice); replaced in Step F.
-- 37 compiled `.pyc` files are tracked in git.
+- 37 compiled `.pyc` files were tracked in git; untracked on 2026-11-20.
 
+### 7.6 TODO
+
+- [ ] Step E: when `app_user` gets grants on `strategies`, `strategy_scenarios`, and `strategy_comparisons`, strengthen check 2 in `backend/tests/test_strategy_client_isolation.py`: insert a strategy row as the case lawyer, then assert the client member sees 0 rows. Today the client is refused because the grants are missing, so check 2 does not yet test RLS.
