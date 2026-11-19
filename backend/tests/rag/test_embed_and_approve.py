@@ -60,14 +60,6 @@ def test_cuda_is_used_only_when_the_torch_build_supports_the_gpu():
     assert not cuda_build_supports((7, 0), build)
 
 
-@pytest.fixture
-def ingest_url() -> str:
-    url = os.getenv("LEGAL_INGEST_TEST_DATABASE_URL")
-    if not url or not url.endswith("/legal_copilot_test"):
-        pytest.skip("LEGAL_INGEST_TEST_DATABASE_URL must point at legal_copilot_test")
-    return url
-
-
 def _ingest(url, path, counter):
     async def run():
         engine = create_ingest_engine(url)
