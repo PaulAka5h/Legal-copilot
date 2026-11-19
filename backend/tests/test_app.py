@@ -29,7 +29,12 @@ def test_ready_endpoint_reports_database_health(api_client) -> None:
     response = api_client.get("/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ready"}
+    assert response.json() == {
+        "status": "ready",
+        "database": "ok",
+        "redis": "not_configured",
+        "object_storage": "not_configured",
+    }
 
 
 def test_request_id_is_generated_and_valid_inbound_id_is_preserved() -> None:

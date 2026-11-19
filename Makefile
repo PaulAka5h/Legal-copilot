@@ -53,11 +53,11 @@ infra-logs:
 # ------------------------------------------------------------------------------
 backend-dev:
 	@echo "Starting FastAPI backend server on http://localhost:8000 (Docs at /docs)..."
-	cd backend && PYTHONPATH=.. uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+	cd backend && PYTHONPATH=.. uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 backend-stop:
 	@echo "Stopping backend server on port 8000..."
-	@fuser -k 8000/tcp 2>/dev/null || pkill -f "uvicorn src.main:app" 2>/dev/null || echo "No server was running on port 8000."
+	@fuser -k 8000/tcp 2>/dev/null || pkill -f "uvicorn app.main:app" 2>/dev/null || echo "No server was running on port 8000."
 	@echo "Backend server stopped."
 
 backend-test:

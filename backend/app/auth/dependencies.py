@@ -64,6 +64,15 @@ async def require_same_origin(request: Request) -> None:
         )
 
 
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+async def require_same_origin_for_writes(request: Request) -> None:
+    """Router-level CSRF guard: enforce the Origin check on state-changing methods."""
+    if request.method not in SAFE_METHODS:
+        await require_same_origin(request)
+
+
 def request_ip(request: Request) -> IpAddress:
     if request.client is None:
         raise HTTPException(

@@ -1,10 +1,16 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from sqlalchemy import text
 
-from app.auth.dependencies import LawyerDep, UserSessionDep, require_lawyer, require_same_origin
+from app.auth.dependencies import (
+    LawyerDep,
+    UserSessionDep,
+    require_lawyer,
+    require_same_origin,
+    require_same_origin_for_writes,
+)
 from app.auth.repository import write_audit_event
 from app.auth.dependencies import request_ip
 from app.cases.dependencies import CaseAccessDep
@@ -20,6 +26,7 @@ from app.errors import problem_responses
 router = APIRouter(
     prefix="/api/v1",
     tags=["client-visibility"],
+    dependencies=[Depends(require_same_origin_for_writes)],
 )
 
 

@@ -12,6 +12,7 @@ from app.config import Settings
 from app.database import create_database_engine, verify_runtime_role
 from app.errors import register_exception_handlers
 from app.health import router as health_router
+from app.integration import include_dev2_case_routers
 from app.lawyer.router import router as lawyer_router
 from app.client_portal.router import router as client_portal_router
 from app.cases.visibility_router import router as visibility_router
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(lawyer_router)
     app.include_router(client_portal_router)
     app.include_router(visibility_router)
+    include_dev2_case_routers(app)
     return app
 
 

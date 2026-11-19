@@ -271,8 +271,8 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 ## 7. Open questions for you
 
 1. ~~**0009 is broken and I may not edit it.**~~ Resolved: owner chose (b); 0009 amended by Dev 1. Options: (a) Dev 2 amends 0009 locally (still unreviewed and unshared) to use `app.is_lawyer_member` and drop the client policy, then I add grants in `0010`; (b) you authorize me to make that edit as an integration fix; (c) I leave the chain broken and report.
-2. May I mount Dev 2's routers into `app.main` behind Dev 1 auth + CaseAccess (router-level dependencies only, no change to Dev 2 logic), and repoint `make backend-dev` to `app.main`? Until then, S2 stays live on the dev server.
-3. Who owns Jobs/SSE and strategy approval/versioning (orchestration §2 vs §3 conflict)?
+2. Answered **yes** (2026-11-19); done in Batch 1. Original question: May I mount Dev 2's routers into `app.main` behind Dev 1 auth + CaseAccess (router-level dependencies only, no change to Dev 2 logic), and repoint `make backend-dev` to `app.main`? Until then, S2 stays live on the dev server.
+3. Answered **none** (2026-11-19): Jobs/SSE and strategy approval/versioning are unassigned and out of scope this session. Original question: Who owns Jobs/SSE and strategy approval/versioning (orchestration §2 vs §3 conflict)?
 4. Can you install or start Python 3.12 + `uv` + Docker on this machine, or point me to the machine and environment where Compose PostgreSQL runs?
 
 See also `DOCS/dev1-to-dev2-requests.md`.

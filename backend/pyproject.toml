@@ -42,5 +42,5 @@ entrypoint = "app.main:app"
 
 [tool.pytest.ini_options]
 addopts = "-q"
-pythonpath = ["."]
+pythonpath = [".", ".."]
 testpaths = ["tests"]

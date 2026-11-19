@@ -1,10 +1,10 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, Path, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from sqlalchemy import text
 
-from app.auth.dependencies import ClientDep, UserSessionDep
+from app.auth.dependencies import ClientDep, UserSessionDep, require_same_origin_for_writes
 from app.errors import problem_responses
 from app.client_portal.schemas import (
     ClientCaseResponse,
@@ -22,6 +22,7 @@ from app.auth.dependencies import request_ip
 router = APIRouter(
     prefix="/api/v1/client",
     tags=["client-portal"],
+    dependencies=[Depends(require_same_origin_for_writes)],
 )
 
 

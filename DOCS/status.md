@@ -130,6 +130,8 @@ Anything that depends on an outside service or dataset is listed here with its c
 | Date | Change |
 |---|---|
 | 2026-11-19 | Project renamed from Legal-copilot to PokkhoAI |
+| 2026-11-19 | Backend Dev 1 close-out Batch 0: static gap report (`DOCS/dev1-closeout-gap-report.md`) and Dev 2 requests. Owner-authorized fix to migration `0009` (undefined `app.has_case_access`; client strategy read removed). |
+| 2026-11-19 | Backend Dev 1 close-out Batch 1 (code only, **not yet run**): single app `app.main:app` mounts Dev 2 analysis/strategy routers behind lawyer session + CaseAccess + CSRF; router-level CSRF added to client-visibility and client-portal writes; `/health/ready` reports Redis/MinIO `not_configured`; `make backend-dev` targets `app.main:app` on 127.0.0.1; route-guard tests added. Jobs/SSE and strategy approval: unassigned (owner). |
 | 2026-11-16 | Documentation set created: PRD, TRD, architecture, database, flows, agents, security, README, status, providers |
 | 2026-11-16 | Frontend Stage 1: Next.js 16.4 + Tailwind v4 app, theme tokens/fonts, cookie-backed EN/BN dictionaries, shared auth components, `/lawyer/login` and `/client/login`; dashboard routes are `NOT_CONFIGURED` stubs |
 | 2026-11-16 | Frontend Stage 1b: development-only mock sessions behind `MOCK_AUTH=true`, role-guarded `(lawyer)`/`(client)` route groups, sign-out, login redirects, and clean localized page titles |

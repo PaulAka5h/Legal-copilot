@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from app.auth.dependencies import SessionFactoryDep
@@ -17,6 +17,13 @@ class HealthResponse(BaseModel):
 
 class ReadyResponse(BaseModel):
     status: Literal["ready"]
+    database: Literal["ok"] = Field(description="PostgreSQL accepted a read query.")
+    redis: Literal["not_configured"] = Field(
+        description="Redis is not wired into the backend yet; not a failure."
+    )
+    object_storage: Literal["not_configured"] = Field(
+        description="MinIO/S3 is not wired into the backend yet; not a failure."
+    )
 
 
 @router.get(
@@ -40,7 +47,10 @@ def health() -> HealthResponse:
     "/health/ready",
     response_model=ReadyResponse,
     summary="Check database readiness",
-    description="Returns ready only when the API database accepts a read query.",
+    description=(
+        "Returns ready only when the API database accepts a read query. "
+        "Services not yet wired into the backend are reported as not_configured."
+    ),
     responses={
         503: {
             "model": Problem,
@@ -61,4 +71,9 @@ async def ready(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database is not ready.",
         ) from exc
-    return ReadyResponse(status="ready")
+    return ReadyResponse(
+        status="ready",
+        database="ok",
+        redis="not_configured",
+        object_storage="not_configured",
+    )
