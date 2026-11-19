@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.rag.text import nfc
+
 EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
 EMBEDDING_VERSION = 1
 PASSAGE_PREFIX = "passage: "
@@ -62,11 +64,26 @@ def load_counter(model_name: str = EMBEDDING_MODEL) -> TokenCounter:
     return TokenCounter(tokenizer)
 
 
+_BN_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+_TRAILING = " \t.,;:)]"
+
+
+def title_ends_with_year(title: str, year: str) -> bool:
+    """True if the title already ends with the year, in Bangla or English digits."""
+    return title.translate(_BN_DIGITS).rstrip(_TRAILING).endswith(year.translate(_BN_DIGITS).strip())
+
+
 def section_header(act_title: str, year: str | None, number: str | None, heading: str | None) -> str:
-    """`{act_title} ({year}) — Section {number}: {heading}` plus newline; absent parts omitted."""
-    title = f"{act_title} ({year})" if year else act_title
+    """`{act_title} ({year}) — Section {number}: {heading}` plus newline, NFC.
+
+    "(year)" is added only when the title does not already end with that year;
+    absent parts are omitted.
+    """
+    title = act_title
+    if year and year.strip() and not title_ends_with_year(act_title, year):
+        title = f"{act_title} ({year})"
     label = f"Section {number}" if number else "Section"
-    return f"{title} — {label}: {heading}\n" if heading else f"{title} — {label}\n"
+    return nfc(f"{title} — {label}: {heading}\n" if heading else f"{title} — {label}\n")
 
 
 def chunk_section(header: str, body: str, counter: TokenCounter) -> list[Chunk]:

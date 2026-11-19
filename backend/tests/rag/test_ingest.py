@@ -17,16 +17,6 @@ SAMPLE = "SAMPLE_DATA_NOT_REAL_LAW"
 BANGLA_BODY = "১। এই ধারাটি SAMPLE_DATA_NOT_REAL_LAW নমুনা পাঠ, কোন আইন নয়। (ক) প্রথম উপধারা।"
 
 
-@pytest.fixture(scope="module")
-def counter():
-    try:
-        from app.rag.ingest.chunking import load_counter
-
-        return load_counter()
-    except Exception as error:  # tokenizer files not cached and no network
-        pytest.skip(f"e5 tokenizer unavailable: {type(error).__name__}")
-
-
 def record(act_id="9001", n="১", lang="bn", body=BANGLA_BODY, title=None):
     return {
         "document_id": f"bd-act-{act_id}-sec-{n}-{lang}",

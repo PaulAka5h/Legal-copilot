@@ -2,6 +2,9 @@
 
 Idempotent: an Act whose content hash equals its current version is skipped.
 A changed Act gets a new version; older versions and their rows are kept (Rule 6).
+Stored section and chunk text is NFC (app.rag.text); legal_sections.content_hash
+is the SHA-256 of the raw scraped text, kept for provenance. Chunk content_hash
+is the SHA-256 of the stored (NFC) chunk text, which the embedder keys on.
 Status is `unknown` unless the section title is the bdlaws "[Repealed]" marker;
 effective dates are not provided by the scraper and stay NULL.
 """
@@ -24,6 +27,7 @@ from app.rag.ingest.chunking import (
     section_header,
 )
 from app.rag.ingest.records import ActBatch
+from app.rag.text import nfc
 
 SOURCE_NAME = "bdlaws.minlaw.gov.bd"
 INGESTED_BY = "app.rag.ingest"
@@ -64,7 +68,7 @@ def act_content_sha256(records: Iterable[dict[str, Any]]) -> bytes:
 
 def source_row(batch: ActBatch, source_name: str = SOURCE_NAME) -> dict[str, Any]:
     first = batch.records[0]
-    title = first["act_name"]
+    title = nfc(first["act_name"])
     number, year = first.get("act_number"), first.get("act_year")
     return {
         "kind": "ordinance" if _ORDINANCE.search(title) else "act",
@@ -79,7 +83,7 @@ def source_row(batch: ActBatch, source_name: str = SOURCE_NAME) -> dict[str, Any
 
 
 def section_row(record: dict[str, Any], position: int) -> dict[str, Any]:
-    heading = record.get("section_title") or None
+    heading = nfc(record["section_title"]) if record.get("section_title") else None
     repealed = bool(heading and _REPEALED_MARKER.fullmatch(heading.strip()))
     return {
         "section_key": record["document_id"],
@@ -87,9 +91,9 @@ def section_row(record: dict[str, Any], position: int) -> dict[str, Any]:
         "section_number": record.get("section_number"),
         "heading": heading,
         "chapter_number": record.get("chapter_number"),
-        "chapter_title": record.get("chapter_title"),
+        "chapter_title": nfc(record["chapter_title"]) if record.get("chapter_title") else None,
         "language": record["language"],
-        "text": record["section_content"],
+        "text": nfc(record["section_content"]),
         "canonical_section_id": canonical_section_id(record),
         "status": "repealed" if repealed else "unknown",
         "status_basis": "section_title_marker" if repealed else None,
@@ -113,7 +117,7 @@ def plan_chunks(record: dict[str, Any], counter: TokenCounter) -> list[dict[str,
             "embedding_model": EMBEDDING_MODEL,
             "embedding_version": EMBEDDING_VERSION,
         }
-        for chunk in chunk_section(header, record["section_content"], counter)
+        for chunk in chunk_section(header, nfc(record["section_content"]), counter)
     ]
 
 
