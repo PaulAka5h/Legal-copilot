@@ -2,8 +2,9 @@
 
 Date: 2026-11-19 · Branch: `dev1/phase-closeout` · Author: Backend Dev 1 (agent)
 
-> **Scope and limits of this audit.** This machine (Windows 10) has **no Python
-> interpreter, no `uv`, no Docker, no PostgreSQL, and no WSL distribution**.
+> **Scope and limits of this audit.** This machine (Windows 10) has **no usable
+> Python environment** (Git Bash has a bare `python3` 3.15 with no pip and no
+> packages; PowerShell has none), **no `uv`, no Docker, no PostgreSQL, and no WSL distribution**.
 > Nothing could be executed: no `pytest`, no `alembic heads/current`, no app boot,
 > no catalog queries. Every finding below comes from **reading the code and
 > migrations**. Items that need a live run are marked **BLOCKED (env)**. No
@@ -48,7 +49,14 @@ It is not a confirmed leak of real data (all state is synthetic and in-memory),
 but it is a cross-tenant break by construction. Per §5 of the brief I am stopping
 here.
 
-### S3 — Migration chain cannot reach head on a fresh database
+### S3 — Migration chain cannot reach head on a fresh database — FIXED IN CODE 2026-11-19
+
+> Resolution: the owner authorized Dev 1 to amend 0009. Policies now use
+> `app.is_lawyer_member(case_id)` and `strategies_client_read` is removed.
+> Regression tests were added in `backend/tests/test_migrations.py`. A static check
+> over all revisions finds no undefined `app.*` function in any policy. A live
+> downgrade/upgrade has **not** been run (environment). Grants and the composite FK
+> are still missing (Batch 2).
 
 `0009_phase6_strategy_engine` (Dev 2) creates policies with
 `app.has_case_access(case_id)`. **No migration defines `app.has_case_access`.**
@@ -217,7 +225,7 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 | 1 | Confirmed: status.md rows 54–56 ("Client invitations…", "Client-visible updates…", "Case closure…") say Not started; B12–B14 code exists (`auth/router.py` accept, `visibility_router.py`, `client_portal/router.py`, close/reopen). B13 is **partial**: no CSRF on writes, client task PATCH likely broken, shared-docs/tasks/visibility untested. | Merge rows in Batch 7; B13 → *Partial* until fixed and tested |
 | 2 | Confirmed stale: §3 says PostgreSQL at `0003`, LLM gateway "Not started" at `app/agents/gateway.py`. Real: chain at `0009`; gateway at `src/ai/gateway.py` (mock + gemini); OCR `src/documents/ocr.py`; embeddings `src/legal_kb/embeddings.py`; validator `src/documents/validator.py` (ClamAV not wired); ingestion `src/legal_kb/ingest_all.py`. §5 still says client activation and `/client/*` are missing, but they exist. | Rewrite §3/§5 in Batch 7 |
 | 3 | **Two app factories, neither complete.** `app.main:app` (pyproject entrypoint, docs command `uv run fastapi dev`) mounts Dev 1 only. `src.main:app` (Makefile `backend-dev`) mounts Dev 2 only, imports via `backend.src.*` (needs repo root on `PYTHONPATH`), hard-codes `researchsphere:devpassword@localhost:5433`, and connects as a non-`app_user` role. | Batch 1: `app.main` becomes the single factory and mounts Dev 2 routers **behind** Dev 1 auth + CaseAccess (needs your OK: see Q2) |
-| 4 | Static: single linear head `0009`. **0009 is broken** (S3). | Needs decision (Q1) |
+| 4 | Static: single linear head `0009`. 0009 was broken (S3); now amended by Dev 1 with owner authorization. | Verify live in Batch 1 |
 | 5 | Confirmed divergence: `legal_chunks` (act_id/act_name/section/is_current, `VECTOR(1024)` e5-large) vs database.md §7 (`legal_source_versions` + `provision_label`). Also created outside Alembic, no `app_user` grants, no ingest role. | Document in schema packet and requests; no change |
 | 6 | **Security defect confirmed** (S1). | Request to Dev 2; propose config default fix |
 | 7 | Confirmed: `src/documents/pipeline.py:103` uses `cases/{case_id}/documents/{doc_id}/{filename}`. The filename in the key is also a privacy concern. Architecture says `org/{org_id}/case/{case_id}/doc/{doc_id}/{version}`. No real storage client exists (path string only). | Report only |
@@ -262,7 +270,7 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 
 ## 7. Open questions for you
 
-1. **0009 is broken and I may not edit it.** Options: (a) Dev 2 amends 0009 locally (still unreviewed and unshared) to use `app.is_lawyer_member` and drop the client policy, then I add grants in `0010`; (b) you authorize me to make that edit as an integration fix; (c) I leave the chain broken and report.
+1. ~~**0009 is broken and I may not edit it.**~~ Resolved: owner chose (b); 0009 amended by Dev 1. Options: (a) Dev 2 amends 0009 locally (still unreviewed and unshared) to use `app.is_lawyer_member` and drop the client policy, then I add grants in `0010`; (b) you authorize me to make that edit as an integration fix; (c) I leave the chain broken and report.
 2. May I mount Dev 2's routers into `app.main` behind Dev 1 auth + CaseAccess (router-level dependencies only, no change to Dev 2 logic), and repoint `make backend-dev` to `app.main`? Until then, S2 stays live on the dev server.
 3. Who owns Jobs/SSE and strategy approval/versioning (orchestration §2 vs §3 conflict)?
 4. Can you install or start Python 3.12 + `uv` + Docker on this machine, or point me to the machine and environment where Compose PostgreSQL runs?

@@ -3,6 +3,12 @@
 Revision ID: 0009_phase6_strategy_engine
 Revises: 0008_b13_client_case_read
 Create Date: 2026-11-19
+
+Amended 2026-11-19 by Backend Dev 1 (integration fix, authorized by the project
+owner): policies now use app.is_lawyer_member(case_id); the original referenced
+app.has_case_access, which no revision defines. The client SELECT policy on
+strategies was removed (Legal Product Rule 8). Local draft; not applied to any
+shared database.
 """
 
 from alembic import op
@@ -113,35 +119,30 @@ def upgrade() -> None:
         """
         CREATE POLICY strategies_lawyer_manage ON public.strategies
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
     op.execute(
         """
         CREATE POLICY strategy_scenarios_lawyer_manage ON public.strategy_scenarios
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
     op.execute(
         """
         CREATE POLICY strategy_comparisons_lawyer_manage ON public.strategy_comparisons
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
 
-    # Client view policy: only approved/current strategies are visible to clients of that case
-    op.execute(
-        """
-        CREATE POLICY strategies_client_read ON public.strategies
-        FOR SELECT TO app_user
-        USING (status IN ('approved', 'current') AND app.is_client_member(case_id));
-        """
-    )
+    # No client policy: strategies are lawyer-side tables (database.md §12.1,
+    # Legal Product Rule 8). Clients see strategy outcomes only through
+    # lawyer-published client_visible_updates.
 
     op.execute("RESET ROLE")
 
@@ -149,7 +150,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("SET ROLE app_owner")
 
-    op.execute("DROP POLICY IF EXISTS strategies_client_read ON public.strategies;")
     op.execute("DROP POLICY IF EXISTS strategy_comparisons_lawyer_manage ON public.strategy_comparisons;")
     op.execute("DROP POLICY IF EXISTS strategy_scenarios_lawyer_manage ON public.strategy_scenarios;")
     op.execute("DROP POLICY IF EXISTS strategies_lawyer_manage ON public.strategies;")

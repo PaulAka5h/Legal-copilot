@@ -22,6 +22,7 @@ Akash and Backend Dev 2 explicitly approve shared use.
 | `0006_b12_invitations` | Constrained client invitation acceptance function and active-invitation uniqueness | Local draft |
 | `0007_b13_client_visibility` | Hearings, updates, shared documents, tasks, visibility fields, notifications, and RLS | Local draft |
 | `0008_b13_client_case_read` | Client SELECT policy for active open cases | Local draft |
+| `0009_phase6_strategy_engine` | Dev 2 strategy tables + RLS. Amended by Dev 1 on 2026-11-19 (owner-authorized): policies use `app.is_lawyer_member` instead of the undefined `app.has_case_access`; client SELECT policy on `strategies` removed. Still missing: `app_user` grants and `(case_id, organization_id)` FK | Local draft. Needs Dev 2 + Akash sign-off; live upgrade not yet verified |
 
 ## Trust boundary
 
