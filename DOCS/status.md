@@ -284,8 +284,10 @@ Test database setup (needed by `tests/rag/test_search.py`; it skips otherwise), 
 
 Open items:
 - [ ] Confirm with `EXPLAIN` on the full corpus that the dense query uses the HNSW index (with 691 chunks the planner uses a sequential scan).
-- [ ] A chunking change does not create a new version for an Act whose text is unchanged (dev Act 16 chunks keep an older header). Decide whether chunker version should be part of the version hash.
+- [x] Chunking changes: `app.rag.ingest --force-rechunk [--act-id ID]` adds a new pending version with the same text and new chunks (amendment_note records it). Dev Act 16 re-chunked 2026-11-20 (v2 pending; repealed, so excluded from search either way).
 - [ ] Abstain threshold (`insufficient_information` below a reranker score) belongs with analysis (Step D).
-- [ ] Bangla stopwords are not removed from the sparse query.
+- [x] Bangla stopwords: curated list `app.rag.text.BANGLA_STOPWORDS` (function words only; legal terms kept) removed from the sparse query, tested.
 - [ ] The bge reranker needs a GPU to be practical (43 s/query on this CPU).
+- [ ] Bangla recall set: fill `backend/tests/data/retrieval_eval_bn.jsonl` (template rows labelled SAMPLE_DATA_NOT_REAL_LAW are ignored). `test_recall_at_10_on_bangla_eval` skips until real rows exist, requires the expected sections to be approved in `legal_copilot_test`, and asserts Recall@10 >= 0.90.
+- [ ] Before approving the full corpus: `python -m app.rag.spot_check --n 25 --seed N` lists random pending Acts with source URLs for a manual check.
 
