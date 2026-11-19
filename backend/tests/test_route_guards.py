@@ -202,3 +202,17 @@ def test_dev2_case_routes_isolate_cases_between_lawyers(api_client) -> None:
     assert other.status_code == 404
     assert unknown.status_code == 404
     assert other.json()["detail"] == unknown.json()["detail"]
+
+
+def test_dev1_routes_declare_typed_response_models() -> None:
+    """Dev 1 routes never return raw dicts (Dev 2 routes tracked as request R14)."""
+    untyped = []
+    for route in _api_routes():
+        endpoint = getattr(route, "endpoint", None) or route.original_route.endpoint
+        if endpoint.__module__.startswith("backend.src"):
+            continue
+        model = route.response_model
+        origin = getattr(model, "__origin__", None)
+        if model in (None, dict) or origin is dict:
+            untyped.append(f"{sorted(route.methods)} {route.path}")
+    assert untyped == []

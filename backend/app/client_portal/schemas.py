@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ClientCaseResponse(BaseModel):
@@ -55,3 +55,8 @@ class ClientHearingResponse(BaseModel):
 
 class DownloadUrlResponse(BaseModel):
     status: Literal["NOT_CONFIGURED"]
+
+
+class ClientTaskPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status: Literal["open", "done", "cancelled"]

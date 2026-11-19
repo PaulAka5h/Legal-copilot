@@ -17,6 +17,7 @@ from app.auth.repository import write_audit_event
 from app.auth.security import hash_token, new_session_token
 from app.cases.dependencies import CaseAccessDep
 from app.cases.repository import (
+    MemberConflictError,
     add_case_member,
     create_case,
     get_case,
@@ -244,12 +245,18 @@ async def add_case_member_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Case member management permission is required.",
         )
-    member = await add_case_member(
-        session,
-        acting_user_id=user.id,
-        case_id=case_id,
-        payload=payload,
-    )
+    try:
+        member = await add_case_member(
+            session,
+            acting_user_id=user.id,
+            case_id=case_id,
+            payload=payload,
+        )
+    except MemberConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     if member is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -338,3 +338,24 @@ base → bootstrap 0001 → `app_owner` to head.
 | Low, open | `notification_owner` WITH CHECK covers `user_id` only. No code writes notifications yet |
 
 Full suite as `app_user`: **131 passed, 1 failed (Dev 2 gateway test, R15), 6 skipped (Dev 2 legal KB)**.
+
+---
+
+## 10. Batch 2b: client-visibility fixes (2026-11-19)
+
+Migration `0011_dev1_client_task_audit`: 0010 → 0011 → 0010 → 0011 passes, and so does base → head.
+
+| Gap (from §3a) | Fix | Test |
+|---|---|---|
+| No CSRF on visibility/client writes | Router-level Origin check (Batch 1) | route guards |
+| No closed-case denial on client-visible writes | Shared `authorize_client_visible_write` / `ClientVisibleWriteDep`: membership 404 → permission 403 → open case 409 | `test_client_visible_writes_are_denied_on_closed_case` |
+| `can_publish_updates` absent | Required for create/publish/withdraw updates, share documents, tasks, visibility fields (lead lawyer implied) | `test_client_visible_writes_need_publish_permission` |
+| Publish/withdraw RLS-only, unaudited | Resolve `case_id`, authorize, `WHERE id AND case_id`, audit `client_update.published/withdrawn`; another lawyer gets the same 404 as an unknown ID | `test_publish_and_withdraw_are_scoped_and_audited` |
+| `response_model=dict` | `SharedDocumentResponse`, `ClientTaskCreatedResponse` (tasks now 201) | typed-response route guard |
+| Client task PATCH always 404 | `app.client_set_task_status` (0011); audited `client_task.status_changed` with `case_id` | `test_client_can_update_own_task_and_nothing_else` |
+| Download audit name, no `case_id` | `document.download` with `case_id`; client audit allowed by 0011 | `test_shared_document_download_is_authorized_and_audited` |
+| Client portal imports lawyer schema | `ClientTaskPatch` moved to `client_portal/schemas.py` | `test_client_portal_imports_no_lawyer_schemas` |
+| **New: `POST /cases/{id}/members` always 500** | `INSERT … ON CONFLICT DO UPDATE` needs UPDATE on `role`/`granted_by`, which app_user lacks (never tested). Now insert, or re-activate in place (permissions/status only); role change or RLS rejection → 409 | exercised by the permission test |
+
+Full suite as `app_user`: **138 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.
+Still open: shared-document existence is not checked until Dev 2's `documents` table exists (R12).

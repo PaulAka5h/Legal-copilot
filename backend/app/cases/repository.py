@@ -2,6 +2,7 @@ import json
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cases.schemas import (
@@ -137,6 +138,13 @@ async def list_case_members(
     ]
 
 
+INSUFFICIENT_PRIVILEGE = "42501"  # includes RLS WITH CHECK violations
+
+
+class MemberConflictError(Exception):
+    """The requested membership change is not allowed (role change or RLS check)."""
+
+
 async def add_case_member(
     session: AsyncSession,
     *,
@@ -159,35 +167,59 @@ async def add_case_member(
     if row is None:
         return None
     organization_id = row["organization_id"]
-    member = (
+    params = {
+        "case_id": case_id,
+        "organization_id": organization_id,
+        "user_id": payload.user_id,
+        "role": payload.role,
+        "permissions": json.dumps(payload.permissions),
+        "acting_user_id": acting_user_id,
+    }
+    existing_role = (
         await session.execute(
             text(
                 """
-                INSERT INTO public.case_members
-                  (case_id, organization_id, user_id, role, permissions, granted_by)
-                VALUES
-                  (:case_id, :organization_id, :user_id, :role,
-                   CAST(:permissions AS jsonb), :acting_user_id)
-                ON CONFLICT (case_id, user_id) DO UPDATE
-                  SET role = EXCLUDED.role,
-                      permissions = EXCLUDED.permissions,
-                      status = 'active',
-                      revoked_at = NULL,
-                      granted_by = EXCLUDED.granted_by
-                RETURNING id, case_id, user_id, role, permissions, status,
-                          granted_at, revoked_at
+                SELECT role FROM public.case_members
+                WHERE case_id = :case_id AND user_id = :user_id
                 """
             ),
-            {
-                "case_id": case_id,
-                "organization_id": organization_id,
-                "user_id": payload.user_id,
-                "role": payload.role,
-                "permissions": json.dumps(payload.permissions),
-                "acting_user_id": acting_user_id,
-            },
+            params,
         )
-    ).mappings().one_or_none()
+    ).scalar_one_or_none()
+    # app_user may update only permissions/status/revoked_at on case_members, so
+    # an existing row is re-activated in place and its role never changes here.
+    if existing_role is not None and existing_role != payload.role:
+        raise MemberConflictError("Existing case member has a different role.")
+    statement = (
+        """
+        UPDATE public.case_members
+        SET permissions = CAST(:permissions AS jsonb),
+            status = 'active',
+            revoked_at = NULL
+        WHERE case_id = :case_id AND user_id = :user_id AND role = :role
+        RETURNING id, case_id, user_id, role, permissions, status,
+                  granted_at, revoked_at
+        """
+        if existing_role is not None
+        else """
+        INSERT INTO public.case_members
+          (case_id, organization_id, user_id, role, permissions, granted_by)
+        VALUES
+          (:case_id, :organization_id, :user_id, :role,
+           CAST(:permissions AS jsonb), :acting_user_id)
+        RETURNING id, case_id, user_id, role, permissions, status,
+                  granted_at, revoked_at
+        """
+    )
+    try:
+        async with session.begin_nested():
+            member = (
+                await session.execute(text(statement), params)
+            ).mappings().one_or_none()
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == INSUFFICIENT_PRIVILEGE:
+            raise MemberConflictError("User cannot be added to this case.") from exc
+        raise
     return (
         CaseMemberResponse.model_validate(dict(member))
         if member is not None

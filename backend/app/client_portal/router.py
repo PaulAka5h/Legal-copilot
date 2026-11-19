@@ -7,6 +7,7 @@ from sqlalchemy import text
 from app.auth.dependencies import ClientDep, UserSessionDep, require_same_origin_for_writes
 from app.errors import problem_responses
 from app.client_portal.schemas import (
+    ClientTaskPatch,
     ClientCaseResponse,
     ClientDocumentResponse,
     ClientNotificationResponse,
@@ -15,7 +16,6 @@ from app.client_portal.schemas import (
     ClientTaskResponse,
     ClientUpdateResponse,
 )
-from app.cases.schemas import ClientTaskPatch
 from app.auth.repository import write_audit_event
 from app.auth.dependencies import request_ip
 
@@ -205,20 +205,20 @@ async def client_documents(
     responses=problem_responses(401, 403, 404, 422, 503),
 )
 async def patch_client_task(
+    request: Request,
     task_id: Annotated[UUID, Path(description="Task ID")],
     user: ClientDep,
     session: UserSessionDep,
     payload: Annotated[ClientTaskPatch, Body(description="Task status")],
 ) -> ClientTaskResponse:
+    """Uses ``app.client_set_task_status``: clients can change only the status of
+    tasks on open cases they belong to. Unknown and foreign tasks return 404."""
     row = (
         await session.execute(
             text(
                 """
-                UPDATE public.client_tasks
-                SET status = :status,
-                    completed_at = CASE WHEN :status = 'done' THEN now() ELSE NULL END
-                WHERE id = :task_id
-                RETURNING id, title, description, due_date::text, status
+                SELECT id, case_id, title, description, due_date::text AS due_date, status
+                FROM app.client_set_task_status(:task_id, :status)
                 """
             ),
             {"task_id": task_id, "status": payload.status},
@@ -226,7 +226,22 @@ async def patch_client_task(
     ).mappings().one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Task was not found.")
-    return ClientTaskResponse.model_validate(dict(row))
+    await write_audit_event(
+        session,
+        action="client_task.status_changed",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="client_task",
+        object_id=row["id"],
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        case_id=row["case_id"],
+        details={"status": payload.status},
+    )
+    return ClientTaskResponse.model_validate(
+        {key: row[key] for key in ("id", "title", "description", "due_date", "status")}
+    )
 
 
 @router.get(
@@ -275,10 +290,12 @@ async def client_document_download(
         await session.execute(
             text(
                 """
-                SELECT id
+                SELECT id, case_id
                 FROM public.client_shared_documents
                 WHERE document_id = :document_id
                   AND revoked_at IS NULL
+                ORDER BY shared_at DESC
+                LIMIT 1
                 """
             ),
             {"document_id": document_id},
@@ -288,7 +305,7 @@ async def client_document_download(
         raise HTTPException(status_code=404, detail="Document was not found.")
     await write_audit_event(
         session,
-        action="client.document_download_requested",
+        action="document.download",
         actor_user_id=user.id,
         actor_role=user.role,
         object_type="shared_document",
@@ -296,5 +313,6 @@ async def client_document_download(
         ip_address=request_ip(request),
         user_agent=request.headers.get("user-agent", "")[:512] or None,
         request_id=getattr(request.state, "request_id", None),
+        case_id=row["case_id"],
     )
     return DownloadUrlResponse(status="NOT_CONFIGURED")

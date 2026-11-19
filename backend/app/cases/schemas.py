@@ -164,6 +164,18 @@ class VisibilityPatch(BaseModel):
     plain_explanation: str | None = Field(default=None, max_length=10000)
 
 
-class ClientTaskPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+class SharedDocumentResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    document_id: UUID
+    display_name: str
+    shared_at: datetime
+
+
+class ClientTaskCreatedResponse(BaseModel):
+    id: UUID
+    case_id: UUID
+    title: str
+    description: str | None
+    due_date: date | None
     status: Literal["open", "done", "cancelled"]
