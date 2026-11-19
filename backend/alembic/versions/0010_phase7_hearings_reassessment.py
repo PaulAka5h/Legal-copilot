@@ -83,16 +83,16 @@ def upgrade() -> None:
         """
         CREATE POLICY hearing_updates_lawyer_manage ON public.hearing_updates
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
     op.execute(
         """
         CREATE POLICY hearing_reassessments_lawyer_manage ON public.hearing_reassessments
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
 
