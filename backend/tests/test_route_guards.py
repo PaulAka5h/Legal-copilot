@@ -38,9 +38,22 @@ def _calls(dependant: Dependant) -> set:
     return found
 
 
-def _api_routes() -> list[APIRoute]:
+def _api_routes() -> list:
+    """Every effective API route with its full path and merged dependant.
+
+    FastAPI 0.164 keeps included routers nested (``_IncludedRouter``) instead of
+    flattening them into ``app.routes``; their ``effective_route_contexts()``
+    expose full paths and router-level dependencies. Older versions flatten.
+    """
     app = create_app(Settings(app_env="test"))
-    return [r for r in app.routes if isinstance(r, APIRoute)]
+    routes: list = []
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            routes.append(route)
+        elif hasattr(route, "effective_route_contexts"):
+            routes.extend(route.effective_route_contexts())
+    assert len(routes) > 40, "route inventory looks incomplete"
+    return routes
 
 
 def test_every_lawyer_case_route_requires_case_access() -> None:

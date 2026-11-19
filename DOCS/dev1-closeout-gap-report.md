@@ -127,7 +127,7 @@ Dev 2's documents, analysis and strategy data are Pydantic objects held in memor
 
 **Shared legal tables** (`legal_sources`, `legal_chunks`) are created by raw SQL in
 `backend/src/legal_kb/migrations.py`, **outside Alembic**. They have no grants to
-`app_user` and no `app_admin_ingest` role. Ingestion connects as `researchsphere`
+`app_user`. The `app_admin_ingest` role exists (created by 0001) but has no grants on legal tables. Ingestion connects as `researchsphere`
 to a separate DB on port 5433. `legal_source_versions` is mentioned in the
 docstring but not created.
 
@@ -241,7 +241,7 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 |---|---|---|---|
 | P1 Authentication and sessions | In progress | **Partial** | No rate limit on forgot/reset/MFA verify; no rotation on privilege change; no password-change endpoint; old injected-identity client test still the only "guard" test besides B12; tests unrun here |
 | P1 Roles, organizations, case membership | In progress | **Partial** | `can_upload`/`can_run_ai`/`can_publish_updates` flags absent; no generated authorization matrix |
-| P1 Database migrations and RLS | In progress | **Partial / broken at head** | S3; §12.1 tables mostly absent; no `app_admin_ingest`; legal KB outside Alembic; client reads `cases` directly |
+| P1 Database migrations and RLS | In progress | **Partial / broken at head** | S3; §12.1 tables mostly absent; `app_admin_ingest` role has no legal-table grants; legal KB outside Alembic; client reads `cases` directly |
 | P1 Case creation | In progress | **Partial** | No ETag/If-Match; no cursor pagination; per-type stage templates absent |
 | P2 Lawyer dashboard shell | In progress | **Frontend-only** (mock data) | Batch 6 |
 | P2 Lawyer matter detail | In progress | **Frontend-only**; `lawyer.ts` calls Dev 2's unauthenticated analysis API and legal-KB search | Batch 6 |
@@ -259,7 +259,7 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 
 0. **Unblock environment** (needs you): Python ≥ 3.12, `uv`, Docker Desktop (or WSL2 + Docker) so Compose PostgreSQL can run. Without it no batch can reach an honest Done.
 1. **Batch 1: integration and boot hygiene**, plus: single factory in `app.main`; Dev 2 routers mounted **only behind** `require_lawyer` + `CaseAccess` + CSRF router-level dependencies (minimal integration touch, logged); `make backend-dev`/`backend-test` point at `app.main`; `/health/ready` reports Redis/MinIO `not_configured`.
-2. **Batch 2: RLS and migrations**, after Q1 is resolved: fix the 0009 chain; new Dev 1 revision adds `app_user` grants and lawyer policies for strategy tables, drops the client strategy read, adds `app_admin_ingest`, legal KB SELECT grants (if the tables move under Alembic), a client column-safe view for cases, and the claims tables + deferred trigger. RLS bypass suite over every existing case table.
+2. **Batch 2: RLS and migrations**, after Q1 is resolved: fix the 0009 chain; new Dev 1 revision adds `app_user` grants and lawyer policies for strategy tables, drops the client strategy read, grants `app_admin_ingest` write access and `app_user` SELECT on legal KB tables (if the tables move under Alembic), a client column-safe view for cases, and the claims tables + deferred trigger. RLS bypass suite over every existing case table.
 3. **Batch 2b (new): B13 fixes**: CSRF on visibility and client-task routes, closed-case denial, `can_publish_updates`, publish/withdraw audit, typed response models, client task UPDATE path, client-only schemas, tests for shared-docs/tasks/visibility/download.
 4. **Batch 3: auth**: rate limits on forgot/reset/MFA, rotation on privilege change, permission flags, generated authorization matrix.
 5. **Batch 4: case creation**: ETag/If-Match, cursor pagination.
@@ -276,3 +276,46 @@ the planned `/timeline` ownership clash. `/health` exists in both.
 4. Can you install or start Python 3.12 + `uv` + Docker on this machine, or point me to the machine and environment where Compose PostgreSQL runs?
 
 See also `DOCS/dev1-to-dev2-requests.md`.
+
+---
+
+## 8. Batch 1 live verification (2026-11-19)
+
+The environment is now available: Docker Desktop (WSL2), `uv` 0.13.9, project Python 3.12.16.
+Compose `db` (pgvector pg16) and `redis` are running. **`minio` cannot start:**
+`minio/minio:RELEASE.2025-04-22T22-12-26Z` fails with "pull access denied" on
+Docker Hub, so `compose.yaml` needs a reachable MinIO image (Dev 2 storage scope).
+
+| Check | Result |
+|---|---|
+| `alembic heads` | `0009_phase6_strategy_engine (head)`, single head |
+| Fresh `upgrade head` (bootstrap 0001 as `postgres`, then `app_owner`) | **Pass**, so the amended 0009 applies |
+| `downgrade base` (as `app_owner`) | **Pass** |
+| Re-`upgrade head` after `downgrade base` | Failed before the fix: the bootstrap guard in `alembic/env.py` refused whenever `alembic_version` existed, even when empty. **Fixed** (guard now refuses only when a revision is recorded). Bootstrap 0001 → `app_owner` to head: **pass**. A second bootstrap after 0001 is still refused. All 24 public tables are owned by `app_owner` |
+| Roles | `app_user`: NOSUPERUSER, NOBYPASSRLS. `app_owner`: BYPASSRLS (migration role). `app_admin_ingest`: exists, no grants |
+| Full `pytest` as `app_user` | **118 passed, 1 failed, 6 skipped** (6 min 37 s) |
+| `/health` · `/health/ready` · `/docs` · `/redoc` · `/openapi.json` | all 200; readiness `{"status":"ready","database":"ok","redis":"not_configured","object_storage":"not_configured"}`; OpenAPI 55 paths |
+| Anonymous Dev 2 case route | 401 `application/problem+json` |
+
+**Failure (1):** `tests/ai/test_gateway.py::test_gateway_environment_provider_selection`
+(Dev 2) asserts that `LLM_PROVIDER=gemini` is accepted. With the providers.md-compliant
+`LLM_APPROVED_PROVIDERS=mock` the gateway correctly refuses. The test encodes defect S1,
+so I left it unchanged and filed it under R1.
+
+**Skips (6), all Dev 2 legal KB:** `test_ingestion.py:90` and `test_vector_pipeline.py:60`
+need the hard-coded `/home/arafath/...` dataset path (pending Akash). The four
+`test_pgvector_live.py` tests need a separate DB on `localhost:5433` with hard-coded
+`researchsphere` credentials.
+
+**Live RLS catalog** (`pg_class`, `pg_policies`, `role_table_grants`) matches §2 exactly:
+14 tables with `case_id` (plus `cases`), all with RLS **and** FORCE RLS. The strategy
+tables have only the lawyer policy (no client policy) and **no `app_user` grants** (Batch 2).
+
+**Route-guard tests:** FastAPI 0.164 keeps included routers nested
+(`_IncludedRouter`), so iterating `app.routes` sees no API routes. The guard tests
+now walk `effective_route_contexts()` and assert more than 40 routes. All 11 pass:
+every lawyer `{case_id}` route needs CaseAccess, every write needs the Origin
+check, every non-public route needs a session; anonymous → 401, missing Origin →
+403, another lawyer's case → the same 404 as an unknown case.
+
+Minor: request logs record the route path without the `/api/v1` prefix (same nesting cause).

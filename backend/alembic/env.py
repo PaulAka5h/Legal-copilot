@@ -67,7 +67,16 @@ async def run_async_migrations() -> None:
             version_table = await connection.scalar(
                 text("SELECT to_regclass('public.alembic_version')")
             )
-            if version_table is not None:
+            # An empty version table (left by `downgrade base`) means no
+            # revision is applied, so bootstrap is still allowed.
+            applied = (
+                await connection.scalar(
+                    text("SELECT count(*) FROM public.alembic_version")
+                )
+                if version_table is not None
+                else 0
+            )
+            if applied:
                 raise RuntimeError(
                     "Bootstrap credentials are only allowed before the first migration"
                 )
