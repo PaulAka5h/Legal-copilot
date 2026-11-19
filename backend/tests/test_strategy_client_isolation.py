@@ -102,9 +102,7 @@ def test_client_member_cannot_read_strategy_tables(api_client) -> None:
             assert visible in ("denied", 0), (table, visible)
 
         # 3. The client API namespace exposes no strategy endpoint.
-        client_paths = [
-            route.path for route in client.app.routes
-            if getattr(route, "path", "").startswith("/api/v1/client")
-        ]
+        # OpenAPI lists every mounted path, including those of included routers.
+        client_paths = [p for p in client.app.openapi()["paths"] if p.startswith("/api/v1/client")]
         assert client_paths, "expected /api/v1/client routes"
         assert not any("strateg" in path for path in client_paths)

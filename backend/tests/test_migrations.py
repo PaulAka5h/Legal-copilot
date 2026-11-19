@@ -25,3 +25,15 @@ def test_migrations_generate_offline_sql_with_required_schema_and_auth_support()
     assert "CREATE FUNCTION app.consume_login_attempt" in result.stdout
     assert "CREATE FUNCTION app.revoke_sessions" in result.stdout
     assert "CREATE TABLE public.audit_logs" in result.stdout
+
+
+def test_revision_ids_fit_alembic_version_column() -> None:
+    """alembic_version.version_num is varchar(32); a longer ID fails only at apply time."""
+    import re
+
+    ids = [
+        re.search(r'^revision = "([^"]+)"', path.read_text(encoding="utf-8"), re.M).group(1)
+        for path in (BACKEND_DIR / "alembic" / "versions").glob("*.py")
+    ]
+    assert ids
+    assert [i for i in ids if len(i) > 32] == []

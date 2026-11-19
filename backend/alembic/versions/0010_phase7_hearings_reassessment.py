@@ -1,13 +1,13 @@
 """Phase 7: Hearings updates, continuous strategy reassessments, diffs, and RLS.
 
-Revision ID: 0010_phase7_hearings_reassessment
+Revision ID: 0010_phase7_hearings
 Revises: 0009_phase6_strategy_engine
 Create Date: 2026-11-19
 """
 
 from alembic import op
 
-revision = "0010_phase7_hearings_reassessment"
+revision = "0010_phase7_hearings"
 down_revision = "0009_phase6_strategy_engine"
 branch_labels = None
 depends_on = None

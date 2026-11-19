@@ -10,14 +10,14 @@ Access (database.md 12.4):
 - Search must exclude versions whose review_status is not 'approved'.
 
 Revision ID: 0011_legal_knowledge_base
-Revises: 0010_phase7_hearings_reassessment
+Revises: 0010_phase7_hearings
 Create Date: 2026-11-20
 """
 
 from alembic import op
 
 revision = "0011_legal_knowledge_base"
-down_revision = "0010_phase7_hearings_reassessment"
+down_revision = "0010_phase7_hearings"
 branch_labels = None
 depends_on = None
 
