@@ -64,9 +64,25 @@ def test_document_sanitizer_wrap_and_corpus():
     assert "</evidence_corpus>" in corpus
 
 
-def test_gateway_environment_provider_selection(monkeypatch):
+def test_gemini_is_rejected_unless_explicitly_approved(monkeypatch):
+    monkeypatch.delenv("LLM_APPROVED_PROVIDERS", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-mock-key")
+    with pytest.raises(ProviderNotApprovedError):
+        LLMGateway()
+
+
+def test_default_gateway_is_mock_only(monkeypatch):
+    monkeypatch.delenv("LLM_APPROVED_PROVIDERS", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    gw = LLMGateway()
+    assert gw.approved_providers == ["mock"]
+    assert gw.current_provider == "mock"
+
+
+def test_gateway_environment_provider_selection_when_approved(monkeypatch):
+    monkeypatch.setenv("LLM_APPROVED_PROVIDERS", "mock,gemini")
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "test-mock-key")
     gw = LLMGateway()
     assert gw.current_provider == "gemini"
-    assert gw.current_model == "gemini-3.5-flash-lite"

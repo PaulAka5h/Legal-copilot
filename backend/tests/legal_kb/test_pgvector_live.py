@@ -1,5 +1,6 @@
 """Integration test connecting to PostgreSQL + pgvector testing real SQL, HNSW index and FTS."""
 
+import os
 from pathlib import Path
 import psycopg
 import pytest
@@ -10,18 +11,20 @@ from backend.src.legal_kb.retriever import LegalHybridRetriever
 from backend.src.legal_kb.schemas import LegalLanguage, ScrapedSectionRecord
 from backend.src.legal_kb.vector_store import PgVectorStore
 
-DB_URL = "postgresql://researchsphere:devpassword@localhost:5433/legal_copilot_test"
+# Throwaway test database only; never point this at a shared database.
+DB_URL = os.environ.get("LEGAL_KB_TEST_DATABASE_URL", "")
 
 
 @pytest.fixture(scope="module")
 def postgres_pgvector_store():
-    # Attempt connection to local test database
+    if not DB_URL:
+        pytest.skip("LEGAL_KB_TEST_DATABASE_URL is not set")
     try:
         with psycopg.connect(DB_URL, autocommit=True) as conn:
             with conn.cursor() as cur:
                 cur.execute(CREATE_LEGAL_KB_TABLES_SQL)
     except Exception as e:
-        pytest.skip(f"PostgreSQL container not accessible on localhost:5433: {e}")
+        pytest.skip(f"Legal KB test database not accessible: {type(e).__name__}")
 
     store = PgVectorStore(db_url=DB_URL)
     embedding_provider = MockEmbeddingProvider(dimension=1024)

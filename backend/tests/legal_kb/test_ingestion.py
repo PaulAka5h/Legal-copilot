@@ -85,7 +85,7 @@ def test_chunker_splits_oversize_text(sample_english_section):
 
 
 def test_real_dataset_streaming():
-    real_jsonl = Path("/home/arafath/ai-builders/Legal-copilot/data-scrapper/data/processed/sections.jsonl")
+    real_jsonl = Path(__file__).resolve().parents[3] / "data-scrapper" / "data" / "processed" / "sections.jsonl"
     if not real_jsonl.exists():
         pytest.skip("Scraped dataset file not found")
 

@@ -46,10 +46,8 @@ app.add_middleware(
 )
 
 # Database & Retriever Setup
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://researchsphere:devpassword@localhost:5433/legal_copilot_test",
-)
+# No credential fallback: set DATABASE_URL in the environment.
+DB_URL = os.environ.get("DATABASE_URL", "")
 vector_store = PgVectorStore(db_url=DB_URL)
 embedding_provider = MockEmbeddingProvider(dimension=1024)
 retriever = LegalHybridRetriever(

@@ -165,10 +165,8 @@ ingest-legal-kb:
 
 db-status:
 	@echo "Querying PostgreSQL pgvector chunk and act statistics..."
-	@docker exec -it $$(docker ps -qf "name=postgres") psql -U postgres -d legal_copilot -c "\
-		SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;" 2>/dev/null || \
-	docker exec -it 3cfd4cd523d9 psql -U researchsphere -d legal_copilot_test -c "\
-		SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;"
+	@docker compose exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
+		"SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;"'
 
 scraper-run:
 	@echo "Running Bangladesh Laws Scraper..."
