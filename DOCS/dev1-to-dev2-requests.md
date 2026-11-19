@@ -1,0 +1,22 @@
+# Backend Dev 1 → Backend Dev 2 Requests
+
+Open requests from Dev 1 for code Dev 2 owns. Dev 1 does not change these files
+except for the marked one-line integration fixes needed to boot the combined app.
+Source: `DOCS/dev1-closeout-gap-report.md` (2026-11-19, static audit).
+
+| # | Severity | File:line | Problem | Proposed fix | State |
+|---|---|---|---|---|---|
+| R1 | Critical (security) | `backend/src/ai/gateway.py:72` | Default `LLM_APPROVED_PROVIDERS` is `mock,gemini`; providers.md approves only `mock` (approval rule 4) | Default to `mock`; read the list only from config | Open |
+| R2 | Critical (security) | `backend/.env.example:18-20` | Example config selects `LLM_PROVIDER=gemini` | `LLM_PROVIDER=mock`, `LLM_APPROVED_PROVIDERS=mock`; drop the Gemini key lines until a review record exists | Open |
+| R3 | High | `backend/scripts/live_gemini_demo.py:47`, `Makefile` `test-gemini-live` | One command sends prompts to an unreviewed provider | Remove, or refuse unless providers.md has a Gemini review record | Open |
+| R4 | Critical (isolation) | `backend/src/analysis/router.py`, `backend/src/strategy/router.py` (all routes) | No auth, no case access, no CSRF; reviewer/approver IDs come from the body; global in-memory state keyed by `case_id` | Take the actor from Dev 1's `LawyerDep`; gate with `CaseAccessDep`; persist to RLS tables; Dev 1 can mount the routers behind router-level dependencies meanwhile | Open |
+| R5 | High | `backend/src/main.py` | Second app factory: anonymous `/api/v1/documents/process` returns page text, anonymous legal-KB search, CORS `*` with credentials, hard-coded `researchsphere:devpassword@localhost:5433`, non-`app_user` role | Retire in favour of `app.main:app`; move Dev 2 routes into routers mounted there | Open |
+| R6 | Critical (migration) | `backend/alembic/versions/0009_phase6_strategy_engine.py:116-133` | Uses `app.has_case_access`, which no migration defines, so a fresh `upgrade head` fails | Use `app.is_lawyer_member(case_id)` (database.md §12.1) | Open; needs a decision on who edits |
+| R7 | High | same file `:140` | `strategies_client_read` exposes strategies to clients (Rule 8) | Drop; clients see strategy outcomes only through `client_visible_updates` | Open |
+| R8 | High | same file | No `GRANT … TO app_user` on the three strategy tables; `organization_id` has no FK | Dev 1 can add grants and composite FK in a new revision once R6 is resolved | Open |
+| R9 | Medium | `backend/src/legal_kb/migrations.py` | Legal KB schema is created outside Alembic; no `app_user` SELECT grant; writes need `app_admin_ingest` (database.md §12.4) | Move into an Alembic revision; Dev 1 will create `app_admin_ingest` | Open |
+| R10 | Medium | `backend/src/legal_kb/*` vs `DOCS/database.md` §7 | `legal_chunks` shape diverges (no `legal_source_versions`; 1024-dim e5-large) | Joint review; update database.md | Open |
+| R11 | Medium | `backend/src/documents/pipeline.py:103` | Storage key `cases/{case_id}/documents/{doc_id}/{filename}` differs from architecture and leaks the filename into the key | `org/{org_id}/case/{case_id}/doc/{doc_id}/{version}` | Open |
+| R12 | High (blocks Dev 1) | n/a | No `documents`, `extracted_pages`, `document_chunks`, `analyses`, `ai_runs` tables, so Dev 1 cannot add document authorization, the shared-document FK, or the retrieval isolation tests | Land Alembic tables with `case_id` and the agreed UUID lifecycle | Open |
+| R13 | Medium | `backend/src/analysis/router.py` review endpoint | Review mutates the analysis in place (Rule 6) and returns `Dict` | New version row; typed response model | Open |
+| R14 | Low | `src/analysis/router.py`, `src/strategy/router.py` | `Dict[str, Any]` response models; no problem+json error declarations | Typed models; `responses=problem_responses(...)` | Open |
