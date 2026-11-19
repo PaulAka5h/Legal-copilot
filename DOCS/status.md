@@ -59,9 +59,9 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 3 Documents | PDF and Word extraction | Done | PyMuPDF & python-docx tests pass | Passed | Digital page-by-page extraction preserving exact physical page numbers and language classification (BN/EN). |
 | 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
 | 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
-| 4 RAG | Chunking and embeddings | In progress | `tests/rag`: chunking (e5 tokenizer, prefix counted, <=512, overlap, exact substrings), NFC/ZWJ, embed worker (resume, content-hash reuse) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A (master prompt). `app.rag.ingest` + `app.rag.embed` in `backend/app/`. Local dev: 20 Acts, 691 chunks, all embedded with self-hosted multilingual-e5-large on CPU (~132 s per 100 chunks). Full corpus not ingested. |
+| 4 RAG | Chunking and embeddings | Done | `tests/rag` (ingest, NFC, embed worker, offload export/import, approval) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A done 2026-11-20. Local embedding ~132 s/100 chunks on CPU; full corpus to be embedded on Kaggle GPU via `app.rag.embed export` / `scripts/kaggle_embed.py` / `app.rag.embed import`. |
 | 4 RAG | Scoped retrieval (case filter) | Not started (in `app/`) | | | Step B. The earlier `src/legal_kb` retriever is unauthenticated and used mock embeddings; not reused as-is. |
-| 4 RAG | Legal source ingestion and versions | In progress | Migration 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest and version-on-change tests pass; approval CLI test passes (reviewer, time, audit event) | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced from this checkout (see 7.1 V8). Versions are `pending` until a person approves them with `app.rag.approve`; none approved locally. |
+| 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; versions stay `pending` until approved with `app.rag.approve` (see 7.8). |
 | 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
 | 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
@@ -237,4 +237,23 @@ Notes for Step A:
 | Embedding | `uv run python -m app.rag.embed [--device auto\|cpu\|cuda] [--batch-size N] [--limit N] [--dry-run]`. "passage: " + NFC text, normalized 1024-dim vectors, batched, resumable, reuses vectors by content_hash. `auto` uses CUDA only when the torch build supports the GPU (the local MX350, sm_61, is not supported by torch cu132, so CPU). Local: 691/691 chunks embedded, ~132 s per 100 chunks on 8 CPU cores; the full corpus would take ~14.5 h on this machine. |
 | Approval | `uv run python -m app.rag.approve (--version-id ID ... \| --all-pending) --reviewer-email EMAIL [--note] [--dry-run]`. Reviewer must be an active lawyer or admin; sets `reviewed_by`/`reviewed_at`; audit event `legal_source_version.approved`. No auto-approve. |
 | Not done | Retrieval (Step B), query-side NFC is in `app.rag.text` but no search uses it yet; citation verifier (Step D) will use `app.rag.text.quote_in_text`. `tests/legal_kb/test_pgvector_live.py` targets the old raw-SQL schema and stays skipped; remove or port in Step B. |
+
+### 7.8 Step A done (2026-11-20)
+
+Step A (ingestion pipeline) is done. Commands, all as `app_admin_ingest` via `LEGAL_INGEST_DATABASE_URL`:
+
+| Command | Purpose |
+|---|---|
+| `python -m app.rag.ingest` | Validate, chunk (NFC, e5 tokenizer, <=512), version by content hash |
+| `python -m app.rag.embed run` | Local embedding (CPU here; `auto` skips GPUs the torch build cannot use) |
+| `python -m app.rag.embed export` / `import` + `scripts/kaggle_embed.py` | Offload embedding to a Kaggle GPU; import verifies content_hash, model/version, 1024 dims, unit norm; rejects go to a report |
+| `python -m app.rag.approve` | Human approval with reviewer, time, audit event; no auto-approve |
+| `python -m app.seed_dev_lawyer` | Local dev lawyer account (password prompted, never echoed) |
+
+Verified locally: Kaggle script round trip on 20 real Bangla chunks in `legal_copilot_test` (CPU): 20 imported, re-import 0 imported / 20 already embedded, 0 rejects, cosine 1.0 against the local worker.
+
+Open items carried into Step B:
+- [ ] Approve the 20 local dev versions once the dev reviewer account exists (`app.seed_dev_lawyer`, then `app.rag.approve --all-pending`).
+- [ ] Fix or delete `tests/legal_kb/test_pgvector_live.py` (targets the old raw-SQL schema; skipped).
+- [ ] Embed the full corpus on Kaggle and ingest all Acts (dry run: 39,637 chunks).
 
