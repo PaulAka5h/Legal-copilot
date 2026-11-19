@@ -59,6 +59,23 @@ async def ensure_case_open(session: AsyncSession, case_id: UUID) -> None:
         )
 
 
+async def authorize_case_write(
+    session: AsyncSession,
+    *,
+    acting_user_id: UUID,
+    case_id: UUID,
+    permission: str,
+) -> CaseAccess:
+    """For routes whose path has no case_id: membership (404), ``permission`` (403),
+    then open case (409). Resolve ``case_id`` from the resource under RLS first."""
+    access = await get_case_membership(session, acting_user_id=acting_user_id, case_id=case_id)
+    if access is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CASE_NOT_FOUND)
+    require_case_permission(access, permission)
+    await ensure_case_open(session, case_id)
+    return access
+
+
 async def authorize_client_visible_write(
     session: AsyncSession,
     *,
@@ -66,12 +83,9 @@ async def authorize_client_visible_write(
     case_id: UUID,
 ) -> CaseAccess:
     """Membership (404), ``can_publish_updates`` (403), then open case (409)."""
-    access = await get_case_membership(session, acting_user_id=acting_user_id, case_id=case_id)
-    if access is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CASE_NOT_FOUND)
-    require_case_permission(access, PUBLISH_PERMISSION)
-    await ensure_case_open(session, case_id)
-    return access
+    return await authorize_case_write(
+        session, acting_user_id=acting_user_id, case_id=case_id, permission=PUBLISH_PERMISSION
+    )
 
 
 async def get_client_visible_write_access(

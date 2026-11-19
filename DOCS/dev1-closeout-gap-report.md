@@ -409,3 +409,21 @@ Bounded lists (`/cases/{id}/members`, `/lawyer/team`) and client-portal lists ar
 unpaginated for now.
 
 Full suite as `app_user`: **152 passed, 1 failed (Dev 2 R15), 6 skipped (Dev 2 legal KB)**.
+
+---
+
+## 13. Batch 5: document authorization and case scope enforcement (2026-11-19)
+
+**Status: blocked on Dev 2 schema (R12). Dev 1 contract delivered and tested.**
+
+| Item | Finding | Delivered |
+|---|---|---|
+| Document endpoints (TRD §3.2) | None exist in the mounted app (Dev 2's upload lives only in the retired `src/main.py`) | `app/cases/document_access.py`: `DocumentReadDep`, `DocumentWriteDep` (`can_upload` + open case), `authorize_document_read/write` for `/documents/{id}` routes after resolving `case_id` under RLS, `check_document_delete` (reason of 10+ characters; 409 during a retention hold), `DOCUMENT_AUDIT_ACTIONS`. Tested via probe routes: lead/team/other-org/client/closed/no-Origin and 404 equivalence (`tests/test_document_access.py`) |
+| `client_shared_documents` FK | `documents` table does not exist | Blocked (R12) |
+| Client download URL | No storage wrapper exists | Still `NOT_CONFIGURED` after full authorization; audited `document.download` (Batch 2b) |
+| Scoped retrieval | No case retrieval exists. The legal-KB retriever has no `case_id`; the analysis engine takes `document_chunks` from the request body (R20) | `tests/test_retrieval_isolation.py`: two orgs, near-identical chunks; lawyer A sees only A's chunks without a filter, nothing with B's filter, client sees nothing. Skips with reason now; **passed** against a temporary local copy of database.md §6 tables with §12.1 RLS (created and dropped; nothing committed) |
+| Workers set `app.current_user_id` | No worker exists | Contract restated in R20 |
+
+"Document Authorization" and "Scoped retrieval (case filter)" stay **Blocked**, not Done.
+
+Full suite as `app_user`: **155 passed, 1 failed (Dev 2 R15), 7 skipped** (6 Dev 2 legal KB, 1 retrieval isolation blocked on R12).
