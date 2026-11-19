@@ -71,12 +71,8 @@ def generate_strategies(
     payload: Annotated[StrategyGenerateRequest, Body(description="Case facts and document list")],
 ) -> List[StrategyRecord]:
     engine = get_strategy_engine()
-    facts = payload.case_facts or {"case_type": "Cheque Dishonour", "title": "Commercial Debt Recovery"}
-    docs = payload.available_documents or [
-        {"filename": "cheque.pdf", "text": "Cheque no 4928192"},
-        {"filename": "return_memo.pdf", "text": "Dishonour memo code 01"},
-        {"filename": "notice.pdf", "text": "Statutory legal notice"},
-    ]
+    facts = payload.case_facts or {}
+    docs = payload.available_documents or []
 
     strategies = engine.generate_strategies_for_case(
         case_id=case_id,
@@ -97,19 +93,7 @@ def list_strategies(
     case_id: Annotated[str, Path(description="Case UUID")],
 ) -> List[StrategyRecord]:
     engine = get_strategy_engine()
-    strategies = engine.get_strategies(case_id)
-    if not strategies:
-        # Generate initial strategies if not yet run
-        strategies = engine.generate_strategies_for_case(
-            case_id=case_id,
-            case_facts={"case_type": "Cheque Dishonour"},
-            available_documents=[
-                {"filename": "cheque.pdf", "text": "Cheque 4928192"},
-                {"filename": "return_memo.pdf", "text": "Dishonour memo"},
-                {"filename": "notice.pdf", "text": "Notice"},
-            ],
-        )
-    return strategies
+    return engine.get_strategies(case_id)
 
 
 @router.get(
@@ -123,15 +107,6 @@ def get_strategy_comparison(
 ) -> StrategyComparisonRecord:
     engine = get_strategy_engine()
     comparison = engine.get_latest_comparison(case_id)
-    if not comparison:
-        # Ensure strategies exist to compare
-        engine.generate_strategies_for_case(
-            case_id=case_id,
-            case_facts={"case_type": "Cheque Dishonour"},
-            available_documents=[{"filename": "cheque.pdf", "text": "Cheque"}],
-        )
-        comparison = engine.get_latest_comparison(case_id)
-
     if not comparison:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -250,11 +225,8 @@ def generate_strategy_report(
     payload: Annotated[StrategyGenerateRequest, Body(description="Case facts and document list")],
 ) -> LegalStrategyReportRecord:
     orchestrator = get_strategy_orchestrator()
-    facts = payload.case_facts or {"case_type": "Cheque Dishonour", "title": "Commercial Debt Recovery"}
-    docs = payload.available_documents or [
-        {"filename": "cheque.pdf", "text": "Cheque #4928192"},
-        {"filename": "memo.pdf", "text": "Dishonour memo code 01"},
-    ]
+    facts = payload.case_facts or {}
+    docs = payload.available_documents or []
     report = orchestrator.generate_final_report(
         case_id=case_id,
         case_facts=facts,

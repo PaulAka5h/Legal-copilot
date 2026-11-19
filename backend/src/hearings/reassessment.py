@@ -26,6 +26,7 @@ from backend.src.hearings.schemas import (
 )
 from backend.src.strategy.evaluator import RATING_ORDER, RubricEvaluator
 from backend.src.strategy.schemas import (
+    STRATEGY_NOT_CONFIGURED_REASON,
     Plausibility,
     ResidualRiskMetadata,
     RubricDimensionScore,
@@ -51,12 +52,17 @@ class HearingReassessmentEngine:
         case_id: str,
         hearing_id: str,
         hearing_update: HearingUpdateRecord,
-        active_strategy: StrategyRecord,
+        active_strategy: Optional[StrategyRecord],
         alternative_strategies: Optional[List[StrategyRecord]] = None,
-        case_title: str = "Commercial Proceeding",
+        case_title: str = "Case",
         organization_id: str = "default_org",
     ) -> HearingReassessmentRecord:
         """Run targeted diffing of the 2-ply scenario tree and recalculate rubric dimensions."""
+
+        if active_strategy is None:
+            return self._reassessment_without_strategy(
+                case_id, hearing_id, hearing_update, case_title, organization_id
+            )
 
         tree_diffs: List[BranchDiffItem] = []
         rubric_diffs: List[RubricDiffItem] = []
@@ -112,6 +118,34 @@ class HearingReassessmentEngine:
             new_evidence_needs=new_evidence_needs,
             reassessed_strategy=reassessed_strategy,
             draft_client_update=draft_client_update,
+            review_status=HearingReviewStatus.DRAFT,
+        )
+
+    def _reassessment_without_strategy(
+        self,
+        case_id: str,
+        hearing_id: str,
+        hearing_update: HearingUpdateRecord,
+        case_title: str,
+        organization_id: str,
+    ) -> HearingReassessmentRecord:
+        """Record the hearing with no tree diff when no lawyer-selected strategy exists."""
+        return HearingReassessmentRecord(
+            case_id=case_id,
+            hearing_id=hearing_id,
+            hearing_update_id=str(hearing_update.id),
+            organization_id=organization_id,
+            recommendation=HearingRecommendation.REVIEW,
+            recommendation_reason=(
+                "No current strategy selected by the lawyer; nothing to reassess. "
+                + STRATEGY_NOT_CONFIGURED_REASON
+            ),
+            draft_client_update=self._draft_client_update(
+                case_title=case_title,
+                hearing_id=hearing_id,
+                hearing_update=hearing_update,
+                recommendation=HearingRecommendation.REVIEW,
+            ),
             review_status=HearingReviewStatus.DRAFT,
         )
 
@@ -266,27 +300,27 @@ class HearingReassessmentEngine:
         stat_dim = RubricDimensionScore(
             dimension_name="statutory_strength",
             rating=stat_score,
-            explanation="Statutory presumption verified under NI Act Sec 138/139.",
+            explanation="Carried over from previous rubric; not re-verified against legal sources.",
         )
         prec_dim = RubricDimensionScore(
             dimension_name="precedent_alignment",
             rating=prec_score,
-            explanation="Binding High Court & Appellate Division citations.",
+            explanation="Carried over from previous rubric; no judgments in knowledge base.",
         )
         fact_dim = RubricDimensionScore(
             dimension_name="factual_support",
             rating=fact_score,
-            explanation="Exhibits and documentary cheques in record.",
+            explanation="Based on lawyer-entered hearing notes.",
         )
         proc_dim = RubricDimensionScore(
             dimension_name="procedural_compliance",
             rating=proc_score,
-            explanation="Compliance with limitation periods and notice requirements.",
+            explanation="Based on lawyer-entered hearing notes; deadlines are not computed.",
         )
         forum_dim = RubricDimensionScore(
             dimension_name="forum_risk",
             rating=forum_score,
-            explanation="Court workload, calendar delays, and bench disposition.",
+            explanation="Based on lawyer-entered hearing notes.",
         )
 
         return self.evaluator.evaluate_strategy(
@@ -317,7 +351,7 @@ class HearingReassessmentEngine:
         if any(term in update_text for term in ["dismissed under section 203", "barred by limitation", "quashed"]):
             return (
                 HearingRecommendation.CHANGE_SUGGESTED,
-                "Criminal complaint barred or dismissed by court. Recommend switching immediately to alternative civil summary recovery under Order XXXVII CPC.",
+                "Hearing notes record a dismissal, bar, or quashing. Lawyer should review alternative strategies.",
             )
 
         # Check for significant evidentiary requirements or procedural warnings
@@ -336,7 +370,7 @@ class HearingReassessmentEngine:
 
         return (
             HearingRecommendation.MAINTAIN,
-            "Court proceedings aligned with strategy objectives. Presumptions and procedural posture remain intact. Maintain current trajectory.",
+            "No change detected in hearing notes that affects the current strategy. Lawyer review still required.",
         )
 
     def _draft_client_update(

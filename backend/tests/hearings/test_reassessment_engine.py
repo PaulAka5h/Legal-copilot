@@ -1,4 +1,4 @@
-"""Unit tests for HearingReassessmentEngine: tree diffing, rubric shifts, and posture recommendations."""
+"""Unit tests for HearingReassessmentEngine: tree diffing, rubric shifts, and posture recommendations. Strategy fixtures are SAMPLE_DATA_NOT_REAL_LAW."""
 
 from datetime import datetime, timezone
 from uuid import uuid4

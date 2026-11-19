@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 from backend.src.strategy.generator import StrategyGenerator
 from backend.src.strategy.schemas import (
+    NO_PRECEDENT_NOTE,
+    NOT_CONFIGURED,
     RecommendationType,
     RubricRating,
     StrategyComparisonItem,
@@ -21,6 +23,7 @@ from backend.src.strategy.schemas import (
     StrategyOrigin,
     StrategyRecord,
     StrategyStatus,
+    comparison_reason,
 )
 
 
@@ -258,19 +261,9 @@ class StrategyEngine:
             strategies=items,
             best_supported_strategy_id=best_strat_id,
             recommendation=RecommendationType.INITIAL,
-            recommendation_reason=(
-                "Strategy evaluated with the highest overall legal grounding and strongest statutory presumption. "
-                "Criminal complaint under NI Act Sec 138 provides the most potent legal leverage."
-            ),
-            trade_offs_analysis=(
-                "NI Act Section 138 provides penal deterrence and statutory presumptions, but suffers from trial forum delays. "
-                "Order XXXVII summary civil suit enables asset attachment before judgment, but requires substantial court fees. "
-                "Section 89A mediation preserves commercial relationship and realizes fastest resolution, but lacks coercive enforcement without consent."
-            ),
-            uncertainties=[
-                "Verification of adverse party's delivery challan receipt signature.",
-                "DLR case law precedent corroboration on disputed security cheque defense.",
-            ],
+            recommendation_reason=comparison_reason(items),
+            trade_offs_analysis=NOT_CONFIGURED,
+            uncertainties=[NO_PRECEDENT_NOTE],
         )
 
         if case_id not in self._comparison_store:

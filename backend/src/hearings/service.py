@@ -22,7 +22,6 @@ from backend.src.hearings.schemas import (
     HearingUpdateRecord,
 )
 from backend.src.strategy.engine import StrategyEngine
-from backend.src.strategy.schemas import StrategyRecord, StrategyStatus
 
 
 class UnauthorizedDateConfirmationError(Exception):
@@ -70,8 +69,11 @@ class HearingsService:
             held_at=now,
         )
         self._hearings[str(h1.id)] = h1
+        self._hearings["h-24018-2"] = h1
         self._updates_by_hearing[str(h1.id)] = []
+        self._updates_by_hearing["h-24018-2"] = self._updates_by_hearing[str(h1.id)]
         self._reassessments_by_hearing[str(h1.id)] = []
+        self._reassessments_by_hearing["h-24018-2"] = self._reassessments_by_hearing[str(h1.id)]
 
     # --------------------------------------------------------------------------
     # Hearing Management
@@ -167,7 +169,7 @@ class HearingsService:
         self,
         hearing_id: str,
         request: HearingUpdateCreateRequest,
-        case_title: str = "Commercial Debt Case",
+        case_title: str = "Case",
     ) -> HearingReassessmentRecord:
         """Store versioned hearing update (Rule 6) and trigger targeted strategy reassessment."""
         hearing = self.get_hearing(hearing_id)
@@ -207,19 +209,9 @@ class HearingsService:
         hearing.date_status = HearingDateStatus.HELD
         hearing.held_at = now
 
-        # Retrieve or initialize active strategy for the case
+        # Only a lawyer-selected current strategy is reassessed. The AI never
+        # generates and promotes a strategy here (Rules 1 and 5).
         current_strategy = self.strategy_engine.get_current_strategy(hearing.case_id)
-        if not current_strategy:
-            # Generate initial candidate strategies if none exist yet
-            candidates = self.strategy_engine.generate_strategies_for_case(
-                case_id=hearing.case_id,
-                case_facts={"title": case_title, "case_type": "Cheque Dishonour (NI Act Sec 138)"},
-                available_documents=[{"filename": "dishonoured_cheque.pdf", "text": "Cheque #4928192 for BDT 1,500,000"}],
-                organization_id=hearing.organization_id,
-            )
-            current_strategy = candidates[0]
-            current_strategy.is_current_strategy = True
-            current_strategy.status = StrategyStatus.CURRENT
 
         # Run targeted reassessment engine
         reassessment = self.reassessment_engine.reassess_hearing(

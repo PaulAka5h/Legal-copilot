@@ -12,37 +12,28 @@ H. Final Comprehensive Legal Strategy Report
 J. Citation & Provenance Validation
 """
 
-from datetime import datetime, timezone
 import re
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import UUID, uuid4
+from uuid import UUID
+
 from backend.src.ai.gateway import LLMGateway
-from backend.src.ai.sanitizer import DocumentSanitizer
-from backend.src.strategy.eligibility import LegalEligibilityValidator
-from backend.src.strategy.evaluator import RubricEvaluator
 from backend.src.strategy.schemas import (
+    NO_PRECEDENT_NOTE,
+    NOT_CONFIGURED,
+    STRATEGY_NOT_CONFIGURED_REASON,
     DisputedFactItem,
     LegalCitationReference,
     LegalIssueAnalysisItem,
     LegalStrategyReportRecord,
-    Plausibility,
     PrecedentReference,
     QueryExpansionResult,
     RecommendationType,
-    ResidualRiskMetadata,
-    RubricDimensionScore,
-    RubricRating,
-    ScenarioOpposingNode,
-    ScenarioResponseNode,
-    ScenarioTree,
     StrategyComparisonItem,
     StrategyComparisonRecord,
-    StrategyOrigin,
     StrategyRecord,
-    StrategyRubricEvaluation,
-    StrategyStatus,
+    comparison_reason,
 )
-from backend.src.strategy.tree import ScenarioTreeExpander
+
 
 BN_DIGIT_MAP = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 
@@ -73,50 +64,11 @@ class StrategyOrchestrator:
         case_facts: Dict[str, Any],
         available_documents: List[Dict[str, Any]],
     ) -> Tuple[List[DisputedFactItem], List[DisputedFactItem], List[str]]:
-        """Extract material facts, separate disputed vs undisputed facts with IDs, and identify legal issues."""
-        undisputed_facts: List[DisputedFactItem] = []
-        disputed_facts: List[DisputedFactItem] = []
-        legal_issues: List[str] = []
+        """Fact extraction is NOT_CONFIGURED until lawyer-confirmed facts exist (master prompt Step C).
 
-        # Undisputed documentary facts
-        undisputed_facts.append(
-            DisputedFactItem(
-                id="fact-1",
-                statement="Cheque No. 4928192 drawn on Agrani Bank for BDT 1,500,000 issued by accused.",
-                is_disputed=False,
-                source_document="Cheque Leaf Photocopy",
-                source_page=1,
-            )
-        )
-        undisputed_facts.append(
-            DisputedFactItem(
-                id="fact-2",
-                statement="Cheque returned unpaid on 25 January 2023 with bank dishonour slip 'Insufficient Funds'.",
-                is_disputed=False,
-                source_document="Bank Return Memo",
-                source_page=1,
-            )
-        )
-
-        # Disputed facts
-        disputed_facts.append(
-            DisputedFactItem(
-                id="fact-3",
-                statement="Accused claims cheque was an undated blank security leaf given with no existing debt.",
-                is_disputed=True,
-                dispute_reason="Complainant states cheque was issued against commercial goods supply invoice #104.",
-                source_document="Accused Written Statement",
-                source_page=1,
-            )
-        )
-
-        legal_issues = [
-            "Whether statutory demand notice was lawfully dispatched and delivered within 30 days under NI Act Sec 138(b)?",
-            "Whether the statutory presumption of consideration under Section 139 applies in favour of the cheque holder?",
-            "Whether alternative summary debt recovery under Order XXXVII CPC is viable in parallel?",
-        ]
-
-        return disputed_facts, undisputed_facts, legal_issues
+        Returns empty lists instead of canned facts and issues.
+        """
+        return [], [], []
 
     # --------------------------------------------------------------------------
     # Stage B: Query Understanding & Expansion (Bilingual EN/BN)
@@ -129,15 +81,8 @@ class StrategyOrchestrator:
         sec_matches = re.findall(r"(?:section|sec|ধারা)\s*(\d+|[০-৯]+)", issue_text, flags=re.IGNORECASE)
         norm_secs = [self.normalize_numerals(s) for s in sec_matches]
 
-        en_queries = [
-            norm_text,
-            f"{norm_text} Negotiable Instruments Act Bangladesh",
-            "presumption consideration cheque dishonour section 138 139",
-        ]
-        bn_queries = [
-            "চেক ডিজঅনার নোটিশ ও মোকদ্দমা দায়েরের তামাদি",
-            "হস্তান্তরযোগ্য দলিল আইন ধারা ১৩৮ ও ১৩৯ উপধারা",
-        ]
+        en_queries = [norm_text] if norm_text.strip() else []
+        bn_queries: List[str] = []
 
         return QueryExpansionResult(
             original_issue=issue_text,
@@ -154,81 +99,24 @@ class StrategyOrchestrator:
         issues: List[str],
         retrieved_citations: List[LegalCitationReference],
     ) -> List[LegalIssueAnalysisItem]:
-        """Analyze case facts against retrieved statutory provisions and precedents."""
-        analyzed_items: List[LegalIssueAnalysisItem] = []
+        """Attach retrieved statutes to each issue. Precedents are never cited (none ingested).
 
-        for idx, issue in enumerate(issues, start=1):
-            if "138" in issue or "notice" in issue:
-                statutes = [c for c in retrieved_citations if c.section == "138"] or retrieved_citations[:1]
-                precedents = [
-                    PrecedentReference(
-                        case_title="Shamsul Haque vs State",
-                        citation="62 DLR (AD) 250",
-                        court="Appellate Division",
-                        year=2010,
-                        legal_principle="Notice sent by registered post with A.D. raises presumption of service under Section 27 General Clauses Act.",
-                        is_verified=True,
-                    )
-                ]
-                reqs = [
-                    "Notice must be dispatched within 30 days of receiving bank dishonour memo.",
-                    "Drawer must be given 30 clear days from notice receipt to pay.",
-                ]
-                exceptions = ["No criminal liability if cheque presented after 6 months validity."]
-                facts = ["fact-1", "fact-2"]
-                uncertainties = ["Date of actual receipt by accused on postal acknowledgment card."]
-            elif "presumption" in issue or "139" in issue:
-                statutes = [
-                    LegalCitationReference(
-                        act_name="The Negotiable Instruments Act, 1881",
-                        section="139",
-                        source_url="https://bdlaws.minlaw.gov.bd/act-25/section-139.html",
-                        is_verified=True,
-                    )
-                ]
-                precedents = [
-                    PrecedentReference(
-                        case_title="Major (Retd.) M. A. Jalil vs State",
-                        citation="58 DLR 145",
-                        court="High Court Division",
-                        year=2006,
-                        legal_principle="Statutory presumption under Section 139 is rebuttable by accused on preponderance of probabilities.",
-                        is_verified=True,
-                    )
-                ]
-                reqs = ["Complainant must be lawful holder in due course."]
-                exceptions = ["Presumption does not apply if drawer proves consideration was illegal or void."]
-                facts = ["fact-1", "fact-3"]
-                uncertainties = ["Whether accused will produce bank statements showing earlier transactions."]
-            else:
-                statutes = [
-                    LegalCitationReference(
-                        act_name="The Code of Civil Procedure, 1908",
-                        section="Order XXXVII",
-                        source_url="https://bdlaws.minlaw.gov.bd/act-86.html",
-                        is_verified=True,
-                    )
-                ]
-                precedents = []
-                reqs = ["Plaint must specifically state suit is instituted under Order XXXVII."]
-                exceptions = ["Defendant may be granted unconditional leave to defend if triable issue raised."]
-                facts = ["fact-1", "fact-2"]
-                uncertainties = ["Payment of ad-valorem court fee required."]
-
-            analyzed_items.append(
-                LegalIssueAnalysisItem(
-                    issue_id=f"issue-{idx}",
-                    issue_text=issue,
-                    applicable_statutes=statutes,
-                    relevant_precedents=precedents,
-                    legal_requirements=reqs,
-                    exceptions=exceptions,
-                    supporting_fact_ids=facts,
-                    uncertainties=uncertainties,
-                )
+        Element-by-element analysis is NOT_CONFIGURED (master prompt Step D), so
+        requirements, exceptions and supporting facts stay empty.
+        """
+        return [
+            LegalIssueAnalysisItem(
+                issue_id=f"issue-{idx}",
+                issue_text=issue,
+                applicable_statutes=list(retrieved_citations),
+                relevant_precedents=[],
+                uncertainties=[
+                    NO_PRECEDENT_NOTE,
+                    "Element-by-element analysis is NOT_CONFIGURED; citations are unverified.",
+                ],
             )
-
-        return analyzed_items
+            for idx, issue in enumerate(issues, start=1)
+        ]
 
     # --------------------------------------------------------------------------
     # Stage D & E: Candidate Strategy & 2-Ply Adversarial Tree Generation
@@ -309,19 +197,9 @@ class StrategyOrchestrator:
             strategies=items,
             best_supported_strategy_id=best_strat_id,
             recommendation=RecommendationType.INITIAL,
-            recommendation_reason=(
-                "Strategy evaluated with the highest overall legal grounding and strongest statutory presumption. "
-                "Criminal complaint under NI Act Sec 138 provides the most potent legal leverage."
-            ),
-            trade_offs_analysis=(
-                "NI Act Section 138 provides penal deterrence and statutory presumptions, but suffers from trial forum delays. "
-                "Order XXXVII summary civil suit enables asset attachment before judgment, but requires substantial court fees. "
-                "Section 89A mediation preserves commercial relationship and realizes fastest resolution, but lacks coercive enforcement without consent."
-            ),
-            uncertainties=[
-                "Verification of adverse party's delivery challan receipt signature.",
-                "DLR case law precedent corroboration on disputed security cheque defense.",
-            ],
+            recommendation_reason=comparison_reason(items),
+            trade_offs_analysis=NOT_CONFIGURED,
+            uncertainties=[NO_PRECEDENT_NOTE],
         )
 
     # --------------------------------------------------------------------------
@@ -361,21 +239,11 @@ class StrategyOrchestrator:
                                     source_id=str(chunk.legal_source_id) if chunk.legal_source_id else None,
                                     chunk_id=str(chunk.id),
                                     source_url=chunk.source_url,
-                                    is_verified=True,
+                                    is_verified=False,
                                 )
                             )
             except Exception:
                 pass
-
-        if not retrieved_citations:
-            retrieved_citations = [
-                LegalCitationReference(
-                    act_name="The Negotiable Instruments Act, 1881",
-                    section="138",
-                    source_url="https://bdlaws.minlaw.gov.bd/act-25/section-138.html",
-                    is_verified=True,
-                )
-            ]
 
         # 3. Analyze Issues
         analyzed_issues = self.analyze_legal_issues(legal_issues, retrieved_citations)
@@ -408,10 +276,7 @@ class StrategyOrchestrator:
         return LegalStrategyReportRecord(
             case_id=case_id,
             organization_id=organization_id,
-            case_summary=case_facts.get(
-                "summary",
-                "Dishonoured cheque dispute concerning commercial supply transaction for BDT 1,500,000.",
-            ),
+            case_summary=str(case_facts.get("summary", "")),
             disputed_facts=disputed_facts,
             undisputed_facts=undisputed_facts,
             identified_issues=analyzed_issues,
@@ -419,21 +284,12 @@ class StrategyOrchestrator:
             relevant_precedents=all_precedents,
             candidate_strategies=strategies,
             comparison_matrix=comparison,
-            evidence_gaps=[
-                "Certified bank statement showing balance on date of cheque presentation.",
-                "Original delivery challan signed by authorized receiving clerk.",
-            ],
-            unresolved_risks=[
-                "Trial delay in magistrate court due to summons execution backlogs.",
-                "Possibility of application for handwriting expert examination by defense.",
-            ],
-            recommended_next_steps=[
-                "Confirm receipt date on postal A.D. card to lock in 30-day limitation window.",
-                "Draft formal petition of complaint under Section 138 NI Act with statutory affidavit.",
-                "File complaint in Metropolitan Magistrate Court within 30 days of notice cure expiry.",
-            ],
+            evidence_gaps=[],
+            unresolved_risks=[NO_PRECEDENT_NOTE],
+            recommended_next_steps=[],
             metadata={
-                "retrieval_model": "multilingual-e5-large",
+                "status": NOT_CONFIGURED,
+                "status_reason": STRATEGY_NOT_CONFIGURED_REASON,
                 "llm_provider": self.gateway.current_provider,
                 "llm_model": self.gateway.current_model,
                 "orchestration_version": "2.0-rag-llm",
@@ -448,13 +304,12 @@ class StrategyOrchestrator:
         strategies: List[StrategyRecord],
         retrieved_citations: List[LegalCitationReference],
     ) -> None:
-        """Validate source references and chunk IDs against retrieved legal corpus."""
-        valid_acts = {c.act_name.lower() for c in retrieved_citations if c.act_name}
+        """Downgrade references whose act was not retrieved. Never upgrades to verified.
 
+        Verification needs the deterministic citation verifier (master prompt idea #7).
+        """
+        valid_acts = {c.act_name.lower() for c in retrieved_citations if c.act_name}
         for strat in strategies:
             for ref in strat.source_references:
-                if ref.act_name and ref.act_name.lower() in valid_acts:
-                    ref.is_verified = True
-                else:
-                    # Mark unverified if not in retrieved corpus
+                if not ref.act_name or ref.act_name.lower() not in valid_acts:
                     ref.is_verified = False

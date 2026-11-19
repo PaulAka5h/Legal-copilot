@@ -128,14 +128,14 @@ def patch_hearing(
 def submit_hearing_update(
     hearing_id: Annotated[str, Path(description="Hearing UUID")],
     payload: Annotated[HearingUpdateCreateRequest, Body(description="Courtroom developments, orders, arguments, and judge remarks")],
-    case_title: Annotated[Optional[str], Query(description="Optional case title for client update")] = "Cheque Dispute",
+    case_title: Annotated[Optional[str], Query(description="Optional case title for client update")] = "Case",
 ) -> HearingReassessmentRecord:
     service = get_hearings_service()
     try:
         return service.submit_hearing_update_and_reassess(
             hearing_id=hearing_id,
             request=payload,
-            case_title=case_title or "Cheque Dispute",
+            case_title=case_title or "Case",
         )
     except HearingNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hearing not found")
