@@ -196,3 +196,23 @@ flowchart TD
 4. **Immutability & Versioning**:
    - AI outputs, page extractions, claims, and strategies are never updated in place. They write new records with `version` and `supersedes_id`.
 5. **Status Tracking**: Keep `DOCS/status.md` updated as modules transition across phases.
+
+---
+
+## 5. Two FastAPI apps: current boundary (2026-11-20)
+
+The backend currently has two separate applications:
+
+| App | Entry point | Owner | Auth / RLS |
+|---|---|---|---|
+| Platform API | `backend/app/main.py` (`app.main:app`, `[tool.fastapi]` entrypoint) | Backend Dev 1 | Lawyer/client sessions, `CaseAccess`, transaction-local `app.current_user_id`, RLS |
+| Pipeline / AI API | `backend/src/main.py` (run from repo root as `backend.src.main:app`) | Backend Dev 2 | None. No authentication, CORS `*`, in-memory storage for analysis, strategy, and hearings |
+
+Decision (Akash, 2026-11-20): **do not merge `backend/src/main.py` into `app/` until Backend Dev 2 approves.** Until then:
+
+- New work from `DOCS/PokkhoAI_master_prompt.md` (RAG ingestion, retrieval, facts, analysis, strategy tree, hearing reassessment, eval) is built in `backend/app/` only, behind `app/` authentication, `CaseAccess`, and RLS, with Alembic migrations.
+- `backend/src/` is not extended. Rule fixes in it are allowed (done 2026-11-20: template precedents and strategies removed, mock-only provider default, hard-coded credentials removed).
+- `backend/src/main.py` must not be exposed beyond localhost: it has no access control (Legal Product Rule 7).
+- Reusable `src/` pieces (E5 embeddings, RRF fusion, reranker, document pipeline, sanitizer) may be imported or ported into `app/` with Backend Dev 2's review of the shared interfaces.
+
+Open item for Backend Dev 2: approve the merge plan, or propose an alternative, for retiring the unauthenticated `src/` app.

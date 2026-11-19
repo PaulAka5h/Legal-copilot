@@ -157,3 +157,70 @@ Anything that depends on an outside service or dataset is listed here with its c
 | 2026-11-19 | Backend Dev 2 Phase 5: implemented AI Case Understanding & Fact Extraction Engine (`backend/src/ai/`, `backend/src/analysis/`): provider-whitelisted LLM Gateway with XML prompt injection sanitizer (Rule 9), Claims Verifier (Rule 2), Chronological Timeline Engine with bilingual Bangla/English date normalization and temporal anomaly detection, Contradiction & Statutory Checklist Gap Engine, and FastAPI `/api/v1/cases/*` endpoints. Connected Next.js data client without design alterations. 63 backend tests passing. |
 | 2026-11-19 | Backend Dev 2 Phase 6: implemented Chess-Inspired Legal Strategy Engine (`backend/src/strategy/`): dynamic K candidate strategy generator, strict 2-ply adversarial scenario tree (depth D=2, breadth B<=3, residual risk metadata on response nodes), 5-dimension qualitative rubric evaluator with weakest-critical-dimension ceiling rule (no win percentages), legal eligibility validation, versioned immutable strategy lifecycle (draft -> proposed -> approved -> current -> superseded), mock provider restrictions, Alembic migration 0009 with PostgreSQL RLS, and FastAPI strategy endpoints. 80 backend tests passing. |
 | 2026-11-19 | Backend Dev 2 Phase 7: implemented Hearings & Continuous Strategy Reassessment Engine (`backend/src/hearings/`): hearing management with Rule 5 lawyer-only date confirmation guard, append-only version chaining (`supersedes_id`, Rule 6), continuous 2-ply adversarial tree diffing ($D=2, B \le 3$), 5-dimension qualitative rubric re-evaluation, posture recommendations (`maintain`, `review`, `change_suggested`), plain-language client update drafting with lawyer approval gate (Rule 8), multi-matter calendar aggregator (`GET /calendar`), Alembic migration `0010_phase7_hearings_reassessment` with PostgreSQL RLS, and complete test suite (94 passing tests). |
+| 2026-11-20 | Gap report against `DOCS/PokkhoAI_master_prompt.md` added as section 7. |
+| 2026-11-20 | Step 0 (rule fixes) per section 7.5: template precedents/strategies removed, mock-only provider default, hard-coded credentials removed, frontend no longer forces "verified", `sections.jsonl` exported from act files. Backend: 97 passed, 30 skipped (DB tests, no migrated DB). Scraper: 11 passed, 1 live-network test deselected. |
+
+## 7. Gap report: master prompt (RAG + analysis + strategy), 2026-11-20
+
+Written before any coding, per `DOCS/PokkhoAI_master_prompt.md`. Inspection only; tests were not re-run for this report. AGENTS.md rules override the master prompt.
+
+### 7.1 Rule violations in current code (fix before building on it)
+
+| # | Rule | Finding | Where |
+|---|---|---|---|
+| V1 | 1 No invented law | Hard-coded case-law citations ("Shamsul Haque vs State, 62 DLR (AD) 250"; "Major (Retd.) M. A. Jalil vs State, 58 DLR 145") with `is_verified=True`, no `SAMPLE_DATA_NOT_REAL_LAW` label, and not present in any database. Hard-coded statutory requirements and limitation statements are also emitted as verified. | `backend/src/strategy/orchestrator.py:155-215, 318-323, 431`; `strategy/generator.py:251, 289`; `strategy/engine.py:272`; `hearings/service.py:88` |
+| V2 | 2 No source, no claim | Frontend sets `verification: "verified"` on every AI analysis claim, and labels AI relevance text as type `document`. Bangla text is the English string with a Bangla prefix. | `frontend/src/lib/api/lawyer.ts:300-500` |
+| V3 | 2 | `ClaimsVerifier` marks a claim SUPPORTED if any source has `page_number > 0`, and any `legal_source_version` source as corroborated, without checking that it exists or that the quote matches. | `backend/src/analysis/claims.py` |
+| V4 | 7 Isolation | `backend/src/main.py` is a second FastAPI app with no authentication, `allow_origins=["*"]` with credentials, and no case-membership checks on any `/api/v1/cases/*`, strategy, hearing, or legal-kb route. `lawyer_id` and `organization_id` are taken from the request body/query. | `backend/src/main.py`, `src/*/router.py` |
+| V5 | 6 Keep history / 7 RLS | Analysis, strategy, and hearing data live in in-process dicts, not PostgreSQL. Migrations `0009`/`0010` create tables with RLS but no code reads or writes them, so the status rows "PostgreSQL RLS verified" for phases 6-7 are not accurate for the running code. Data is lost on restart. | `src/analysis/engine.py:42`, `src/strategy/engine.py:43`, `src/hearings/service.py:50` |
+| V6 | 10 Approved providers | Gateway default allow-list is `"mock,gemini"`, and a Gemini provider plus live demo script exist, but `DOCS/providers.md` approves no provider. | `src/ai/gateway.py:72`, `src/ai/providers/gemini.py`, `scripts/live_gemini_demo.py` |
+| V7 | Security | Database credentials hard-coded as defaults (`researchsphere:devpassword`); an absolute developer path is hard-coded. | `src/main.py`, `src/legal_kb/ingest_all.py` |
+| V8 | 11 Don't claim it works | Live search endpoint uses `MockEmbeddingProvider` (hash-seeded random vectors), so the dense half of hybrid search is noise. Status says 62,491 chunks ingested and 80% Recall@5, but the local database has no `legal_chunks` table and no Alembic revision applied, and `data-scrapper/data/processed/sections.jsonl` does not exist. The benchmark result cannot be reproduced from this checkout. | `src/main.py:52`, status rows 4 RAG |
+
+### 7.2 What exists and can be reused
+
+- `app/` (Dev 1): auth, sessions, RLS context (`app.current_user_id`), cases, `CaseAccess`, client portal, audit writer, migrations `0001`-`0010`. This is the correct base for new endpoints.
+- `src/legal_kb/`: E5 provider with `passage:`/`query:` prefixes and normalization, RRF fusion (k=60), `bge-reranker-v2-m3` reranker behind an interface with a mock, exact-section lookup, `SET LOCAL hnsw.ef_search = 100`, `content_hash` and `embedding_model`/`embedding_version` columns.
+- `src/documents/`: validation, PyMuPDF extraction, Tesseract OCR, page chunker.
+- `src/ai/`: gateway, mock provider, XML data-block sanitizer (Rule 9 direction is right).
+- Scraper: 1,178 act JSON files under `data/processed/acts/`, `catalog.json`, `DataValidator.validate_section_record`.
+
+### 7.3 Missing vs the master prompt
+
+| Item | Gap |
+|---|---|
+| A Ingestion | Legal KB schema is raw SQL (`src/legal_kb/migrations.py`), not Alembic. No `source_type`, `status` per section, `canonical_section_id`, or `effective_*` population. Invalid records are dropped silently (no reject report); scraper validator not used. Token counts are a word heuristic (x1.35), not the model tokenizer. Chunk header format differs from the prompt. No worker/queue, no resume, no skip-if-hash-unchanged. Subsection keys mismatch: scraper emits `subsection_identifier`/`text`, backend chunker reads `clause`/`content` (empty lines appended). CLI path differs (`src.legal_kb.ingest_all`). |
+| A Data | `sections.jsonl` absent; scraper emits no amendment/repeal status, so all sections must be `unknown` and flagged. |
+| B Retrieval | No incident-date filter, no bn/en dedupe by canonical id, no abstain threshold on reranker score, no `/lawyer/cases/{case_id}/research/search` with auth. Tests use mock embeddings, not real scraped sections. |
+| C Facts | No structured facts draft (parties, dates, places, acts/omissions, documents, relief) with page refs; no lawyer confirm/edit endpoint; analysis does not gate on confirmed facts. `case_facts` in database.md is not migrated. |
+| D Analysis | No element-by-element `ViolationFinding`; no deterministic citation verifier (exists-in-DB, in-force, NFC substring quote). |
+| E Strategy | Tree is 2 plies with fixed node types, not the 3-ply `StrategyNode` contract with per-node verified citations; content is hard-coded templates (cheque-dishonour scenario). No "no precedent in knowledge base" behaviour. |
+| F Hearings | Reassessment is in-memory; no `HearingReassessment` diff contract (closed/new options, tasks, draft next date) persisted. |
+| G Deadlines/eval | No curated deadline rules table or deterministic calculator; no `backend/eval/` harness. |
+| Docs | `DOCS/AI_AGENTS.md` does not exist (referenced by AGENTS.md and the prompt). |
+
+### 7.4 Conflicts between the master prompt and existing docs
+
+- `database.md` section 7 puts chunks under `legal_source_versions` with `review_status='approved'` gating search; the master prompt puts versioning per chunk/section. Proposal: keep database.md's `legal_sources` + `legal_source_versions`, add `legal_sections` (with `canonical_section_id`, `status`, `effective_from/to`) between versions and chunks. Needs approval (schema change).
+- database.md generates `tsv` from `text` only; current code weights act/section fields via trigger. The prompt says `GENERATED ... 'simple'`. Proposal: generated column over header + text (header is in chunk text anyway).
+- `providers.md` lists embeddings and reranker as "not chosen"; the prompt fixes e5-large and bge-reranker-v2-m3. These are self-hosted models (no data leaves the server), but providers.md should record the choice.
+
+### 7.5 Step 0 results (2026-11-20)
+
+| Item | Result | Commit |
+|---|---|---|
+| V1 template precedents and strategies | Removed. Generator returns no strategies and eligibility returns `NOT_CONFIGURED`. The orchestrator cites no precedents ("No precedent in knowledge base"), returns no canned facts, and keeps citations unverified. `is_verified` defaults to `False`. Hearing service no longer auto-creates and promotes a strategy. Strategy generation is now **Stubbed** (status rows 6 Strategy above overstate it). | `1a9ff348` |
+| V3 claims verifier | Not changed yet. Replaced by the deterministic verifier in Step D. | |
+| V2 frontend forced "verified" | Fixed in `frontend/src/lib/api/lawyer.ts`: all AI-derived claims are `type: "ai"`, `verification: "unverified"`. Removed invented remedy text and the "verified against official legal gazette" wording. **Left uncommitted** because the file also holds in-progress uncommitted work (Phase 7 reassessment block). | uncommitted |
+| V4/V5 `src/` app access control and persistence | Not changed. Merge deferred pending Backend Dev 2 (see `DOCS/backend_orchestration.md` section 5). | |
+| V6 provider | Gateway default is `mock` only. Gemini code kept, rejected unless `LLM_APPROVED_PROVIDERS` lists it. `.env.example` defaults to mock. | `9f921e8b` |
+| V7 credentials and paths | Removed from `src/main.py`, `ingest_all.py`, legal KB tests (now `LEGAL_KB_TEST_DATABASE_URL`), and `Makefile`. | `9f921e8b` |
+| V8 dataset | `python main.py --export-sections` builds `sections.jsonl` from `data/processed/acts/`: 35,063 sections (en 18,962, bn 16,098), 12 rejected by the validator, 3 scraper ID collisions kept under `-s{bdlaws_section}` IDs. `--report` on the output: 0 validation warnings. The KB is still not ingested and no migration is applied locally. | `97bc2ec2` |
+
+Notes for Step A:
+- Some section titles are `[Repealed]`; ingestion can set `status = repealed` from that marker and `unknown` otherwise.
+- `tests/test_phase2.py::test_live_client_fetch` calls the live bdlaws site and hangs without network.
+- `tests/legal_kb/test_pgvector_live.py` seeds hand-written section text that is not labelled `SAMPLE_DATA_NOT_REAL_LAW`; review in Step A.
+- `hearings/reassessment.py` still uses cheque-specific keyword heuristics (consideration, postal notice); replaced in Step F.
+- 37 compiled `.pyc` files are tracked in git.
+
