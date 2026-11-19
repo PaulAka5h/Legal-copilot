@@ -11,6 +11,7 @@ Last updated: 2026-11-16
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
 | (none yet) | LLM | None | No external provider has been reviewed or approved |
 | self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
+| self-hosted `BAAI/bge-reranker-v2-m3` (optional) | Reranking legal search results | Runs on our own hardware; no external data transfer | Optional via `RERANKER_PROVIDER`; default is the mock reranker |
 | Kaggle Notebooks (GPU compute) | Running the same e5-large model for the legal knowledge base | Public statute text from `legal_chunks` only (exported by `app.rag.embed export`); never case documents, client data, or prompts | Directed by Arafath 2026-11-20 for legal KB embeddings only; review checklist below not completed |
 | (none yet) | OCR | None | Local Tesseract is the default; no cloud OCR approved |
 

@@ -60,7 +60,7 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
 | 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
 | 4 RAG | Chunking and embeddings | Done | `tests/rag` (ingest, NFC, embed worker, offload export/import, approval) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A done 2026-11-20. Local embedding ~132 s/100 chunks on CPU; full corpus to be embedded on Kaggle GPU via `app.rag.embed export` / `scripts/kaggle_embed.py` / `app.rag.embed import`. |
-| 4 RAG | Scoped retrieval (case filter) | Not started (in `app/`) | | | Step B. The earlier `src/legal_kb` retriever is unauthenticated and used mock embeddings; not reused as-is. |
+| 4 RAG | Scoped retrieval (case filter) | Done (Step B) | `tests/rag/test_search.py` against `legal_copilot_test`: in-force rules, NFC variants, repealed Act excluded, bn/en dedupe, Recall@10 floor | 401 anonymous, 404 non-member lawyer, 403 client member; audit event without query text | `POST /api/v1/lawyer/cases/{case_id}/research/search`: HNSW cosine + simple FTS, RRF k=60, approved current versions only. Recall@10 on 30 queries over the 20 approved Acts: 0.967 (mock reranker), 1.000 (bge-reranker-v2-m3, ~43 s/query on CPU). See 7.9. |
 | 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; all 20 versions approved by a dev lawyer with audit events (see 7.8). |
 | 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
@@ -254,6 +254,38 @@ Verified locally: Kaggle script round trip on 20 real Bangla chunks in `legal_co
 
 Open items carried into Step B:
 - [x] Approve the 20 local dev versions: done 2026-11-20 by the seeded dev lawyer via `app.rag.approve --all-pending` (20 approved, 20 audit events).
-- [ ] Fix or delete `tests/legal_kb/test_pgvector_live.py` (targets the old raw-SQL schema; skipped).
+- [x] `tests/legal_kb/test_pgvector_live.py` deleted in Step B (replaced by `tests/rag/test_search.py`).
 - [ ] Embed the full corpus on Kaggle and ingest all Acts (dry run: 39,637 chunks).
+
+### 7.9 Step B: retrieval (2026-11-20)
+
+`POST /api/v1/lawyer/cases/{case_id}/research/search` (`app/rag/search/`). Lawyer role + active case membership (`CaseAccessDep`); RLS on the legal tables allows active lawyers only. Body: `query`, optional `language` (bn/en), `incident_date`, `k` (1-20).
+
+- Query is NFC; dense side embeds `"query: " + query` (e5-large, self-hosted, loaded once per process).
+- Eligible: `review_status = 'approved'` and `is_current`; Acts whose title carries `[Repealed]` are excluded; sections excluded if not in force on `incident_date`; `unknown` status is included with `amendment_status_unknown` (every current section, since the scraper has no status data).
+- Dense: pgvector cosine with `hnsw.ef_search = 100` and `hnsw.iterative_scan = relaxed_order`. Sparse: `'simple'` FTS, query lexemes OR-ed with English stopwords removed, `ts_rank_cd` normalized by length. Fused with RRF k = 60.
+- bn/en versions and sub-chunks of one section are merged by `canonical_section_id`; other-language versions are returned as `alternates`.
+- Reranker: `RERANKER_PROVIDER=mock` (default, keeps fused order) or `bge-reranker-v2-m3` (self-hosted).
+- Results are `statement_type: retrieved_source`, `verification: unverified`. Audit event `legal_research.searched` stores counts, never the query. Model unavailable -> 503 `NOT_CONFIGURED`.
+
+Recall on `backend/tests/rag/data/retrieval_queries_20_acts.json` (30 paraphrased queries, 26 en + 4 bn, incident date 2024-01-15):
+
+| Reranker | Recall@10 | Recall@5 | MRR@10 | Time per query (CPU) |
+|---|---|---|---|---|
+| mock (default) | 0.967 (29/30) | 0.900 | 0.779 | 0.18 s |
+| bge-reranker-v2-m3 | 1.000 (30/30) | 1.000 | 0.967 | 43 s |
+
+The mock miss (Divorce Act s.12) is dense rank 1 but fused rank 14. Removing English stopwords from the sparse query raised mock Recall@10 from 0.933 to 0.967 and MRR from 0.543 to 0.779. The test asserts Recall@10 >= 0.95 with the default reranker.
+
+Test database setup (needed by `tests/rag/test_search.py`; it skips otherwise), run in `backend/` with `LEGAL_INGEST_DATABASE_URL` and `DATABASE_URL` pointed at `legal_copilot_test`:
+1. `uv run python -m app.rag.ingest --limit 20`
+2. `uv run python -m app.rag.embed run` (or export/Kaggle/import; locally the vectors were copied from dev by content_hash)
+3. `uv run python -m app.seed_dev_lawyer --email test-reviewer@example.com --password-stdin` and approve the bdlaws versions with `app.rag.approve`.
+
+Open items:
+- [ ] Confirm with `EXPLAIN` on the full corpus that the dense query uses the HNSW index (with 691 chunks the planner uses a sequential scan).
+- [ ] A chunking change does not create a new version for an Act whose text is unchanged (dev Act 16 chunks keep an older header). Decide whether chunker version should be part of the version hash.
+- [ ] Abstain threshold (`insufficient_information` below a reranker score) belongs with analysis (Step D).
+- [ ] Bangla stopwords are not removed from the sparse query.
+- [ ] The bge reranker needs a GPU to be practical (43 s/query on this CPU).
 
