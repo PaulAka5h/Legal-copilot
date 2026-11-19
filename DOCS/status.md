@@ -61,7 +61,7 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
 | 4 RAG | Chunking and embeddings | Done | `tests/rag` (ingest, NFC, embed worker, offload export/import, approval) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A done 2026-11-20. Local embedding ~132 s/100 chunks on CPU; full corpus to be embedded on Kaggle GPU via `app.rag.embed export` / `scripts/kaggle_embed.py` / `app.rag.embed import`. |
 | 4 RAG | Scoped retrieval (case filter) | Not started (in `app/`) | | | Step B. The earlier `src/legal_kb` retriever is unauthenticated and used mock embeddings; not reused as-is. |
-| 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; versions stay `pending` until approved with `app.rag.approve` (see 7.8). |
+| 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; all 20 versions approved by a dev lawyer with audit events (see 7.8). |
 | 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
 | 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
@@ -253,7 +253,7 @@ Step A (ingestion pipeline) is done. Commands, all as `app_admin_ingest` via `LE
 Verified locally: Kaggle script round trip on 20 real Bangla chunks in `legal_copilot_test` (CPU): 20 imported, re-import 0 imported / 20 already embedded, 0 rejects, cosine 1.0 against the local worker.
 
 Open items carried into Step B:
-- [ ] Approve the 20 local dev versions once the dev reviewer account exists (`app.seed_dev_lawyer`, then `app.rag.approve --all-pending`).
+- [x] Approve the 20 local dev versions: done 2026-11-20 by the seeded dev lawyer via `app.rag.approve --all-pending` (20 approved, 20 audit events).
 - [ ] Fix or delete `tests/legal_kb/test_pgvector_live.py` (targets the old raw-SQL schema; skipped).
 - [ ] Embed the full corpus on Kaggle and ingest all Acts (dry run: 39,637 chunks).
 
