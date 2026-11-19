@@ -319,3 +319,22 @@ check, every non-public route needs a session; anonymous → 401, missing Origin
 403, another lawyer's case → the same 404 as an unknown case.
 
 Minor: request logs record the route path without the `/api/v1` prefix (same nesting cause).
+
+---
+
+## 9. Batch 2: RLS and migrations (2026-11-19)
+
+New revision `0010_dev1_rls_and_claims`: 0009 → 0010 → 0009 → 0010 passes, and so does
+base → bootstrap 0001 → `app_owner` to head.
+
+| Item | Result |
+|---|---|
+| Strategy tables | `app_user` SELECT/INSERT; column-level UPDATE on `status`, `is_current_strategy`, `approved_by`, `approved_at`, `updated_at`; `review_status` on comparisons. UPDATE of content and DELETE are denied (tested). `(case_id, organization_id)` FKs and same-case FKs for scenarios/comparisons |
+| `case_members_create` (0001 bug) | Subquery columns were unqualified, so the client-profile check compared `cp` to itself. **Proved exploitable** on the old policy (a case lawyer granted client membership to another organization's lawyer); fixed and regression-tested |
+| Claims & verification (§9) | Tables, FORCE RLS, insert-only grants; deferred constraint trigger rejects sourced claim types without a `claim_sources` row at commit; assumption/prediction may be unsourced (tested) |
+| RLS bypass suite | `tests/test_rls_bypass.py`: all 16 case tables × {no context, other org, owner, client, revoked} + foreign-case INSERT. Client sees rows only in client-visible tables; a user's own membership/audit rows are allowed and checked separately |
+| `client_profiles` / `organization_members` (§12.3a) | Verified: clients are not org members, so they read only their own profile; no client payload includes `internal_notes` (tested) |
+| Not done (no schema) | §12.1 Dev 2 tables and `ai_runs`; legal KB grants (tables outside Alembic). See schema packet notes |
+| Low, open | `notification_owner` WITH CHECK covers `user_id` only. No code writes notifications yet |
+
+Full suite as `app_user`: **131 passed, 1 failed (Dev 2 gateway test, R15), 6 skipped (Dev 2 legal KB)**.
