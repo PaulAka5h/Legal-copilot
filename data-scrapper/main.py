@@ -8,6 +8,7 @@ from pathlib import Path
 
 import config
 from scraper.client import BDLawsClient
+from scraper.export import export_sections
 from scraper.scraper import BDLawsScraper
 from scraper.storage import StorageManager
 from scraper.validator import DataValidator
@@ -39,10 +40,20 @@ def main():
     parser.add_argument("--discover", action="store_true", help="Run catalog discovery only and output catalog.json")
     parser.add_argument("--validate", action="store_true", help="Run validation checks on existing extracted data")
     parser.add_argument("--report", action="store_true", help="Generate quality and statistics report")
+    parser.add_argument(
+        "--export-sections", action="store_true",
+        help="Rebuild sections.jsonl from data/processed/acts/ (no network); invalid records go to a report",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose debug logging")
 
     args = parser.parse_args()
     setup_logging(args.verbose)
+
+    if args.export_sections:
+        summary = export_sections(config.ACTS_DIR, config.SECTIONS_JSONL_FILE, config.EXPORT_REPORT_FILE)
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        print(f"[✓] Rejects and duplicates listed in {config.EXPORT_REPORT_FILE}")
+        return
 
     client = BDLawsClient()
     storage = StorageManager()
