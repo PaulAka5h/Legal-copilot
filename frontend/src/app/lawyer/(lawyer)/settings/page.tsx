@@ -6,6 +6,7 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { getLawyerProfile } from "@/lib/api/lawyer";
 import { dictionaries, pick, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
   const settings = copy.settings;
-  const profile = getLawyerProfile();
+  const profile = await getLawyerProfile();
 
   return (
     <>
@@ -25,7 +26,7 @@ export default async function SettingsPage() {
         title={settings.title}
         subtitle={settings.subtitle}
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="settings-grid">
         <section className="panel">

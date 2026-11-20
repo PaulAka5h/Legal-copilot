@@ -26,6 +26,7 @@ import {
   type Language,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -66,7 +67,7 @@ function versionDateLabel(date: string, language: Language) {
   }).format(new Date(date));
 }
 
-function MemoHeader({
+async function MemoHeader({
   summary,
   language,
   copy,
@@ -75,7 +76,7 @@ function MemoHeader({
   language: Language;
   copy: Dictionary["hearingSummary"];
 }) {
-  const profile = getLawyerProfile();
+  const profile = await getLawyerProfile();
 
   return (
     <dl className="grid gap-x-6 gap-y-3 border-b border-[color:var(--color-border)] py-5 sm:grid-cols-2">
@@ -341,8 +342,11 @@ export default async function HearingSummaryPage({
     await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language].hearingSummary;
-  const matter = getCase(caseId);
-  const hearingExists = listHearings(caseId).some(
+  const [matter, hearings] = await Promise.all([
+    getCase(caseId),
+    listHearings(caseId),
+  ]);
+  const hearingExists = hearings.some(
     (hearing) => hearing.id === hearingId,
   );
 
@@ -492,9 +496,11 @@ export default async function HearingSummaryPage({
           </p>
         </aside>
 
-        <p className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
-          {copy.mock}
-        </p>
+        {usedDemoData() ? (
+          <p className="mt-4 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+            {copy.mock}
+          </p>
+        ) : null}
 
         {editing ? (
           <SummaryEditor

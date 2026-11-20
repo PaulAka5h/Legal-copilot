@@ -6,6 +6,7 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { listClients } from "@/lib/api/lawyer";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LawyerClientsPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const clients = listClients();
+  const clients = await listClients();
 
   return (
     <>
@@ -30,7 +31,7 @@ export default async function LawyerClientsPage() {
           </Link>
         }
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
       <ClientsList language={language} clients={clients} />
     </>
   );

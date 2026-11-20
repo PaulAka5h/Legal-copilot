@@ -7,6 +7,7 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { listCaseTypes, listClients, listCourts } from "@/lib/api/lawyer";
 import { dictionaries, pick, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -21,7 +22,7 @@ export default async function NewMatterPage({
   const language = await getLanguage();
   const copy = dictionaries[language];
   const { error } = await searchParams;
-  const clients = listClients();
+  const clients = await listClients();
   const courts = listCourts();
   const caseTypes = listCaseTypes();
 
@@ -32,7 +33,7 @@ export default async function NewMatterPage({
         title={copy.newMatter.title}
         subtitle={copy.newMatter.subtitle}
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <form className="panel client-form" action={createMatterAction}>
         <p className="mock-note">{copy.newMatter.mockNote}</p>

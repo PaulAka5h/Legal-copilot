@@ -7,7 +7,7 @@ import type {
   Localized,
   Matter,
   MatterStage,
-} from "@/lib/api/lawyer";
+} from "@/lib/api/lawyerTypes";
 
 export const matterStages: MatterStage[] = [
   { id: "filed", label: { en: "Case filed", bn: "মামলা দায়ের" } },

@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // Document uploads are at most 20 MB (lib/documents.ts); leave room for multipart overhead.
+      bodySizeLimit: "21mb",
+    },
+  },
   turbopack: {
     rules: {
       "*.css": {

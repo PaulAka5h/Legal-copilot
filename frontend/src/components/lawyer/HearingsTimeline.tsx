@@ -9,7 +9,11 @@ import {
   SummaryBadge,
   hearingDateLabel,
 } from "@/components/lawyer/hearingParts";
-import type { CaseDocument, Hearing } from "@/lib/api/lawyer";
+import {
+  HearingUpdateForm,
+  ReassessmentCard,
+} from "@/components/lawyer/hearingUpdate";
+import type { CaseDocument, Hearing, Reassessment } from "@/lib/api/lawyerTypes";
 import {
   format,
   numberFor,
@@ -32,6 +36,8 @@ export function HearingsTimeline({
   error,
   onUpload,
   onRetry,
+  reassessments,
+  demo,
 }: {
   caseId: string;
   hearings: Hearing[];
@@ -43,6 +49,8 @@ export function HearingsTimeline({
   error: "hearing" | "note" | null;
   onUpload: (hearingId: string, files: File[]) => void | Promise<void>;
   onRetry: (document: CaseDocument) => void;
+  reassessments: Reassessment[];
+  demo: boolean;
 }) {
   return (
     <div className="panel col-span-full">
@@ -58,9 +66,11 @@ export function HearingsTimeline({
         </span>
       </div>
 
-      <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
-        {copy.hearingMock}
-      </p>
+      {demo ? (
+        <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+          {copy.hearingMock}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="form-error" role="alert">
@@ -78,6 +88,9 @@ export function HearingsTimeline({
             const current = index === hearings.length - 1;
             const currentNote = hearing.notes[hearing.notes.length - 1];
             const edited = hearing.notes.length > 1;
+            const reassessment = reassessments.find(
+              (item) => item.hearingId === hearing.id,
+            );
 
             return (
               <li
@@ -156,6 +169,12 @@ export function HearingsTimeline({
                         <p className="mt-3 text-[9px] text-[color:var(--color-muted)]">
                           {copy.hearingsLocked}
                         </p>
+                      ) : !demo ? (
+                        <HearingUpdateForm
+                          caseId={caseId}
+                          hearingId={hearing.id}
+                          copy={copy.ai}
+                        />
                       ) : (
                         <form action={addHearingNoteAction} className="mt-3">
                           <input type="hidden" name="caseId" value={caseId} />
@@ -187,6 +206,13 @@ export function HearingsTimeline({
                         </form>
                       )}
                     </details>
+                    {reassessment ? (
+                      <ReassessmentCard
+                        reassessment={reassessment}
+                        language={language}
+                        copy={copy.ai}
+                      />
+                    ) : null}
                   </div>
 
                   <div className="mt-3 border-t border-[color:var(--color-border)] pt-3">

@@ -17,6 +17,8 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
+import { notFound } from "next/navigation";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -27,7 +29,8 @@ export default async function ClientDashboardPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.clientDashboard;
-  const caseData = getClientCase();
+  const caseData = await getClientCase();
+  if (!caseData) notFound();
 
   const stages: CaseProgressStage[] = caseData.stages.map((stage) => ({
     id: stage.id,
@@ -46,7 +49,7 @@ export default async function ClientDashboardPage() {
         subtitle={dashboard.subtitle}
       />
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="case-hero">
         <div>

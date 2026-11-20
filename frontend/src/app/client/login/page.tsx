@@ -36,7 +36,11 @@ export default async function ClientLoginPage() {
       <h2>{copy.title}</h2>
       <p className="form-intro">{copy.intro}</p>
       {isMockAuthEnabled() ? <p className="mock-note">{common.mockNotice}</p> : null}
-      <MockLoginForm action={clientLogin} notice={common.mockDisabled}>
+      <MockLoginForm action={clientLogin} notices={{
+          NOT_CONFIGURED: common.mockDisabled,
+          INVALID: common.loginInvalid,
+          UNAVAILABLE: common.loginUnavailable,
+        }}>
         <Field label={copy.clientId} icon="user">
           <input
             name="clientId"

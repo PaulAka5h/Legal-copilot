@@ -45,7 +45,11 @@ export default async function LawyerLoginPage() {
       <h2>{copy.welcome}</h2>
       <p className="form-intro">{copy.intro}</p>
       {isMockAuthEnabled() ? <p className="mock-note">{common.mockNotice}</p> : null}
-      <MockLoginForm action={lawyerLogin} notice={common.mockDisabled}>
+      <MockLoginForm action={lawyerLogin} notices={{
+          NOT_CONFIGURED: common.mockDisabled,
+          INVALID: common.loginInvalid,
+          UNAVAILABLE: common.loginUnavailable,
+        }}>
         <Field label={copy.email} icon="mail">
           <input
             type="email"

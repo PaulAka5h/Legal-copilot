@@ -6,6 +6,7 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { listMatters } from "@/lib/api/lawyer";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LawyerMattersPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const matters = listMatters();
+  const matters = await listMatters();
 
   return (
     <>
@@ -30,7 +31,7 @@ export default async function LawyerMattersPage() {
           </Link>
         }
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
       <MattersTable language={language} matters={matters} />
     </>
   );

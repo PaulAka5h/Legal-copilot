@@ -14,7 +14,7 @@ export default async function ClientLayout({ children }: { children: ReactNode }
   const language = await getLanguage();
 
   return (
-    <ClientShell language={language} profile={getClientProfile()}>
+    <ClientShell language={language} profile={await getClientProfile()}>
       {children}
     </ClientShell>
   );

@@ -17,6 +17,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -52,10 +53,12 @@ export default async function LawyerDashboardPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.dashboard;
-  const profile = getLawyerProfile();
-  const stats = getLawyerStats();
-  const recentMatters = getRecentMatters();
-  const activities = getRecentActivity();
+  const [profile, stats, recentMatters, activities] = await Promise.all([
+    getLawyerProfile(),
+    getLawyerStats(),
+    getRecentMatters(),
+    getRecentActivity(),
+  ]);
 
   const nextValue = stats.nextHearing
     ? `${numberFor(language, stats.nextHearing.day)} ${pick(stats.nextHearing.month, language)}`
@@ -80,7 +83,7 @@ export default async function LawyerDashboardPage() {
         }
       />
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="stats-grid">
         <Stat

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
-import { resetClientPassword } from "@/lib/api/lawyer";
 import { dictionaries, type Language } from "@/lib/i18n";
 
 export function ResetPasswordButton({ language }: { language: Language }) {
@@ -14,7 +13,7 @@ export function ResetPasswordButton({ language }: { language: Language }) {
       <button
         type="button"
         className="outline-button small"
-        onClick={() => setStatus(resetClientPassword().status)}
+        onClick={() => setStatus("NOT_CONFIGURED")}
       >
         <Icon name="lock" size={15} />
         {copy.resetPassword}

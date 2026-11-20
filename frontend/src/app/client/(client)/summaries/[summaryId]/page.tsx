@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { usedDemoData } from "@/lib/api/backendClient";
 import { downloadClientSummaryAction } from "@/app/client/actions";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
@@ -24,7 +25,7 @@ export default async function ClientSummaryPage({
   const { download } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const summary = getApprovedSummary(summaryId);
+  const summary = await getApprovedSummary(summaryId);
 
   if (!summary) notFound();
 
@@ -41,7 +42,7 @@ export default async function ClientSummaryPage({
         subtitle={copy.clientSummaries.subtitle}
       />
 
-      <p className="mock-note">{copy.clientSummaries.mock}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.clientSummaries.mock}</p> : null}
 
       <article className="panel summary-detail">
         <div className="summary-meta">

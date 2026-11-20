@@ -3,25 +3,35 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  addDocument,
+  addFact,
   addHearing,
   addHearingNote,
   approveHearingSummary,
+  confirmFact,
   createClient,
   createMatter,
   downloadHearingSummary,
+  extractFacts,
+  getDocumentStatus,
   getHearingSummary,
+  rejectFact,
+  runAnalysis,
+  runStrategy,
   saveHearingSummaryVersion,
   setCaseStage,
-  setDocumentStatus,
+  submitHearingUpdate,
+  uploadDocument,
+  type ActionResult,
   type CaseDocument,
   type ClaimType,
   type CreateClientState,
   type DocumentStatus,
-  type NewDocumentInput,
+  type FactCategory,
   type SummarySection,
   type Verification,
 } from "@/lib/api/lawyer";
+import { dictionaries } from "@/lib/i18n";
+import { getLanguage } from "@/lib/language";
 import { getSession } from "@/lib/session";
 
 const claimTypes: ClaimType[] = [
@@ -36,8 +46,14 @@ function summaryPath(caseId: string, hearingId: string) {
   return `/lawyer/matters/${encodeURIComponent(caseId)}/hearings/${encodeURIComponent(hearingId)}/summary`;
 }
 
+async function requireLawyer() {
+  const session = await getSession();
+  if (!session || session.role !== "lawyer") redirect("/lawyer/login");
+}
+
 export async function createMatterAction(formData: FormData) {
-  const matter = createMatter({
+  await requireLawyer();
+  const matter = await createMatter({
     title: String(formData.get("title") ?? ""),
     court: String(formData.get("court") ?? ""),
     caseType: String(formData.get("caseType") ?? ""),
@@ -58,7 +74,9 @@ export async function updateMatterStageAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   const stageId = String(formData.get("stageId") ?? "");
 
-  if (!setCaseStage(caseId, stageId)) redirect("/lawyer/matters");
+  if (!(await setCaseStage(caseId, stageId))) {
+    redirect(`/lawyer/matters/${encodeURIComponent(caseId)}?stageError=1`);
+  }
 
   revalidatePath(`/lawyer/matters/${caseId}`);
   revalidatePath("/lawyer/matters");
@@ -73,7 +91,7 @@ export async function addHearingAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   if (!caseId) redirect("/lawyer/matters");
 
-  const hearing = addHearing(caseId, {
+  const hearing = await addHearing(caseId, {
     date: String(formData.get("date") ?? ""),
     note: String(formData.get("note") ?? ""),
   });
@@ -95,7 +113,7 @@ export async function addHearingNoteAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   if (!caseId) redirect("/lawyer/matters");
 
-  const hearing = addHearingNote(
+  const hearing = await addHearingNote(
     caseId,
     String(formData.get("hearingId") ?? ""),
     String(formData.get("note") ?? ""),
@@ -158,7 +176,7 @@ export async function saveHearingSummaryAction(formData: FormData) {
 
   if (invalid) redirect(`${path}?editError=1#editor`);
 
-  const saved = saveHearingSummaryVersion(caseId, hearingId, sections);
+  const saved = await saveHearingSummaryVersion(caseId, hearingId, sections);
   if (!saved) redirect(`${path}?editError=1#editor`);
 
   revalidatePath(path);
@@ -175,7 +193,7 @@ export async function approveHearingSummaryAction(formData: FormData) {
   const hearingId = String(formData.get("hearingId") ?? "");
   const path = summaryPath(caseId, hearingId);
 
-  if (!caseId || !hearingId || !approveHearingSummary(caseId, hearingId)) {
+  if (!caseId || !hearingId || !(await approveHearingSummary(caseId, hearingId))) {
     redirect(`${path}?approveError=1#share`);
   }
 
@@ -202,35 +220,134 @@ export async function downloadHearingSummaryAction(formData: FormData) {
   redirect(`${path}?download=${download.status}#download`);
 }
 
-export async function uploadDocumentAction(input: {
-  caseId: string;
-} & NewDocumentInput): Promise<CaseDocument | null> {
+/** Upload one file (FormData: caseId, hearingId, file). */
+export async function uploadDocumentAction(
+  formData: FormData,
+): Promise<CaseDocument | null> {
   const session = await getSession();
   if (!session || session.role !== "lawyer") return null;
 
-  return addDocument(input.caseId, input);
+  const caseId = String(formData.get("caseId") ?? "");
+  const hearingId = String(formData.get("hearingId") ?? "");
+  const file = formData.get("file");
+  if (!caseId || !(file instanceof File)) return null;
+
+  const saved = await uploadDocument(caseId, hearingId, file);
+  if (saved) revalidatePath(`/lawyer/matters/${caseId}`);
+  return saved;
 }
 
-export async function setDocumentStatusAction(
+/** Current processing status of a document (demo documents move to demoStatus). */
+export async function refreshDocumentStatusAction(
   caseId: string,
   documentId: string,
-  status: DocumentStatus,
-): Promise<boolean> {
+  demoStatus: DocumentStatus,
+): Promise<DocumentStatus | null> {
   const session = await getSession();
-  if (!session || session.role !== "lawyer") return false;
+  if (!session || session.role !== "lawyer") return null;
 
-  return setDocumentStatus(caseId, documentId, status);
+  return getDocumentStatus(caseId, documentId, demoStatus);
+}
+
+// ---------- case intelligence (facts, analysis, strategy, hearing updates) ----------
+
+const FACT_CATEGORIES: FactCategory[] = [
+  "party",
+  "date",
+  "place",
+  "act_or_omission",
+  "document",
+  "relief_sought",
+  "other",
+];
+const MAX_DETAIL = 240;
+
+/** Back to the matter, on the given tab, with the outcome in the query string. */
+function finish(caseId: string, tab: string, result: ActionResult): never {
+  const path = `/lawyer/matters/${encodeURIComponent(caseId)}`;
+  revalidatePath(path);
+  const query = new URLSearchParams({ tab, ai: result.status });
+  if (result.status === "error") query.set("detail", result.message.slice(0, MAX_DETAIL));
+  redirect(`${path}?${query.toString()}`);
+}
+
+function field(formData: FormData, name: string) {
+  return String(formData.get(name) ?? "").trim();
+}
+
+export async function addFactAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  const category = field(formData, "category") as FactCategory;
+  const result = FACT_CATEGORIES.includes(category)
+    ? await addFact(caseId, { statement: field(formData, "statement"), category })
+    : ({ status: "error", message: "category" } as const);
+  finish(caseId, "facts", result);
+}
+
+export async function confirmFactAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  finish(caseId, "facts", await confirmFact(caseId, field(formData, "factId")));
+}
+
+export async function rejectFactAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  const language = await getLanguage();
+  const note = field(formData, "note") || dictionaries[language].caseDetail.ai.rejectDefault;
+  finish(caseId, "facts", await rejectFact(caseId, field(formData, "factId"), note));
+}
+
+export async function extractFactsAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  finish(caseId, "facts", await extractFacts(caseId));
+}
+
+export async function runAnalysisAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  finish(caseId, "analysis", await runAnalysis(caseId));
+}
+
+export async function runStrategyAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  finish(caseId, "analysis", await runStrategy(caseId));
+}
+
+/** Record a hearing outcome; the backend re-runs analysis and strategy. */
+export async function submitHearingUpdateAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  const nextDate = field(formData, "nextHearingDate");
+  const result = await submitHearingUpdate(caseId, field(formData, "hearingId"), {
+    orderText: field(formData, "orderText"),
+    notes: field(formData, "notes"),
+    nextHearingDate: /^\d{4}-\d{2}-\d{2}$/.test(nextDate) ? nextDate : null,
+    nextHearingConfirmed: formData.get("nextHearingConfirmed") === "on",
+  });
+  revalidatePath("/lawyer/dashboard");
+  finish(caseId, "hearings", result);
 }
 
 export async function createClientAction(
   _state: CreateClientState,
   formData: FormData,
 ): Promise<CreateClientState> {
-  const client = createClient({
-    name: String(formData.get("name") ?? ""),
-    phone: String(formData.get("phone") ?? ""),
-    email: String(formData.get("email") ?? ""),
-  });
+  const session = await getSession();
+  if (!session || session.role !== "lawyer") return { status: "error" };
+
+  const language = await getLanguage();
+  const client = await createClient(
+    {
+      name: String(formData.get("name") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      email: String(formData.get("email") ?? ""),
+    },
+    dictionaries[language].newClient.invitationPassword,
+  );
 
   if (!client) return { status: "error" };
 

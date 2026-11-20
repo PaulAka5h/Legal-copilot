@@ -1,7 +1,7 @@
 import type {
   HearingSummaryVersion,
   SummarySection,
-} from "@/lib/api/lawyer";
+} from "@/lib/api/lawyerTypes";
 
 export const hearingSummaryVersions: Record<string, HearingSummaryVersion[]> =
   {};

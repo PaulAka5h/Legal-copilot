@@ -11,6 +11,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -25,7 +26,7 @@ export default async function ClientDetailPage({
   const { clientId } = await params;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const client = getClientDetail(clientId);
+  const client = await getClientDetail(clientId);
 
   if (!client) notFound();
 
@@ -51,7 +52,7 @@ export default async function ClientDetailPage({
         </div>
       </div>
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="panel matters-panel">
         <div className="panel-head padded">

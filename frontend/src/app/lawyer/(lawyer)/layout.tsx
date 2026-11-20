@@ -12,12 +12,13 @@ export default async function LawyerLayout({ children }: { children: ReactNode }
   if (session.role !== "lawyer") redirect("/client/dashboard");
 
   const language = await getLanguage();
+  const [profile, matters] = await Promise.all([getLawyerProfile(), listMatters()]);
 
   return (
     <LawyerShell
       language={language}
-      profile={getLawyerProfile()}
-      matterCount={listMatters().length}
+      profile={profile}
+      matterCount={matters.length}
     >
       {children}
     </LawyerShell>
