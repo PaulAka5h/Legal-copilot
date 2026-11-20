@@ -22,6 +22,26 @@ class Settings(BaseSettings):
     session_absolute_hours: int = Field(default=12, gt=0)
     mfa_encryption_key: str | None = None
 
+    # Object storage (MinIO / S3). Keys are cases/{case_id}/documents/{document_id}.
+    minio_endpoint: str | None = None
+    minio_access_key: str | None = None
+    minio_secret_key: str | None = None
+    minio_bucket: str | None = None
+    minio_secure: bool = False
+
+    # Malware scanning: "none" means not configured (dev processes with a warning;
+    # production refuses uploads).
+    malware_scanner: Literal["none"] = "none"
+    ocr_languages: str = "ben+eng"
+    max_pdf_pages: int = Field(default=200, gt=0)
+
+    # Fact extraction LLM. Only providers listed in DOCS/providers.md may be approved.
+    llm_provider: Literal["mock", "ollama"] = "mock"
+    llm_approved_providers: str = "mock"
+    llm_base_url: str | None = None
+    llm_model: str | None = None
+    llm_timeout_seconds: float = Field(default=120, gt=0)
+
     @property
     def secure_session_cookie(self) -> bool:
         if self.session_cookie_secure is not None:

@@ -43,6 +43,7 @@ def api_client(local_app_user_database_url: str):
             database_url=local_app_user_database_url,
             app_origin=APP_ORIGIN,
             session_cookie_secure=True,
+            minio_bucket=os.getenv("TEST_MINIO_BUCKET") or None,
         )
     )
     client = TestClient(
