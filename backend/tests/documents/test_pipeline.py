@@ -25,7 +25,12 @@ def sample_pdf_bytes():
 
 @pytest.fixture
 def sample_image_bytes():
+    # Real text so the test holds with a real Tesseract as well as the mock fallback.
+    from PIL import ImageDraw, ImageFont
+
     img = Image.new("RGB", (200, 100), color="white")
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    ImageDraw.Draw(img).text((8, 35), "SAMPLE receipt 2024", fill="black", font=font)
     bio = io.BytesIO()
     img.save(bio, format="PNG")
     return bio.getvalue()
