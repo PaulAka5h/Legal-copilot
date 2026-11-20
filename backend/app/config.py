@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_model: str | None = None
 
+    # Analysis abstains below these relevance thresholds (calibrated 2026-11-20 on the
+    # 20-Act set: relevant queries' best cosine >= 0.80, unrelated <= 0.78).
+    analysis_min_similarity: float = Field(default=0.79, ge=0, le=1)
+    analysis_min_rerank_score: float = Field(default=0.1, ge=0, le=1)
+
     @property
     def secure_session_cookie(self) -> bool:
         if self.session_cookie_secure is not None:

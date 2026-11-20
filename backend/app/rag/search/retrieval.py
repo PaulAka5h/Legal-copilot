@@ -71,7 +71,7 @@ _HYBRID = text(
       SELECT ({TSQUERY_SQL}) AS ts
     ),
     dense AS (
-      SELECT d.id, row_number() OVER (ORDER BY d.dist) AS r
+      SELECT d.id, d.dist, row_number() OVER (ORDER BY d.dist) AS r
       FROM (
         -- The query vector must be a bound parameter, not a joined column:
         -- pgvector can only order by the HNSW index against a constant/parameter.
@@ -95,17 +95,18 @@ _HYBRID = text(
       ) s
     ),
     fused AS (
-      SELECT id, sum(1.0 / ({RRF_K} + r)) AS score, min(dense_r) AS dense_rank, min(sparse_r) AS sparse_rank
+      SELECT id, sum(1.0 / ({RRF_K} + r)) AS score, min(dense_r) AS dense_rank, min(sparse_r) AS sparse_rank,
+             min(dist) AS dense_distance
       FROM (
-        SELECT id, r, r AS dense_r, NULL::bigint AS sparse_r FROM dense
+        SELECT id, r, r AS dense_r, NULL::bigint AS sparse_r, dist FROM dense
         UNION ALL
-        SELECT id, r, NULL::bigint, r FROM sparse
+        SELECT id, r, NULL::bigint, r, NULL::float8 FROM sparse
       ) both_lists
       GROUP BY id
       ORDER BY score DESC, id
       LIMIT {FUSED_K}
     )
-    SELECT f.id AS chunk_id, f.score, f.dense_rank, f.sparse_rank,
+    SELECT f.id AS chunk_id, f.score, f.dense_rank, f.sparse_rank, f.dense_distance,
            c.text, c.chunk_index, c.provision_label,
            sec.id AS section_id, sec.canonical_section_id, sec.section_number, sec.heading,
            sec.language, sec.status AS section_status, sec.source_url,
@@ -148,6 +149,7 @@ class SearchHit:
     fused_score: float
     dense_rank: int | None
     sparse_rank: int | None
+    dense_similarity: float | None
     rerank_score: float | None
     in_force_status: str
     warnings: list[str]
@@ -262,6 +264,7 @@ def _hit(row: Any, status: str, warnings: list[str]) -> SearchHit:
         fused_score=float(row["score"]),
         dense_rank=row["dense_rank"],
         sparse_rank=row["sparse_rank"],
+        dense_similarity=None if row["dense_distance"] is None else round(1 - float(row["dense_distance"]), 4),
         rerank_score=None,
         in_force_status=status,
         warnings=warnings,

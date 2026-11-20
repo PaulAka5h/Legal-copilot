@@ -41,6 +41,9 @@ class ResearchSearchHit(BaseModel):
     fused_score: float = Field(description="Reciprocal Rank Fusion score (k=60); a ranking signal, not a probability")
     dense_rank: int | None = Field(description="Rank in vector search, if retrieved there")
     sparse_rank: int | None = Field(description="Rank in full-text search, if retrieved there")
+    dense_similarity: float | None = Field(
+        description="Cosine similarity to the query (e5), if retrieved by vector search; a relevance signal, not a probability"
+    )
     rerank_score: float | None = Field(description="Cross-encoder score; null with the mock reranker")
     in_force_status: Literal["in_force", "unknown", "amended", "partly_repealed", "repealed"]
     warnings: list[str] = Field(description="e.g. amendment_status_unknown, effective_dates_unknown")
