@@ -95,7 +95,9 @@ export function NewClientForm({ language }: { language: Language }) {
     >
       {state?.status === "error" ? (
         <p className="form-error" role="alert">
-          {state.message === "organization" ? copy.organizationError : copy.error}
+          {"message" in state && state.message === "organization"
+            ? copy.organizationError
+            : copy.error}
         </p>
       ) : null}
 

@@ -18,6 +18,7 @@ const en = {
       "Demo data — the server is not reachable, so this page shows SAMPLE_DATA_NOT_REAL_LAW sample data, not real law.",
     loginInvalid: "The email or password is not correct.",
     loginUnavailable: "The server is not reachable. Try again shortly.",
+    notAvailableYet: "This feature is not available yet.",
   },
   nav: {
     workspace: "Workspace",
@@ -126,6 +127,7 @@ const en = {
     mockGenerated:
       "SAMPLE_DATA_NOT_REAL_LAW — Mock credentials generated for preview. The password is shown only once.",
     invitationPassword: "Set by the client when they accept a case invitation",
+    organizationError: "Choose a firm or organization before creating a client.",
   },
   clientDetail: {
     back: "Back to clients",
@@ -377,6 +379,8 @@ const en = {
     signOutTitle: "Sign out",
     signOutBody: "End this session on this device.",
     signOut: "Sign out",
+    signOutAll: "Sign out all devices",
+    signOutAllBody: "End every active sign-in session.",
   },
   meta: {
     home: "Log in",
@@ -446,7 +450,18 @@ const en = {
         passwordLength: "Password must be at least 8 characters.",
         passwordMatch: "Passwords do not match.",
         draftNotice: "Please confirm that you understand this.",
+        emailTaken: "An account with this email already exists.",
+        general: "Your account could not be created. Please try again.",
       },
+    },
+    forgotPassword: {
+      back: "Back to login",
+      eyebrow: "Password recovery",
+      title: "Forgot password?",
+      intro: "Enter your email address and we will send reset instructions.",
+      submit: "Send reset link",
+      sent: "If an account exists, reset instructions have been sent.",
+      error: "The reset request could not be sent.",
     },
   },
   client: {
@@ -458,6 +473,7 @@ const en = {
     title: "View your case",
     intro: "Use the details shared by your lawyer.",
     clientId: "Client ID",
+    email: "Email address",
     password: "Password",
     submit: "View my case",
     switchAction: "Log in as a lawyer",
@@ -465,6 +481,19 @@ const en = {
       "No account? Your lawyer gives you your Client ID and password.",
     helpTitle: "Your access is private.",
     helpBody: "Contact your lawyer if you need new login details.",
+    invalidCredentials: "The email or password is not correct.",
+    rateLimited: "Too many attempts. Please wait and try again.",
+    acceptInvitation: {
+      eyebrow: "Client invitation",
+      title: "Accept your invitation",
+      intro: "Set a secure password to access your case.",
+      tokenLabel: "Invitation token",
+      passwordLabel: "Password",
+      confirmLabel: "Confirm password",
+      submit: "Accept invitation",
+      invalid: "The invitation token or password is invalid.",
+      error: "The invitation could not be accepted.",
+    },
   },
   clientDashboard: {
     eyebrow: "Client portal",
@@ -552,6 +581,7 @@ const bn: Dictionary = {
       "ডেমো তথ্য — সার্ভারে সংযোগ করা যাচ্ছে না, তাই এই পৃষ্ঠায় SAMPLE_DATA_NOT_REAL_LAW নমুনা তথ্য দেখানো হচ্ছে, প্রকৃত আইন নয়।",
     loginInvalid: "ইমেইল বা পাসওয়ার্ড সঠিক নয়।",
     loginUnavailable: "সার্ভারে সংযোগ করা যাচ্ছে না। একটু পরে আবার চেষ্টা করুন।",
+    notAvailableYet: "এই বৈশিষ্ট্যটি এখনো উপলব্ধ নয়।",
   },
   nav: {
     workspace: "কর্মক্ষেত্র",
@@ -660,6 +690,7 @@ const bn: Dictionary = {
     mockGenerated:
       "SAMPLE_DATA_NOT_REAL_LAW — প্রিভিউয়ের জন্য মক পরিচয়পত্র তৈরি। পাসওয়ার্ডটি শুধুমাত্র একবার দেখানো হয়।",
     invitationPassword: "মামলার আমন্ত্রণ গ্রহণের সময় মক্কেল নিজেই সেট করবেন",
+    organizationError: "মক্কেল তৈরি করার আগে ফার্ম বা প্রতিষ্ঠান নির্বাচন করুন।",
   },
   clientDetail: {
     back: "মক্কেল তালিকায় ফিরুন",
@@ -912,6 +943,8 @@ const bn: Dictionary = {
     signOutTitle: "সাইন আউট",
     signOutBody: "এই ডিভাইসে সেশন শেষ করুন।",
     signOut: "সাইন আউট",
+    signOutAll: "সব ডিভাইস থেকে সাইন আউট",
+    signOutAllBody: "সব সক্রিয় সাইন-ইন সেশন শেষ করুন।",
   },
   meta: {
     home: "লগ ইন",
@@ -981,7 +1014,18 @@ const bn: Dictionary = {
         passwordLength: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।",
         passwordMatch: "পাসওয়ার্ড দুটি মিলছে না।",
         draftNotice: "অনুগ্রহ করে এটি নিশ্চিত করুন।",
+        emailTaken: "এই ইমেইল দিয়ে একটি অ্যাকাউন্ট আছে।",
+        general: "আপনার অ্যাকাউন্ট তৈরি করা যায়নি। আবার চেষ্টা করুন।",
       },
+    },
+    forgotPassword: {
+      back: "লগইনে ফিরুন",
+      eyebrow: "পাসওয়ার্ড পুনরুদ্ধার",
+      title: "পাসওয়ার্ড ভুলে গেছেন?",
+      intro: "আপনার ইমেইল দিন; আমরা রিসেট নির্দেশনা পাঠাব।",
+      submit: "রিসেট লিংক পাঠান",
+      sent: "অ্যাকাউন্ট থাকলে রিসেট নির্দেশনা পাঠানো হয়েছে।",
+      error: "রিসেট অনুরোধ পাঠানো যায়নি।",
     },
   },
   client: {
@@ -993,6 +1037,7 @@ const bn: Dictionary = {
     title: "আপনার মামলা দেখুন",
     intro: "আইনজীবীর দেওয়া তথ্য ব্যবহার করুন।",
     clientId: "মক্কেল আইডি",
+    email: "ইমেইল ঠিকানা",
     password: "পাসওয়ার্ড",
     submit: "আমার মামলা দেখুন",
     switchAction: "আইনজীবী হিসেবে লগ ইন করুন",
@@ -1000,6 +1045,19 @@ const bn: Dictionary = {
       "অ্যাকাউন্ট নেই? আপনার মক্কেল আইডি ও পাসওয়ার্ড আপনার আইনজীবী দেবেন।",
     helpTitle: "আপনার প্রবেশাধিকার ব্যক্তিগত।",
     helpBody: "নতুন তথ্যের জন্য আইনজীবীর সাথে যোগাযোগ করুন।",
+    invalidCredentials: "ইমেইল বা পাসওয়ার্ড সঠিক নয়।",
+    rateLimited: "অনেকবার চেষ্টা করেছেন। একটু অপেক্ষা করে আবার চেষ্টা করুন।",
+    acceptInvitation: {
+      eyebrow: "মক্কেল আমন্ত্রণ",
+      title: "আমন্ত্রণ গ্রহণ করুন",
+      intro: "আপনার মামলার অ্যাক্সেসের জন্য একটি নিরাপদ পাসওয়ার্ড দিন।",
+      tokenLabel: "আমন্ত্রণ টোকেন",
+      passwordLabel: "পাসওয়ার্ড",
+      confirmLabel: "পাসওয়ার্ড নিশ্চিত করুন",
+      submit: "আমন্ত্রণ গ্রহণ করুন",
+      invalid: "আমন্ত্রণ টোকেন বা পাসওয়ার্ড সঠিক নয়।",
+      error: "আমন্ত্রণ গ্রহণ করা যায়নি।",
+    },
   },
   clientDashboard: {
     eyebrow: "মক্কেল পোর্টাল",

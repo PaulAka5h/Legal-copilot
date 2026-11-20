@@ -12,6 +12,12 @@ import {
   type LoginState,
   type Role,
 } from "@/lib/session";
+import {
+  BackendUnavailable,
+  MOCK_PREFIX,
+  SESSION_COOKIE,
+  backendRequest,
+} from "@/lib/api/backendClient";
 
 export async function setLanguage(formData: FormData) {
   const language = formData.get("language") === "bn" ? "bn" : "en";
@@ -58,11 +64,109 @@ export async function clientLogin(
   formData: FormData,
 ): Promise<LoginState> {
   // Clients sign in with the email their invitation was sent to.
-  return signIn("client", "clientId", formData);
+  return signIn("client", "email", formData);
 }
 
 export async function signOut() {
   const session = await getSession();
   await clearSession();
   redirect(session?.role === "client" ? "/client/login" : "/lawyer/login");
+}
+
+export async function signOutAll() {
+  const session = await getSession();
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+
+  if (token && !token.startsWith(MOCK_PREFIX)) {
+    try {
+      await backendRequest("/api/v1/auth/logout-all", {
+        method: "POST",
+        token,
+      });
+    } catch {
+      // Local sign-out must still succeed if the backend is unavailable.
+    }
+  }
+
+  await clearSession();
+  redirect(session?.role === "client" ? "/client/login" : "/lawyer/login");
+}
+
+export type PasswordResetState = { message: "sent" | "error" } | null;
+
+export async function requestPasswordReset(
+  _state: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { message: "error" };
+
+  try {
+    const response = await backendRequest("/api/v1/auth/password/forgot", {
+      method: "POST",
+      json: { email },
+    });
+    return { message: response.ok ? "sent" : "error" };
+  } catch (error) {
+    if (error instanceof BackendUnavailable) return { message: "error" };
+    throw error;
+  }
+}
+
+export type InvitationState =
+  | { status: "invalid" }
+  | { status: "error" }
+  | null;
+
+export async function acceptClientInvitation(
+  _state: InvitationState,
+  formData: FormData,
+): Promise<InvitationState> {
+  const token = String(formData.get("token") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (
+    token.length < 32 ||
+    password.length < 12 ||
+    password !== confirmPassword
+  ) {
+    return { status: "invalid" };
+  }
+
+  let response: Response;
+  try {
+    response = await backendRequest("/api/v1/auth/invitations/accept", {
+      method: "POST",
+      json: { token, password },
+    });
+  } catch (error) {
+    if (error instanceof BackendUnavailable) return { status: "error" };
+    throw error;
+  }
+  if (!response.ok) {
+    return { status: response.status === 400 || response.status === 422 ? "invalid" : "error" };
+  }
+
+  for (const header of response.headers.getSetCookie()) {
+    const [pair] = header.split(";");
+    const index = pair.indexOf("=");
+    if (pair.slice(0, index).trim() === SESSION_COOKIE) {
+      const sessionToken = pair.slice(index + 1).trim();
+      if (sessionToken) {
+        const store = await cookies();
+        store.set(SESSION_COOKIE, sessionToken, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 60 * 60 * 8,
+        });
+        redirect("/client/dashboard");
+      }
+    }
+  }
+
+  return { status: "error" };
 }

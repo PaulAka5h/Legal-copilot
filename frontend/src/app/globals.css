@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 @theme {
+  --font-inter: "Segoe UI";
+  --font-cormorant: Georgia;
+  --font-hind: "Noto Sans Bengali";
+  --font-noto-serif-bengali: "Noto Serif Bengali";
+}
+
+@theme {
   --color-green: #00984a;
   --color-deep: #076732;
   --color-mid: #028b45;
