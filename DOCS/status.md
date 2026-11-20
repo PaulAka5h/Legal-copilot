@@ -312,9 +312,26 @@ Migrations `0013_case_documents`, `0014_case_facts` applied to local dev and tes
 All write endpoints require the same-origin check; all write an audit event with counts or IDs only. Quotes are checked in code against the exact page version (NFC, whitespace-normalized); a `document_says` fact with a failed quote cannot be confirmed (API 409 and a database CHECK).
 
 Open items:
-- [ ] Install Tesseract (`tesseract-ocr`, `tesseract-ocr-ben`) and re-run `tests/test_documents.py` to exercise real OCR.
+- [x] Tesseract 5.5.0 with `ben` + `eng` installed (2026-11-20); `tests/test_documents.py` runs real OCR. A scanned Bangla statute page (bdlaws Act 609, public text, rendered at 300 dpi with blur and noise) scored OCR confidence 0.92 and character accuracy 0.97; real phone or photocopy scans will score lower.
 - [ ] Malware scanner (ClamAV) for production; until then production refuses uploads.
-- [ ] ARQ worker calling `process_document()` (decided, not built). A crash mid-processing leaves a document in `processing`; the worker should handle retries.
-- [ ] Ollama: pick and pin a local model, then measure extraction quality on synthetic Bangla/English documents before relying on it.
-- [ ] Security review of the upload and extraction paths (AGENTS.md: file uploads and user data).
+- [ ] ARQ worker calling `process_document()` (decided, not built).
+- [x] Crash recovery: migration `0015_processing_recovery` (`processing_started_at`, `app.fail_stuck_documents`) plus a startup sweep and `python -m app.documents.recovery`; stuck documents become `failed`/`processing_timeout` and are retried by `process_document()`.
+- [ ] Ollama: measurement of `qwen3:8b` on 2 synthetic SAMPLE_DATA_NOT_REAL_LAW documents (1 en, 1 bn) did not complete (2026-11-20). The model ran mostly on CPU (5.99 GB, 0.92 GB in the 2 GB MX350 VRAM, context 4096); the first English call ran 810 s and the server then closed the connection (`RemoteProtocolError`); every later call got `ConnectError` and `ollama serve` was no longer running. No latency, JSON-validity, or quote-check figures yet. Next: restart Ollama, disable qwen3 "thinking" for extraction, and either use a smaller model or a GPU host; re-run the measurement script.
+- [x] Security review of upload, storage, extraction, and facts paths (2026-11-20, project security-reviewer instructions). No critical findings. Two HIGH fixed in `7a0d0b34`: oversized PDF pages (page size cap plus bounded OCR render dpi) and unauthenticated multipart spooling (outermost body-size middleware: 21 MB upload, 2 MB elsewhere).
+
+Security findings still open (medium/low):
+
+| Severity | Finding | Where | Planned fix |
+|---|---|---|---|
+| MEDIUM | DB pool exhaustion: `CaseAccessDep` holds a pooled connection for the whole request while upload/extraction open more; OCR has no Tesseract timeout and extraction has no batch cap, so ~8 concurrent long requests can stall the API | `app/auth/dependencies.py`, `app/documents/router.py`, `app/facts/service.py` | Short membership transaction; move processing and extraction to the ARQ worker; `pytesseract` timeouts; cap pages per extraction run; rate limits |
+| MEDIUM | Blocking calls on the event loop: `validate_upload` (PyMuPDF open/repair) and `store.put` run synchronously | `app/documents/router.py` | Wrap in `asyncio.to_thread` |
+| MEDIUM | A trivial quote (e.g. "the") passes the quote check, so an injected or careless fact can be confirmed as `document_says` with a meaningless source | `app/facts/schemas.py`, `app/facts/service.py` | Minimum quote length (~20 characters or 3 words) and key-term overlap between statement and quote |
+| MEDIUM | Case permissions not enforced: upload, page correction, extraction, and confirmation check membership only, not `can_upload` / `can_run_ai` (TRD, Security.md 5.1.3) | `app/documents/router.py`, `app/facts/router.py` | Check `access.role` and `access.permissions` as `app/cases/router.py` does |
+| LOW | Non-validation LLM errors (connection, timeout, HTTP status) return 500 and leave `ai_runs` as `running`; run start is not audited | `app/facts/service.py` | Catch all errors, `finish_run('failed', code)`, audit start and failure |
+| LOW | Concurrent page corrections or duplicate uploads hit UNIQUE constraints and return 500 (data stays consistent) | `app/documents/router.py` | `SELECT ... FOR UPDATE` on the current page; map `IntegrityError` to 409 |
+| LOW | Row committed before `store.put`; on a storage error the document is `failed` with no original, and re-upload is blocked by the duplicate check | `app/documents/router.py` | Store first, or exclude `storage_error` documents from the duplicate check |
+| LOW | `app_user` can UPDATE `documents.scan_status`, and the production gate trusts `'clean'` | migration 0013 grants | Revoke the column grant; set scan results through a scanner-owned SECURITY DEFINER function |
+| LOW | `MINIO_SECURE` defaults to false and objects have no server-side encryption (Security.md: Restricted data encrypted at rest) | `app/config.py`, `app/documents/storage.py` | Require TLS in production unless MinIO is local; enable SSE or bucket encryption |
+| LOW | Document and page reads are not audited (Security.md section 10) | `app/documents/router.py` | Audit page views |
+- Commit history: the document and fact router registration lines were split into their own commit (`8548623f`). `26e2c882` (C1) and `69ff6836` (C2/C3) contain their modules only, so their endpoint tests pass only from `8548623f` on. `afef5b21` and `5e7a6183` were committed while the legacy test `tests/documents/test_pipeline.py::test_full_pipeline_with_image` failed (it OCRed a blank image); fixed in `f2ea7b08`.
 
