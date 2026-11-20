@@ -88,6 +88,8 @@ async def evaluate(provider: str, limit: int | None) -> dict:
                     "citations_verified": summary["citations_verified"],
                     "analysis_valid": analysis.origin == "ai" or llm is None,
                     "strategy_valid": tree_draft.origin == "ai" or llm is None,
+                    "analysis_provider_error": any(w.startswith("provider_error") for w in analysis.warnings),
+                    "strategy_provider_error": any(w.startswith("provider_error") for w in tree_draft.warnings),
                     "nodes": tree_summary["nodes"], "nodes_verified": tree_summary["nodes_verified"],
                     "no_verified_finding": not any(f["verification"] == "verified" for f in findings),
                 })
@@ -112,8 +114,14 @@ async def evaluate(provider: str, limit: int | None) -> dict:
         "abstain_rate": rate(sum(p["abstained"] for p in per_pattern), n),
         "citation_verification_pass_rate": rate(sum(p.get("citations_verified", 0) for p in ran),
                                                 sum(p.get("citations", 0) for p in ran)),
-        "analysis_schema_validity": rate(sum(p["analysis_valid"] for p in ran), len(ran)),
-        "strategy_schema_validity": rate(sum(p["strategy_valid"] for p in ran), len(ran)),
+        # Validity among answers the model returned; provider errors (rate limits, 5xx) are counted separately.
+        "analysis_schema_validity": rate(sum(p["analysis_valid"] for p in ran),
+                                         sum(not p["analysis_provider_error"] for p in ran)),
+        "strategy_schema_validity": rate(sum(p["strategy_valid"] for p in ran),
+                                         sum(not p["strategy_provider_error"] for p in ran)),
+        "analysis_provider_errors": sum(p["analysis_provider_error"] for p in ran),
+        "strategy_provider_errors": sum(p["strategy_provider_error"] for p in ran),
+        "ai_output_rate": rate(sum(p["analysis_valid"] and p["strategy_valid"] for p in ran), len(ran)),
         "strategy_node_verification_rate": rate(sum(p["nodes_verified"] for p in ran), sum(p["nodes"] for p in ran)),
         "seconds": round(time.perf_counter() - started, 1),
     }
@@ -126,7 +134,8 @@ async def evaluate(provider: str, limit: int | None) -> dict:
 def to_markdown(results: list[dict]) -> str:
     keys = ["patterns", "recall_at_5", "recall_at_10", "recall_at_10_en", "recall_at_10_bn", "mrr_at_10",
             "abstain_rate", "citation_verification_pass_rate", "analysis_schema_validity",
-            "strategy_schema_validity", "strategy_node_verification_rate", "seconds"]
+            "strategy_schema_validity", "analysis_provider_errors", "strategy_provider_errors", "ai_output_rate",
+            "strategy_node_verification_rate", "seconds"]
     header = "| Metric | " + " | ".join(f"{r['provider']}" + (f" ({r['model']})" if r["model"] else "") for r in results) + " |"
     lines = [header, "|---|" + "---|" * len(results)]
     lines += [f"| {k} | " + " | ".join(str(r["metrics"].get(k)) for r in results) + " |" for k in keys]
@@ -152,8 +161,10 @@ def main() -> None:
             f"Generated {datetime.now(UTC):%Y-%m-%d %H:%M} UTC by `uv run python -m eval.run "
             f"{' '.join('--provider ' + r['provider'] for r in results)} --write` against the local approved "
             "knowledge base. Fact patterns: `backend/eval/fact_patterns.jsonl` (synthetic, SAMPLE_DATA_NOT_REAL_LAW).\n\n"
-            "Schema validity counts model outputs that validated without falling back to the mock (1.0 by "
-            "definition for the mock). Citation verification is the deterministic verifier (Step D). Reranker: mock "
+            "Schema validity is the share of model answers that validated (after one retry) among the answers the "
+            "provider returned; provider errors (free-tier rate limits, 5xx) are counted separately and fall back "
+            "to the labelled mock. ai_output_rate is the share of patterns where both analysis and strategy came from "
+            "the model. The mock is 1.0 by definition. Citation verification is the deterministic verifier (Step D). Reranker: mock "
             "(fused order); abstain threshold: cosine similarity 0.79.\n\n" + to_markdown(results),
             encoding="utf-8")
         print(f"wrote {RESULTS_MD}")
