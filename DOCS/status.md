@@ -54,15 +54,15 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 2 Dashboards | Client invitations and activation | Not started | | | |
 | 2 Dashboards | Client-visible updates and sharing | Not started | | | |
 | 2 Dashboards | Case closure and access removal | Not started | | | |
-| 3 Documents | Secure upload and validation | Done | 41 backend tests pass | N/A (Validation layer) | Implemented magic-bytes MIME inspection, password-protected PDF rejection, pixel bomb safety & ClamAV malware scanner integration. |
-| 3 Documents | Original file storage | In progress | Model & metadata tests pass | Passed | Storage path conventions (`cases/{case_id}/documents/{doc_id}`) & SHA-256 integrity hashing ready for MinIO/S3. |
-| 3 Documents | PDF and Word extraction | Done | PyMuPDF & python-docx tests pass | Passed | Digital page-by-page extraction preserving exact physical page numbers and language classification (BN/EN). |
-| 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
-| 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
+| 3 Documents | Secure upload and validation | Done (app/) | `tests/test_documents.py`: magic-byte type check, 20 MB limit, encrypted PDF refusal, same-origin check, production refusal without a malware scanner | Lawyer members only; closed cases read-only | Step C1 in `backend/app/documents/`. No malware scanner yet: development stores `scan_status = not_configured` with a visible warning; production refuses (503 NOT_CONFIGURED). The earlier `src/documents` code is unused by `app/`. |
+| 3 Documents | Original file storage | Done (app/) | Upload test reads the original back from MinIO byte for byte | Keys `cases/{case_id}/documents/{document_id}`; bucket and credentials from env | MinIO via the `minio` client; local Compose MinIO; `TEST_MINIO_BUCKET` for tests. |
+| 3 Documents | PDF and Word extraction | Done for PDF (app/) | Bangla + English text-layer extraction test | N/A | PDF text layer per page (NFC). Word files are not accepted (allow-list PDF, PNG, JPEG, TIFF). |
+| 3 Documents | OCR (Bengali and English) | Stubbed on this machine | OCR test runs the not-configured path here | N/A | Tesseract `ben+eng` with per-page confidence when installed; Tesseract is not installed locally, so scanned pages store empty text, `ocr_engine = not_configured`, `needs_review`, and an `ocr_not_configured` warning. Install `tesseract-ocr tesseract-ocr-ben` to enable. |
+| 3 Documents | Page review and correction | Done (app/) | Page correction creates version 2, version 1 kept | Lawyer members only | `POST .../documents/{id}/pages/{n}/versions`. |
 | 4 RAG | Chunking and embeddings | Done | `tests/rag` (ingest, NFC, embed worker, offload export/import, approval) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A done 2026-11-20. Local embedding ~132 s/100 chunks on CPU; full corpus to be embedded on Kaggle GPU via `app.rag.embed export` / `scripts/kaggle_embed.py` / `app.rag.embed import`. |
 | 4 RAG | Scoped retrieval (case filter) | Done (Step B) | `tests/rag/test_search.py` against `legal_copilot_test`: in-force rules, NFC variants, repealed Act excluded, bn/en dedupe, Recall@10 floor | 401 anonymous, 404 non-member lawyer, 403 client member; audit event without query text | `POST /api/v1/lawyer/cases/{case_id}/research/search`: HNSW cosine + simple FTS, RRF k=60, approved current versions only. Recall@10 on 30 queries over the 20 approved Acts: 0.967 (mock reranker), 1.000 (bge-reranker-v2-m3, ~43 s/query on CPU). See 7.9. |
 | 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; all 20 versions approved by a dev lawyer with audit events (see 7.8). |
-| 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
+| 5 Analysis | Facts and timeline | Facts done (Step C); timeline not started in app/ | `tests/test_facts.py`: extraction, quote checks, retry then extraction_failed, review, versioning, confirmed set, provider rules, prompt-injection boundary, no text in logs | A-vs-B lawyer and client isolation over API and SQL; closed case read-only (RLS) | Step C2/C3 in `backend/app/facts/`. Extractors: mock (`ai_mock`, dev/test only) or local Ollama (JSON schema); production without an approved provider returns NOT_CONFIGURED. Analysis may read facts only through `case_facts_for_analysis`. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
 | 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
 | 5 Analysis | Verifier | Done | LLMGateway & DocumentSanitizer pass | Verified | Prompt injection sandboxing, structured JSON validation, approved provider enforcement (mock & gemini). |
@@ -291,4 +291,30 @@ Open items:
 - [ ] The bge reranker needs a GPU to be practical (43 s/query on this CPU).
 - [ ] Bangla recall set: fill `backend/tests/data/retrieval_eval_bn.jsonl` (template rows labelled SAMPLE_DATA_NOT_REAL_LAW are ignored). `test_recall_at_10_on_bangla_eval` skips until real rows exist, requires the expected sections to be approved in `legal_copilot_test`, and asserts Recall@10 >= 0.90.
 - [ ] Before approving the full corpus: `python -m app.rag.spot_check --n 25 --seed N` lists random pending Acts with source URLs for a manual check.
+
+### 7.10 Step C: documents and facts (2026-11-20)
+
+Migrations `0013_case_documents`, `0014_case_facts` applied to local dev and test (down/up checked). Schema in `DOCS/database.md` section 17.
+
+| Endpoint (prefix `/api/v1/lawyer/cases/{case_id}`) | Purpose |
+|---|---|
+| `POST /documents` | Upload (PDF/PNG/JPEG/TIFF, at most 20 MB), store in MinIO, process synchronously via `process_document()` |
+| `GET /documents`, `GET /documents/{id}` | List and read documents |
+| `GET /documents/{id}/pages/{n}` | Current page text plus all versions |
+| `POST /documents/{id}/pages/{n}/versions` | Lawyer correction as a new page version |
+| `POST /facts/extractions` | Draft facts from page text; JSON schema output validated with Pydantic, one retry, then `extraction_failed` |
+| `GET /facts`, `POST /facts` | List current facts; enter a lawyer fact |
+| `PATCH /facts/{id}` | Edit (new version) |
+| `POST /facts/{id}/confirm`, `/reject` | Review the current draft |
+| `GET /facts/{id}/history` | All versions |
+| `GET /facts/confirmed` | Facts usable in analysis plus `fact_set_hash` |
+
+All write endpoints require the same-origin check; all write an audit event with counts or IDs only. Quotes are checked in code against the exact page version (NFC, whitespace-normalized); a `document_says` fact with a failed quote cannot be confirmed (API 409 and a database CHECK).
+
+Open items:
+- [ ] Install Tesseract (`tesseract-ocr`, `tesseract-ocr-ben`) and re-run `tests/test_documents.py` to exercise real OCR.
+- [ ] Malware scanner (ClamAV) for production; until then production refuses uploads.
+- [ ] ARQ worker calling `process_document()` (decided, not built). A crash mid-processing leaves a document in `processing`; the worker should handle retries.
+- [ ] Ollama: pick and pin a local model, then measure extraction quality on synthetic Bangla/English documents before relying on it.
+- [ ] Security review of the upload and extraction paths (AGENTS.md: file uploads and user data).
 
