@@ -1,9 +1,9 @@
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Body, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Body, HTTPException, Request, status
 
-from app.auth.dependencies import LawyerDep, UserSessionDep, request_ip
+from app.auth.dependencies import require_same_origin, LawyerDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
 from app.cases.dependencies import CaseAccessDep
 from app.errors import problem_responses
@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/v1/lawyer", tags=["legal-research"])
     ),
     response_model=ResearchSearchResponse,
     responses=problem_responses(401, 403, 404, 422, 503),
+    dependencies=[Depends(require_same_origin)],
 )
 async def search_case_research(
     request: Request,
