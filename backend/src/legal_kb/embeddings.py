@@ -1,4 +1,4 @@
-"""Embedding service module for Legal-Copilot RAG.
+"""Embedding service module for PokkhoAI RAG.
 
 Supports:
 1. MockEmbeddingProvider: Deterministic embeddings for fast unit tests without GPU/network.

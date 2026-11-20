@@ -169,13 +169,13 @@ function Logo({ light = false }: { light?: boolean }) {
     <button
       className={`logo ${light ? "logo-light" : ""}`}
       onClick={() => undefined}
-      aria-label="Legal Copilot"
+      aria-label="PokkhoAI"
     >
       <span className="logo-mark">
         <span>LC</span>
       </span>
       <span className="logo-copy">
-        <b>Legal Copilot</b>
+        <b>PokkhoAI</b>
         <small>
           <Bilingual en="Legal workspace" bn="আইনি সহায়ক" />
         </small>
@@ -295,7 +295,7 @@ function AppContent() {
   };
 
   useEffect(() => {
-    document.title = `${screenNames[screen]} - ${language === "en" ? "EN" : "BN"} | Legal Copilot`;
+    document.title = `${screenNames[screen]} - ${language === "en" ? "EN" : "BN"} | PokkhoAI`;
   }, [language, screen]);
 
   if (screen === "lawyer-login")

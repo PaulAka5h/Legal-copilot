@@ -1,4 +1,4 @@
-# AI Legal Platform for Bangladesh (working title)
+# PokkhoAI
 
 An AI decision-support platform for lawyers in Bangladesh, built for the AI Builders Congress.
 

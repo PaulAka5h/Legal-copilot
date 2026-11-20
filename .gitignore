@@ -22,6 +22,7 @@ __pycache__/
 /dist/
 
 # Large Datasets & Scraped Raw/Processed Corpus (Preserve on local disk, do not push to GitHub)
+data-scrapper/data/
 data-scrapper/data/raw/
 data-scrapper/data/processed/acts/
 data-scrapper/data/processed/sections.jsonl

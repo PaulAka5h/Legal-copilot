@@ -3,6 +3,7 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { NewClientForm } from "@/components/lawyer/NewClientForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -20,7 +21,7 @@ export default async function NewClientPage() {
         title={copy.newClient.title}
         subtitle={copy.newClient.subtitle}
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {isMockAuthEnabled() ? <p className="mock-note">{copy.common.mockData}</p> : null}
       <NewClientForm language={language} />
     </>
   );

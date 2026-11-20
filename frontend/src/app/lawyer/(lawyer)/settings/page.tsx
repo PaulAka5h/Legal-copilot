@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { signOut } from "@/app/actions";
+import { signOut, signOutAll } from "@/app/actions";
 import { Icon } from "@/components/Icon";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PageHeading } from "@/components/lawyer/PageHeading";
@@ -82,6 +82,21 @@ export default async function SettingsPage() {
               <button className="outline-button" type="submit">
                 <Icon name="logout" size={17} />
                 {settings.signOut}
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <section className="panel settings-signout">
+          <div className="panel-head">
+            <div>
+              <h2>{settings.signOutAll}</h2>
+              <p>{settings.signOutAllBody}</p>
+            </div>
+            <form action={signOutAll}>
+              <button className="outline-button" type="submit">
+                <Icon name="logout" size={17} />
+                {settings.signOutAll}
               </button>
             </form>
           </div>

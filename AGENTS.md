@@ -4,7 +4,7 @@ Instructions for AI coding agents working in this repository.
 
 ## Project Overview
 
-**AI Legal Platform for Bangladesh** (working title): a decision-support web app for
+**PokkhoAI**: an AI legal decision-support platform for Bangladesh, built for
 lawyers. A lawyer uploads client documents, the AI extracts the facts, researches
 Bangladesh law, and compares legal strategies with a chess-inspired engine
 (strategy, opposing response, counterargument, risk). After each hearing the

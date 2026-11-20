@@ -1,8 +1,8 @@
 # Backend Developer Orchestration & Work Division
 
-This document specifies the exact division of responsibilities, ownership boundaries, and coordination protocols between the two backend developers (**Backend Dev 1** and **Backend Dev 2**) working on the Legal-Copilot backend.
+This document specifies the exact division of responsibilities, ownership boundaries, and coordination protocols between the two backend developers (**Backend Dev 1** and **Backend Dev 2**) working on the PokkhoAI backend.
 
-The architecture, conventions, and endpoint structures strictly follow **[DOCS/TRD.md](file:///home/arafath/ai-builders/Legal-copilot/DOCS/TRD.md)**, **[DOCS/PRD.md](file:///home/arafath/ai-builders/Legal-copilot/DOCS/PRD.md)** (Section 9 Delivery Phases), and **[DOCS/database.md](file:///home/arafath/ai-builders/Legal-copilot/DOCS/database.md)**.
+The architecture, conventions, and endpoint structures strictly follow **[TRD.md](./TRD.md)**, **[PRD.md](./PRD.md)** (Section 9 Delivery Phases), and **[database.md](./database.md)**.
 
 ---
 
