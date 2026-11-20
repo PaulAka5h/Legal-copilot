@@ -1,206 +1,155 @@
-/** Server-side client for communicating with the PokkhoAI FastAPI backend. */
-
 import "server-only";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+import type { components } from "@/lib/api/schema";
 
-const BACKEND_URL = (process.env.BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
-const APP_ORIGIN = (process.env.APP_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Server-side client for the FastAPI backend. Types come from the backend
+ * OpenAPI schema (`npm run gen:api`). Components never call this directly;
+ * lib/api/lawyer.ts and lib/api/client.ts adapt responses to UI shapes.
+ */
 
-export type BackendProblem = {
-  status: number;
-  detail?: string;
-  errors?: Array<{ loc?: Array<string | number>; msg?: string }>;
-};
+export type Api = components["schemas"];
 
-export type CurrentUser = {
-  id: string;
-  email: string;
-  role: "lawyer" | "client" | "admin";
-  full_name: string;
-  preferred_language: "en" | "bn";
-};
+const BACKEND_URL = process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000";
+// The backend's CSRF check compares Origin with its APP_ORIGIN setting.
+const APP_ORIGIN = process.env.APP_ORIGIN ?? "http://localhost:3000";
+const TIMEOUT_MS = Number(process.env.BACKEND_TIMEOUT_MS ?? 120_000);
 
-export async function backendFetch(path: string, init: RequestInit = {}) {
-  const incoming = await headers();
-  const requestHeaders = new Headers(init.headers);
-  const cookie = (await cookies()).toString();
+export const SESSION_COOKIE = "lc_session";
+export const MOCK_PREFIX = "mock.";
 
-  if (cookie) requestHeaders.set("cookie", cookie);
-  if (!requestHeaders.has("origin") && init.method && init.method !== "GET") {
-    requestHeaders.set("origin", APP_ORIGIN);
+/** The backend could not be reached (network error or timeout). */
+export class BackendUnavailable extends Error {
+  constructor() {
+    super("Backend is unreachable.");
   }
-  if (!requestHeaders.has("x-request-id") && incoming.get("x-request-id")) {
-    requestHeaders.set("x-request-id", incoming.get("x-request-id")!);
-  }
-
-  return fetch(`${BACKEND_URL}${path}`, {
-    ...init,
-    headers: requestHeaders,
-    cache: "no-store",
-  });
 }
 
-export async function readProblem(response: Response): Promise<BackendProblem> {
+/** The backend answered with an error status. */
+export class BackendError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+  ) {
+    super(`Backend returned ${status}.`);
+  }
+}
+
+type Method = "GET" | "POST" | "PATCH";
+type RequestOptions = {
+  method?: Method;
+  json?: unknown;
+  form?: FormData;
+  token?: string;
+};
+
+// Per-request flag: set when any data on the page came from the demo fallback.
+const demoState = cache(() => ({ used: false }));
+
+export function markDemoData() {
+  demoState().used = true;
+}
+
+export function usedDemoData() {
+  return demoState().used;
+}
+
+/** The backend session token from our cookie, or null for no or mock sessions. */
+export async function sessionToken(): Promise<string | null> {
+  const value = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!value || value.startsWith(MOCK_PREFIX)) return null;
+  return value;
+}
+
+/** Raw request; returns the Response so callers can read Set-Cookie. */
+export async function backendRequest(
+  path: string,
+  { method = "GET", json, form, token }: RequestOptions = {},
+): Promise<Response> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (method !== "GET") headers.Origin = APP_ORIGIN;
+  if (json !== undefined) headers["Content-Type"] = "application/json";
+  if (token) headers.Cookie = `${SESSION_COOKIE}=${token}`;
+
   try {
-    const body = (await response.json()) as BackendProblem;
-    return { ...body, status: response.status };
+    return await fetch(`${BACKEND_URL}${path}`, {
+      method,
+      headers,
+      body: form ?? (json !== undefined ? JSON.stringify(json) : undefined),
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
   } catch {
-    return { status: response.status };
+    throw new BackendUnavailable();
   }
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const response = await backendFetch("/api/v1/me");
-  if (!response.ok) return null;
-  return (await response.json()) as CurrentUser;
-}
-
-export async function relaySessionCookie(response: Response): Promise<void> {
-  const setCookie = response.headers.get("set-cookie");
-  const match = setCookie ? /^lc_session=([^;]*)/i.exec(setCookie) : null;
-  if (!match) return;
-
-  (await cookies()).set("lc_session", match[1], {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: match[1] ? 60 * 60 * 12 : 0,
-  });
-}
-
-export type LegalSearchResult = {
-  chunk_id: string;
-  act_name: string;
-  act_year?: string;
-  section?: string;
-  provision_label?: string;
-  score: number;
-  retrieval_type: string;
-  text: string;
-  source_url: string;
-};
-
-export type LegalSearchResponse = {
-  query: string;
-  total_results: number;
-  results: LegalSearchResult[];
-};
-
-export async function queryLegalKnowledgeBase(
-  query: string,
-  topK = 5,
-  actId?: string,
-): Promise<LegalSearchResponse | null> {
+async function errorDetail(response: Response): Promise<string> {
   try {
-    const params = new URLSearchParams({
-      q: query,
-      top_k: String(topK),
-    });
-    if (actId) params.append("act_id", actId);
+    const body: unknown = await response.json();
+    if (body && typeof body === "object" && "detail" in body) {
+      const { detail } = body as { detail: unknown };
+      return typeof detail === "string" ? detail : JSON.stringify(detail);
+    }
+  } catch {
+    // Not JSON; fall through.
+  }
+  return response.statusText;
+}
 
-    const res = await backendFetch(`/api/v1/legal-kb/search?${params.toString()}`, {
-      method: "GET",
-      cache: "no-store",
-    });
+/**
+ * Authenticated JSON call as the signed-in user. Throws BackendUnavailable when
+ * there is no real session (mock sign-in) or the backend cannot be reached.
+ */
+export async function backend<T>(
+  path: string,
+  options: Omit<RequestOptions, "token"> = {},
+): Promise<T> {
+  const token = await sessionToken();
+  if (!token) throw new BackendUnavailable();
 
-    if (!res.ok) return null;
-    return (await res.json()) as LegalSearchResponse;
-  } catch (err) {
-    console.error("Failed to query backend legal knowledge base:", err);
-    return null;
+  const response = await backendRequest(path, { ...options, token });
+  if (response.status === 401) redirect("/");
+  if (!response.ok) {
+    throw new BackendError(response.status, await errorDetail(response));
+  }
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+/** Like backend(), but a 404 becomes null. */
+export async function backendOrNull<T>(
+  path: string,
+  options: Omit<RequestOptions, "token"> = {},
+): Promise<T | null> {
+  try {
+    return await backend<T>(path, options);
+  } catch (error) {
+    if (error instanceof BackendError && error.status === 404) return null;
+    throw error;
   }
 }
 
-export type BackendTimelineEvent = {
-  id: string;
-  event_date: string;
-  raw_date_text: string;
-  title: string;
-  description: string;
-  actor: string;
-  source_page: number;
-  confidence: string;
-  is_anomaly: boolean;
-  anomaly_reason?: string;
-};
-
-export type BackendCaseAnalysis = {
-  id: string;
-  case_id: string;
-  version: number;
-  client_position: string;
-  factual_summary: string;
-  legal_issues: string[];
-  claims: Array<{
-    id: string;
-    text: string;
-    claim_type: string;
-    confidence_label: string;
-    needs_lawyer_review: boolean;
-    sources: Array<{
-      document_name: string;
-      page_number: number;
-      quote: string;
-      source_url?: string;
-    }>;
-  }>;
-  timeline: BackendTimelineEvent[];
-  contradictions: Array<{
-    id: string;
-    issue: string;
-    statement_a: string;
-    source_a_document: string;
-    source_a_page: number;
-    statement_b: string;
-    source_b_document: string;
-    source_b_page: number;
-    severity: string;
-    analysis: string;
-  }>;
-  gaps: Array<{
-    id: string;
-    missing_item: string;
-    statutory_requirement: string;
-    impact: string;
-  }>;
-  citations: Array<{
-    act_id: string;
-    act_name: string;
-    section: string;
-    section_title: string;
-    relevance_reason: string;
-    source_url: string;
-  }>;
-  suggested_next_steps: string[];
-  review_status: string;
-};
-
-export async function fetchCaseAnalysis(caseId: string): Promise<BackendCaseAnalysis | null> {
+/**
+ * Run the real call; on BackendUnavailable use the demo fallback and mark the
+ * page as showing demo data. Other errors propagate.
+ */
+export async function withDemoFallback<T>(
+  real: () => Promise<T>,
+  demo: () => T | Promise<T>,
+): Promise<T> {
   try {
-    const res = await backendFetch(`/api/v1/cases/${encodeURIComponent(caseId)}/analysis`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as BackendCaseAnalysis;
-  } catch (err) {
-    console.error("Failed to fetch backend case analysis:", err);
-    return null;
+    return await real();
+  } catch (error) {
+    if (!(error instanceof BackendUnavailable)) throw error;
+    markDemoData();
+    return demo();
   }
 }
 
-export async function fetchCaseTimeline(caseId: string): Promise<BackendTimelineEvent[]> {
-  try {
-    const res = await backendFetch(`/api/v1/cases/${encodeURIComponent(caseId)}/timeline`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    return (await res.json()) as BackendTimelineEvent[];
-  } catch (err) {
-    console.error("Failed to fetch backend case timeline:", err);
-    return [];
-  }
+export function caseUrl(caseId: string, suffix = "") {
+  return `/api/v1/lawyer/cases/${encodeURIComponent(caseId)}${suffix}`;
 }

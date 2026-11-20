@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
-  setDocumentStatusAction,
+  refreshDocumentStatusAction,
   uploadDocumentAction,
 } from "@/app/lawyer/actions";
+import { AnalysisPanel } from "@/components/lawyer/AnalysisPanel";
+import { FactsPanel } from "@/components/lawyer/FactsPanel";
 import { HearingsTimeline } from "@/components/lawyer/HearingsTimeline";
 import {
   DocumentList,
@@ -13,7 +15,11 @@ import {
   SummaryBadge,
   hearingDateLabel,
 } from "@/components/lawyer/hearingParts";
-import type { CaseDocument, Hearing } from "@/lib/api/lawyer";
+import type {
+  CaseDocument,
+  CaseIntelligence,
+  Hearing,
+} from "@/lib/api/lawyerTypes";
 import { MAX_DOCUMENT_BYTES, isAllowedDocument } from "@/lib/documents";
 import {
   format,
@@ -23,7 +29,13 @@ import {
   type Language,
 } from "@/lib/i18n";
 
-type Tab = "hearings" | "documents";
+export type WorkspaceTab = "hearings" | "documents" | "facts" | "analysis";
+export type WorkspaceNotice = {
+  status: "ok" | "error" | "NOT_CONFIGURED";
+  detail: string;
+} | null;
+
+const TABS: WorkspaceTab[] = ["hearings", "documents", "facts", "analysis"];
 
 export function MatterWorkspace({
   caseId,
@@ -33,6 +45,10 @@ export function MatterWorkspace({
   copy,
   locked,
   error,
+  intelligence,
+  demo,
+  initialTab,
+  notice,
 }: {
   caseId: string;
   hearings: Hearing[];
@@ -41,8 +57,12 @@ export function MatterWorkspace({
   copy: Dictionary["caseDetail"];
   locked: boolean;
   error: "hearing" | "note" | null;
+  intelligence: CaseIntelligence;
+  demo: boolean;
+  initialTab: WorkspaceTab;
+  notice: WorkspaceNotice;
 }) {
-  const [tab, setTab] = useState<Tab>("hearings");
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab);
   const [caseDocuments, setCaseDocuments] = useState(initialDocuments);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -52,13 +72,15 @@ export function MatterWorkspace({
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  function markReady(documentId: string) {
+  async function refreshStatus(documentId: string) {
+    const status = await refreshDocumentStatusAction(caseId, documentId, "ready");
+    if (!status) return;
     setCaseDocuments((items) =>
-      items.map((item) =>
-        item.id === documentId ? { ...item, status: "ready" } : item,
-      ),
+      items.map((item) => (item.id === documentId ? { ...item, status } : item)),
     );
-    void setDocumentStatusAction(caseId, documentId, "ready");
+    if (status === "processing") {
+      timers.current.push(setTimeout(() => void refreshStatus(documentId), 3000));
+    }
   }
 
   async function handleUpload(hearingId: string, files: File[]) {
@@ -93,13 +115,11 @@ export function MatterWorkspace({
 
     await Promise.all(
       files.map(async (file, index) => {
-        const saved = await uploadDocumentAction({
-          caseId,
-          hearingId,
-          name: file.name,
-          size: file.size,
-          mimeType: file.type,
-        });
+        const form = new FormData();
+        form.append("caseId", caseId);
+        form.append("hearingId", hearingId);
+        form.append("file", file, file.name);
+        const saved = await uploadDocumentAction(form);
 
         if (!saved) {
           setCaseDocuments((items) =>
@@ -119,7 +139,9 @@ export function MatterWorkspace({
         setCaseDocuments((items) =>
           items.map((item) => (item.id === pending[index].id ? saved : item)),
         );
-        timers.current.push(setTimeout(() => markReady(saved.id), 1400));
+        if (saved.status === "processing") {
+          timers.current.push(setTimeout(() => void refreshStatus(saved.id), 1400));
+        }
       }),
     );
   }
@@ -130,8 +152,7 @@ export function MatterWorkspace({
         item.id === document.id ? { ...item, status: "processing" } : item,
       ),
     );
-    void setDocumentStatusAction(caseId, document.id, "processing");
-    timers.current.push(setTimeout(() => markReady(document.id), 1400));
+    timers.current.push(setTimeout(() => void refreshStatus(document.id), 1400));
   }
 
   const tabClass = (active: boolean) =>
@@ -147,27 +168,56 @@ export function MatterWorkspace({
         className="mb-3 inline-flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-1"
         role="tablist"
       >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "hearings"}
-          className={tabClass(tab === "hearings")}
-          onClick={() => setTab("hearings")}
-        >
-          {copy.tabs.hearings}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "documents"}
-          className={tabClass(tab === "documents")}
-          onClick={() => setTab("documents")}
-        >
-          {copy.tabs.documents}
-        </button>
+        {TABS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            aria-selected={tab === item}
+            className={tabClass(tab === item)}
+            onClick={() => setTab(item)}
+          >
+            {item === "hearings" || item === "documents"
+              ? copy.tabs[item]
+              : copy.ai.tabs[item]}
+          </button>
+        ))}
       </div>
 
-      {tab === "hearings" ? (
+      {notice ? (
+        <p
+          className={notice.status === "ok" ? "mock-note" : "form-error"}
+          role={notice.status === "ok" ? "status" : "alert"}
+        >
+          {notice.status === "ok"
+            ? copy.ai.done
+            : notice.status === "NOT_CONFIGURED"
+              ? demo
+                ? copy.ai.demoOnly
+                : copy.ai.notConfigured
+              : format(copy.ai.failed, { detail: notice.detail })}
+        </p>
+      ) : null}
+
+      {tab === "facts" ? (
+        <FactsPanel
+          caseId={caseId}
+          facts={intelligence.facts}
+          language={language}
+          copy={copy.ai}
+          locked={locked || demo}
+        />
+      ) : tab === "analysis" ? (
+        <AnalysisPanel
+          caseId={caseId}
+          analysis={intelligence.analysis}
+          strategy={intelligence.strategy}
+          language={language}
+          copy={copy.ai}
+          locked={locked}
+          demo={demo}
+        />
+      ) : tab === "hearings" ? (
         <HearingsTimeline
           caseId={caseId}
           hearings={hearings}
@@ -179,6 +229,8 @@ export function MatterWorkspace({
           error={error}
           onUpload={handleUpload}
           onRetry={handleRetry}
+          reassessments={intelligence.reassessments}
+          demo={demo}
         />
       ) : (
         <div className="panel col-span-full">
@@ -194,9 +246,11 @@ export function MatterWorkspace({
             </span>
           </div>
 
-          <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
-            {copy.documentsMock}
-          </p>
+          {demo ? (
+            <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
+              {copy.documentsMock}
+            </p>
+          ) : null}
 
           {hearings.length === 0 ? (
             <p className="mt-4 text-[10px] text-[color:var(--color-muted)]">

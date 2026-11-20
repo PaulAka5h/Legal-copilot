@@ -26,6 +26,8 @@ dependencies = [
     "pytesseract>=0.3.13",
     "uvicorn>=0.54.0",
     "google-genai>=3.5.0",
+    "pyarrow>=18",
+    "minio>=7.2",
 ]
 
 [dependency-groups]

@@ -12,7 +12,7 @@ Status: Draft 1. Items marked **(decide)** need a decision during project setup.
 | Database | PostgreSQL 16+ | One store for relational data, row level security, full-text search, and vectors | Vector scale limits are lower than a dedicated vector database; fine for this scale |
 | Vector search | pgvector (HNSW index) | Same database and same transaction as the permission data, so filters and security rules apply together | Filtered vector search needs care (see 6.4) |
 | API style | REST with OpenAPI 3.1 | Resource-shaped data; schema is generated; TypeScript client can be generated; easy to test | Less flexible for ad hoc queries than GraphQL |
-| Background jobs | Redis plus a worker library, Celery or ARQ **(decide)** | OCR, embeddings, and AI runs take longer than a request | Extra service to run |
+| Background jobs | Redis plus **ARQ** (decided 2026-11-20 by Arafath: async, fits FastAPI, Redis already in Compose) | OCR, embeddings, and AI runs take longer than a request | Extra service to run. Not implemented yet: document processing runs synchronously through one `process_document(doc_id)` entry point that the ARQ worker will call later |
 | Object storage | S3-compatible (MinIO in development) | Private buckets, pre-signed URLs, lifecycle rules | Needs encryption and access policy setup |
 | OCR | Tesseract with Bengali and English data behind an interface **(test)** | Open source, runs locally, no client data leaves the system | Accuracy on poor scans and handwriting is limited; a cloud OCR may be needed after privacy review |
 | PDF text | PyMuPDF or pdfplumber | Fast page-level text and image extraction | Licence check for PyMuPDF (AGPL) **(decide)** |
@@ -203,6 +203,8 @@ Upload ─► validate ─► store original ─► queue job
    job: detect type ─► extract text or OCR ─► quality check ─► save pages
         ─► clean ─► chunk ─► embed ─► store chunks ─► status = ready
 ```
+
+Current implementation (Step C, 2026-11-20): the "job" runs synchronously in the upload request through `process_document(doc_id)`, which an ARQ worker will call later without changes. Originals go to MinIO under `cases/{case_id}/documents/{document_id}`. Scanned pages use Tesseract `ben+eng`; page text is stored NFC and versioned with per-page OCR confidence. Without a configured malware scanner, development processes files with `scan_status = 'not_configured'` and a visible warning; production refuses them.
 
 ### 5.1 Validation
 - Check content by magic bytes, not extension. Allow-list: PDF, DOC, DOCX, JPEG, PNG (more later).

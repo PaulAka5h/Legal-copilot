@@ -15,17 +15,20 @@ from backend.src.legal_kb.service import LegalIngestionService
 from backend.src.legal_kb.vector_store import PgVectorStore
 import psycopg
 
-DEFAULT_DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://researchsphere:devpassword@localhost:5433/legal_copilot_test",
+# No credential fallback: pass --db-url or set DATABASE_URL.
+DEFAULT_DB_URL = os.environ.get("DATABASE_URL")
+DEFAULT_JSONL_PATH = (
+    Path(__file__).resolve().parents[3] / "data-scrapper" / "data" / "processed" / "sections.jsonl"
 )
-DEFAULT_JSONL_PATH = Path("/home/arafath/ai-builders/Legal-copilot/data-scrapper/data/processed/sections.jsonl")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Ingest scraped Bangladesh Acts into PostgreSQL pgvector")
     parser.add_argument("--jsonl", type=Path, default=DEFAULT_JSONL_PATH, help="Path to sections.jsonl")
-    parser.add_argument("--db-url", type=str, default=DEFAULT_DB_URL, help="PostgreSQL connection string")
+    parser.add_argument(
+        "--db-url", type=str, default=DEFAULT_DB_URL, required=DEFAULT_DB_URL is None,
+        help="PostgreSQL connection string (defaults to DATABASE_URL)",
+    )
     parser.add_argument("--batch-size", type=int, default=64, help="Embedding & DB batch size")
     parser.add_argument("--limit", type=int, default=None, help="Max chunks to ingest (None for all)")
     parser.add_argument("--use-real-model", action="store_true", help="Load real multilingual-e5-large model")
@@ -35,7 +38,6 @@ def main():
     print("Bangladesh Legal Knowledge Base - Batch Ingestion Pipeline")
     print("=" * 60)
     print(f"Dataset path: {args.jsonl}")
-    print(f"Target DB URL: {args.db_url}")
     print(f"Batch size:   {args.batch_size}")
     print(f"Chunk limit:  {args.limit if args.limit else 'ALL available chunks'}")
     print(f"Embedding:    {'intfloat/multilingual-e5-large' if args.use_real_model else 'MockEmbeddingProvider (1024-dim fast dev)'}")

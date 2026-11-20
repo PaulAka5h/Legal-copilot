@@ -4,31 +4,24 @@ import { useActionState, type ReactNode } from "react";
 import type { LoginState } from "@/lib/session";
 
 export type LoginAction = (state: LoginState, formData: FormData) => Promise<LoginState>;
+type LoginFailure = NonNullable<LoginState>["status"];
 
 export function MockLoginForm({
   action,
-  notice,
-  invalidMessage,
-  rateLimitedMessage,
+  notices,
   children,
 }: {
   action: LoginAction;
-  notice: string;
-  invalidMessage: string;
-  rateLimitedMessage: string;
+  notices: Record<LoginFailure, string>;
   children: ReactNode;
 }) {
   const [state, formAction] = useActionState(action, null);
 
   return (
     <form action={formAction}>
-      {state?.status && state.status !== "NOT_CONFIGURED" ? (
+      {state ? (
         <p className="form-error" role="alert">
-          {state.status === "rate_limited" ? rateLimitedMessage : invalidMessage}
-        </p>
-      ) : state?.status === "NOT_CONFIGURED" ? (
-        <p className="form-error" role="alert">
-          {notice}
+          {notices[state.status]}
         </p>
       ) : null}
       {children}

@@ -1,4 +1,4 @@
-"""Tests for 2-Ply Adversarial Scenario Tree, Depth/Breadth Limits, and Pruning."""
+"""Tests for 2-Ply Adversarial Scenario Tree, Depth/Breadth Limits, and Pruning. Strategy fixtures are SAMPLE_DATA_NOT_REAL_LAW."""
 
 from uuid import uuid4
 from backend.src.strategy.schemas import (

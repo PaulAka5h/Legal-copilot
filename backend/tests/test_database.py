@@ -67,7 +67,7 @@ def test_user_transaction_sets_and_clears_context_as_app_user() -> None:
         url.drivername != "postgresql+asyncpg"
         or url.host not in {"localhost", "127.0.0.1", "::1"}
         or url.username != "app_user"
-        or url.database != "legal_copilot"
+        or url.database not in {"legal_copilot", "legal_copilot_test"}
         or not url.password
     ):
         pytest.fail(

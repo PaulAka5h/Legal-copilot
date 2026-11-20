@@ -14,6 +14,14 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 
+NOT_CONFIGURED = "NOT_CONFIGURED"
+NO_PRECEDENT_NOTE = "No precedent in knowledge base: judgments are not ingested, so no case law is cited."
+STRATEGY_NOT_CONFIGURED_REASON = (
+    "NOT_CONFIGURED: no grounded strategy generator is implemented yet. "
+    "No candidate strategies are produced until retrieval, fact confirmation, and citation verification exist."
+)
+
+
 class StrategyStatus(str, Enum):
     DRAFT = "draft"
     PROPOSED = "proposed"
@@ -65,12 +73,13 @@ class LegalCitationReference(BaseModel):
     chunk_id: Optional[str] = None
     source_url: Optional[str] = None
     source_page: Optional[int] = None
-    is_verified: bool = True
+    # Unverified until a deterministic citation check passes (Rule 2).
+    is_verified: bool = False
 
 
 class PrecedentReference(BaseModel):
     case_title: str
-    citation: str  # e.g. "54 DLR (AD) 124" or "2018 BLD (HCD) 345"
+    citation: str  # reporter citation exactly as stored in legal_sources
     court: str = "High Court Division"  # High Court Division | Appellate Division
     year: Optional[int] = None
     legal_principle: str
@@ -277,3 +286,9 @@ class LegalStrategyReportRecord(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
+def comparison_reason(items: List["StrategyComparisonItem"]) -> str:
+    """Neutral comparison reason; the lawyer decides (Rule 5)."""
+    if not items:
+        return STRATEGY_NOT_CONFIGURED_REASON
+    return "Draft: highest qualitative rubric rating among candidates. Lawyer review required."

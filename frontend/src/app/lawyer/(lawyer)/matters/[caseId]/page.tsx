@@ -8,10 +8,15 @@ import {
   type CaseProgressStage,
 } from "@/components/CaseProgress";
 import { Icon } from "@/components/Icon";
-import { MatterWorkspace } from "@/components/lawyer/MatterWorkspace";
+import {
+  MatterWorkspace,
+  type WorkspaceNotice,
+  type WorkspaceTab,
+} from "@/components/lawyer/MatterWorkspace";
+import { usedDemoData } from "@/lib/api/backendClient";
 import {
   getCase,
-  getBackendMatter,
+  getCaseIntelligence,
   listDocuments,
   listHearings,
   type Matter,
@@ -26,7 +31,6 @@ import {
   type Language,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -68,19 +72,39 @@ export default async function LawyerMatterPage({
   searchParams,
 }: {
   params: Promise<{ caseId: string }>;
-  searchParams: Promise<{ hearingError?: string; noteError?: string }>;
+  searchParams: Promise<{
+    hearingError?: string;
+    noteError?: string;
+    stageError?: string;
+    tab?: string;
+    ai?: string;
+    detail?: string;
+  }>;
 }) {
   const { caseId } = await params;
-  const { hearingError, noteError } = await searchParams;
+  const { hearingError, noteError, stageError, tab, ai, detail } =
+    await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const mock = isMockAuthEnabled();
-  const matter = mock ? getCase(caseId) : await getBackendMatter(caseId);
+  const matter = await getCase(caseId);
 
   if (!matter) notFound();
 
   const stages = stagesFor(matter, language, copy.caseDetail);
-  const hearings = listHearings(caseId);
+  const [hearings, intelligence] = await Promise.all([
+    listHearings(caseId),
+    getCaseIntelligence(caseId),
+  ]);
+  const documents = await listDocuments(caseId, hearings);
+  const demo = usedDemoData();
+  const initialTab: WorkspaceTab =
+    tab === "documents" || tab === "facts" || tab === "analysis"
+      ? tab
+      : "hearings";
+  const notice: WorkspaceNotice =
+    ai === "ok" || ai === "error" || ai === "NOT_CONFIGURED"
+      ? { status: ai, detail: detail ?? "" }
+      : null;
   const { reached, total, percent } = progressFor(stages);
   const locked = matter.status === "closed";
   const hearingFormError = hearingError
@@ -113,7 +137,7 @@ export default async function LawyerMatterPage({
           </p>
         </div>
 
-        {mock ? <div className="stage-picker">
+        <div className="stage-picker">
           <label className="stage-label" htmlFor="case-stage">
             {copy.caseDetail.stageLabel}
           </label>
@@ -136,17 +160,21 @@ export default async function LawyerMatterPage({
             </button>
           </form>
           <span className="stage-help">
-            {locked ? copy.caseDetail.stageLocked : copy.caseDetail.stageHelp}
+            {locked
+              ? copy.caseDetail.stageLocked
+              : stageError
+                ? copy.caseDetail.stageUnsupported
+                : copy.caseDetail.stageHelp}
           </span>
           <span className="stage-hearing">
             {format(copy.caseDetail.hearing, {
               number: numberFor(language, matter.hearingNumber),
             })}
           </span>
-        </div> : <div className="stage-picker"><span className="stage-help">{copy.caseDetail.notAvailableYet}</span></div>}
+        </div>
       </div>
 
-      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {demo ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="case-layout">
         <div className="panel progress-panel">
@@ -173,20 +201,20 @@ export default async function LawyerMatterPage({
           />
         </div>
 
-        {mock ? (
-          <MatterWorkspace
-            key={matter.id}
-            caseId={matter.id}
-            hearings={hearings}
-            initialDocuments={listDocuments(caseId)}
-            language={language}
-            copy={copy.caseDetail}
-            locked={locked}
-            error={hearingFormError}
-          />
-        ) : (
-          <div className="panel empty-note">{copy.caseDetail.notAvailableYet}</div>
-        )}
+        <MatterWorkspace
+          key={`${matter.id}-${initialTab}-${ai ?? ""}`}
+          caseId={matter.id}
+          hearings={hearings}
+          initialDocuments={documents}
+          language={language}
+          copy={copy.caseDetail}
+          locked={locked}
+          error={hearingFormError}
+          intelligence={intelligence}
+          demo={demo}
+          initialTab={initialTab}
+          notice={notice}
+        />
       </div>
     </>
   );

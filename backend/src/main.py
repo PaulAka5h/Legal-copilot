@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from backend.src.analysis.router import router as analysis_router
 from backend.src.documents.pipeline import DocumentProcessingPipeline
+from backend.src.hearings.router import router as hearings_router
 from backend.src.strategy.router import router as strategy_router
 from backend.src.legal_kb.embeddings import MockEmbeddingProvider
 from backend.src.legal_kb.retriever import LegalHybridRetriever
@@ -45,10 +46,8 @@ app.add_middleware(
 )
 
 # Database & Retriever Setup
-DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://researchsphere:devpassword@localhost:5433/legal_copilot_test",
-)
+# No credential fallback: set DATABASE_URL in the environment.
+DB_URL = os.environ.get("DATABASE_URL", "")
 vector_store = PgVectorStore(db_url=DB_URL)
 embedding_provider = MockEmbeddingProvider(dimension=1024)
 retriever = LegalHybridRetriever(
@@ -79,6 +78,7 @@ class SearchResponse(BaseModel):
 
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(strategy_router, prefix="/api/v1")
+app.include_router(hearings_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])

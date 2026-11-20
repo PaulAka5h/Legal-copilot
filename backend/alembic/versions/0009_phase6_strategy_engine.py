@@ -113,35 +113,29 @@ def upgrade() -> None:
         """
         CREATE POLICY strategies_lawyer_manage ON public.strategies
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
     op.execute(
         """
         CREATE POLICY strategy_scenarios_lawyer_manage ON public.strategy_scenarios
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
     op.execute(
         """
         CREATE POLICY strategy_comparisons_lawyer_manage ON public.strategy_comparisons
         FOR ALL TO app_user
-        USING (app.has_case_access(case_id))
-        WITH CHECK (app.has_case_access(case_id));
+        USING (app.is_lawyer_member(case_id))
+        WITH CHECK (app.is_lawyer_member(case_id));
         """
     )
 
-    # Client view policy: only approved/current strategies are visible to clients of that case
-    op.execute(
-        """
-        CREATE POLICY strategies_client_read ON public.strategies
-        FOR SELECT TO app_user
-        USING (status IN ('approved', 'current') AND app.is_client_member(case_id));
-        """
-    )
+    # No client policy: clients see strategy information only through
+    # client-visible tables and the /client API namespace (Rule 8).
 
     op.execute("RESET ROLE")
 
@@ -149,7 +143,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("SET ROLE app_owner")
 
-    op.execute("DROP POLICY IF EXISTS strategies_client_read ON public.strategies;")
     op.execute("DROP POLICY IF EXISTS strategy_comparisons_lawyer_manage ON public.strategy_comparisons;")
     op.execute("DROP POLICY IF EXISTS strategy_scenarios_lawyer_manage ON public.strategy_scenarios;")
     op.execute("DROP POLICY IF EXISTS strategies_lawyer_manage ON public.strategies;")

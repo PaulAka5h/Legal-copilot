@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.auth.router import auth_router, identity_router
 from app.cases.router import router as cases_router
 from app.clients.router import router as clients_router
+from app.body_limit import BodySizeLimitMiddleware
 from app.config import Settings
 from app.database import create_database_engine, verify_runtime_role
 from app.errors import register_exception_handlers
@@ -15,7 +16,25 @@ from app.health import router as health_router
 from app.lawyer.router import router as lawyer_router
 from app.client_portal.router import router as client_portal_router
 from app.cases.visibility_router import router as visibility_router
+from app.rag.search.router import router as research_router
+from app.documents.router import router as documents_router
+from app.facts.router import router as facts_router
+from app.case_analysis.router import router as analysis_router
+from app.strategy_tree.router import router as strategy_tree_router
+from app.hearing_updates.router import router as hearing_updates_router
 from app.logging_config import configure_logging
+
+
+async def _startup_sweep(engine, minutes: int, logger) -> None:
+    """Mark documents left 'processing' by a crash as failed; never blocks startup."""
+    from app.documents.recovery import sweep_stuck_documents
+
+    try:
+        swept = await sweep_stuck_documents(engine, minutes)
+        logger.info("documents.stuck_sweep", extra={"event": "documents.stuck_sweep", "count": swept})
+    except Exception as error:
+        logger.warning("documents.stuck_sweep_failed",
+                       extra={"event": "documents.stuck_sweep_failed", "error_type": type(error).__name__})
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -31,6 +50,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine = create_database_engine(app_settings.database_url)
             try:
                 await verify_runtime_role(engine)
+                if app_settings.sweep_stuck_documents_on_startup:
+                    await _startup_sweep(engine, app_settings.stuck_processing_minutes, logger)
                 app.state.session_factory = async_sessionmaker(
                     engine,
                     expire_on_commit=False,
@@ -78,6 +99,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     register_exception_handlers(app)
+    # Added last so it is the outermost middleware: body size is enforced before
+    # routing, authentication, and multipart parsing.
+    app.add_middleware(BodySizeLimitMiddleware)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(identity_router)
@@ -86,6 +110,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(lawyer_router)
     app.include_router(client_portal_router)
     app.include_router(visibility_router)
+    app.include_router(research_router)
+    app.include_router(documents_router)
+    app.include_router(facts_router)
+    app.include_router(analysis_router)
+    app.include_router(strategy_tree_router)
+    app.include_router(hearing_updates_router)
     return app
 
 

@@ -3,33 +3,22 @@ import type { ReactNode } from "react";
 import { LawyerShell } from "@/components/lawyer/LawyerShell";
 import { getLawyerProfile, listMatters } from "@/lib/api/lawyer";
 import { getLanguage } from "@/lib/language";
-import { getSession, hasSessionCookie, isMockAuthEnabled } from "@/lib/session";
+import { getSession } from "@/lib/session";
 
 export default async function LawyerLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
 
-  if (!session) {
-    redirect((await hasSessionCookie()) ? "/auth/clear?next=/lawyer/login" : "/lawyer/login");
-  }
+  if (!session) redirect("/lawyer/login");
   if (session.role !== "lawyer") redirect("/client/dashboard");
 
   const language = await getLanguage();
+  const [profile, matters] = await Promise.all([getLawyerProfile(), listMatters()]);
 
   return (
     <LawyerShell
       language={language}
-      profile={
-        isMockAuthEnabled()
-          ? getLawyerProfile()
-          : {
-              firstName: { en: session.full_name, bn: session.full_name },
-              name: { en: session.full_name, bn: session.full_name },
-              email: session.email,
-              firm: { en: "", bn: "" },
-              location: { en: "", bn: "" },
-            }
-      }
-      matterCount={isMockAuthEnabled() ? listMatters().length : 0}
+      profile={profile}
+      matterCount={matters.length}
     >
       {children}
     </LawyerShell>

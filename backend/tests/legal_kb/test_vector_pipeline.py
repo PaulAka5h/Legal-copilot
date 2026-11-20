@@ -55,7 +55,7 @@ def test_in_memory_vector_store():
 
 
 def test_full_ingestion_pipeline_with_real_dataset():
-    dataset_file = Path("/home/arafath/ai-builders/Legal-copilot/data-scrapper/data/processed/sections.jsonl")
+    dataset_file = Path(__file__).resolve().parents[3] / "data-scrapper" / "data" / "processed" / "sections.jsonl"
     if not dataset_file.exists():
         pytest.skip("Scraped dataset file not found")
 

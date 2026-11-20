@@ -9,7 +9,7 @@ export async function downloadClientSummaryAction(formData: FormData) {
   if (!session || session.role !== "client") redirect("/client/login");
 
   const summaryId = String(formData.get("summaryId") ?? "");
-  if (!summaryId || !getApprovedSummary(summaryId)) {
+  if (!summaryId || !(await getApprovedSummary(summaryId))) {
     redirect("/client/dashboard");
   }
 

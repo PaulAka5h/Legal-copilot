@@ -3,10 +3,10 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { ClientsList } from "@/components/lawyer/ClientsList";
 import { PageHeading } from "@/components/lawyer/PageHeading";
-import { listBackendClients, listClients } from "@/lib/api/lawyer";
+import { listClients } from "@/lib/api/lawyer";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { isMockAuthEnabled } from "@/lib/session";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -16,8 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LawyerClientsPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const mock = isMockAuthEnabled();
-  const clients = mock ? listClients() : await listBackendClients();
+  const clients = await listClients();
 
   return (
     <>
@@ -32,7 +31,7 @@ export default async function LawyerClientsPage() {
           </Link>
         }
       />
-      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
       <ClientsList language={language} clients={clients} />
     </>
   );

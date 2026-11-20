@@ -23,6 +23,7 @@ ACTS_DIR.mkdir(parents=True, exist_ok=True)
 CHECKPOINT_FILE = PROCESSED_DATA_DIR / "checkpoints.json"
 FAILED_RECORDS_FILE = FAILED_DATA_DIR / "failed_records.json"
 VALIDATION_REPORT_FILE = REPORTS_DIR / "validation_report.json"
+EXPORT_REPORT_FILE = REPORTS_DIR / "export_sections_report.json"
 
 # Network & Scraping Settings
 BASE_URL = "https://bdlaws.minlaw.gov.bd"

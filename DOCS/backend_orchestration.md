@@ -196,3 +196,24 @@ flowchart TD
 4. **Immutability & Versioning**:
    - AI outputs, page extractions, claims, and strategies are never updated in place. They write new records with `version` and `supersedes_id`.
 5. **Status Tracking**: Keep `DOCS/status.md` updated as modules transition across phases.
+
+---
+
+## 5. Two FastAPI apps: current boundary (2026-11-20)
+
+The backend currently has two separate applications:
+
+| App | Entry point | Owner | Auth / RLS |
+|---|---|---|---|
+| Platform API | `backend/app/main.py` (`app.main:app`, `[tool.fastapi]` entrypoint) | Arafath (was Backend Dev 1) | Lawyer/client sessions, `CaseAccess`, transaction-local `app.current_user_id`, RLS |
+| Pipeline / AI API | `backend/src/main.py` (run from repo root as `backend.src.main:app`) | Arafath (Backend Dev 2) | None. No authentication, CORS `*`, in-memory storage for analysis, strategy, and hearings |
+
+Ownership (2026-11-20): Arafath (Backend Dev 2) currently owns both `backend/app/` and `backend/src/`. Both-developer review for shared schema changes is satisfied by Arafath's sign-off while this holds.
+
+Decisions (Arafath, 2026-11-20):
+
+- Merging `backend/src/main.py` into `app/` is **approved**. It is a separate, later step and is not done yet.
+- Until the merge, new work from `DOCS/PokkhoAI_master_prompt.md` (RAG ingestion, retrieval, facts, analysis, strategy tree, hearing reassessment, eval) is built in `backend/app/` only, behind `app/` authentication, `CaseAccess`, and RLS, with Alembic migrations.
+- `backend/src/` is not extended before the merge. Rule fixes in it are allowed (done 2026-11-20: template precedents and strategies removed, mock-only provider default, hard-coded credentials removed).
+- `backend/src/main.py` must not be exposed beyond localhost: it has no access control (Legal Product Rule 7).
+- Migrations `0009`/`0010` were never applied anywhere; their policies were changed in place to `app.is_lawyer_member(case_id)` and the client read policy on `strategies` was removed (Rule 8).

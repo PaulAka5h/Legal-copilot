@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // Document uploads are at most 20 MB (lib/documents.ts); leave room for multipart overhead.
+      bodySizeLimit: "21mb",
+    },
+  },
   turbopack: {
     rules: {
       "*.css": {

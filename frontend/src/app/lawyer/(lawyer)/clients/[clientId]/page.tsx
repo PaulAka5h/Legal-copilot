@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ResetPasswordButton } from "@/components/lawyer/ResetPasswordButton";
-import { getBackendClient, getClientDetail } from "@/lib/api/lawyer";
+import { getClientDetail } from "@/lib/api/lawyer";
 import {
   dictionaries,
   numberFor,
@@ -11,7 +11,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { isMockAuthEnabled } from "@/lib/session";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -26,8 +26,7 @@ export default async function ClientDetailPage({
   const { clientId } = await params;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const mock = isMockAuthEnabled();
-  const client = mock ? getClientDetail(clientId) : await getBackendClient(clientId);
+  const client = await getClientDetail(clientId);
 
   if (!client) notFound();
 
@@ -53,7 +52,7 @@ export default async function ClientDetailPage({
         </div>
       </div>
 
-      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="panel matters-panel">
         <div className="panel-head padded">
@@ -61,7 +60,7 @@ export default async function ClientDetailPage({
             <h2>{copy.clientDetail.casesTitle}</h2>
             <p>{copy.clientDetail.casesSub}</p>
           </div>
-          {mock ? <ResetPasswordButton language={language} /> : null}
+          <ResetPasswordButton language={language} />
         </div>
 
         {client.cases.length ? (

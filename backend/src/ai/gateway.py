@@ -68,8 +68,9 @@ class LLMGateway:
         provider: Optional[BaseLLMProvider] = None,
         approved_providers: Optional[List[str]] = None,
     ):
-        # Whitelist from environment or DOCS/providers.md defaults
-        raw_approved = os.getenv("LLM_APPROVED_PROVIDERS", "mock,gemini")
+        # DOCS/providers.md approves only "mock". Gemini stays disabled until a
+        # review record exists there and LLM_APPROVED_PROVIDERS is set explicitly.
+        raw_approved = os.getenv("LLM_APPROVED_PROVIDERS", "mock")
         self.approved_providers = approved_providers or [
             p.strip().lower() for p in raw_approved.split(",") if p.strip()
         ]

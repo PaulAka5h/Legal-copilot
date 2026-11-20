@@ -5,12 +5,9 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { QuickActions } from "@/components/lawyer/QuickActions";
 import {
   getLawyerProfile,
-  getBackendDashboard,
   getLawyerStats,
   getRecentActivity,
   getRecentMatters,
-  listBackendMatters,
-  getBackendActivity,
 } from "@/lib/api/lawyer";
 import {
   dictionaries,
@@ -20,7 +17,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { getSession, isMockAuthEnabled } from "@/lib/session";
+import { usedDemoData } from "@/lib/api/backendClient";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -56,14 +53,12 @@ export default async function LawyerDashboardPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.dashboard;
-  const mock = isMockAuthEnabled();
-  const session = await getSession();
-  const profile = mock
-    ? getLawyerProfile()
-    : { firstName: { en: session?.full_name || "", bn: session?.full_name || "" }, name: { en: session?.full_name || "", bn: session?.full_name || "" }, email: session?.email || "", firm: { en: "", bn: "" }, location: { en: "", bn: "" } };
-  const stats = mock ? getLawyerStats() : await getBackendDashboard();
-  const recentMatters = mock ? getRecentMatters() : (await listBackendMatters()).slice(0, 3);
-  const activities = mock ? getRecentActivity() : await getBackendActivity();
+  const [profile, stats, recentMatters, activities] = await Promise.all([
+    getLawyerProfile(),
+    getLawyerStats(),
+    getRecentMatters(),
+    getRecentActivity(),
+  ]);
 
   const nextValue = stats.nextHearing
     ? `${numberFor(language, stats.nextHearing.day)} ${pick(stats.nextHearing.month, language)}`
@@ -88,7 +83,7 @@ export default async function LawyerDashboardPage() {
         }
       />
 
-      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="stats-grid">
         <Stat

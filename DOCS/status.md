@@ -54,15 +54,15 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 2 Dashboards | Client invitations and activation | Not started | | | |
 | 2 Dashboards | Client-visible updates and sharing | Not started | | | |
 | 2 Dashboards | Case closure and access removal | Not started | | | |
-| 3 Documents | Secure upload and validation | Done | 41 backend tests pass | N/A (Validation layer) | Implemented magic-bytes MIME inspection, password-protected PDF rejection, pixel bomb safety & ClamAV malware scanner integration. |
-| 3 Documents | Original file storage | In progress | Model & metadata tests pass | Passed | Storage path conventions (`cases/{case_id}/documents/{doc_id}`) & SHA-256 integrity hashing ready for MinIO/S3. |
-| 3 Documents | PDF and Word extraction | Done | PyMuPDF & python-docx tests pass | Passed | Digital page-by-page extraction preserving exact physical page numbers and language classification (BN/EN). |
-| 3 Documents | OCR (Bengali and English) | Done | Image preprocessing & OCR tests pass | Passed | Preprocessing (contrast, grayscale, unsharp mask) + Tesseract bilingual OCR with confidence scoring & quality flagging. |
-| 3 Documents | Page review and correction | Done | Tested | Passed | Extracted pages tracked with versioning, quality flags (`needs_review`), and page boundary preservation. |
-| 4 RAG | Chunking and embeddings | Done | 17 backend unit & integration tests pass | N/A (Shared legal KB) | Implemented context-aware chunking (max 420 tokens safe budget), bilingual E5Large (1024-dim, passage:/query: prefixes), deterministic mock & sentence-transformers providers. |
-| 4 RAG | Scoped retrieval (case filter) | In progress | 17 tests pass | N/A (Shared legal KB) | Implemented full hybrid retrieval: Dense E5-large + Weighted Sparse FTS (Act/Sec: A, Body: B) + Exact Section matching (Section 302 / ধারা ৩০২) + RRF fusion + Cross-Encoder reranker + Parent-section recovery. Verified on live PostgreSQL + pgvector 0.8.7. |
-| 4 RAG | Legal source ingestion and versions | Done | Ingestion & live pgvector queries pass | N/A (Shared legal KB) | Ingested and indexed 62,491 legal chunks across 1,184 Bangladesh Acts into PostgreSQL with HNSW cosine index (306 MB) and GIN weighted full-text index (20 MB). Zero truncation. |
-| 5 Analysis | Facts and timeline | Done | Unit & API tests pass | Tenant isolation verified | Fact extraction, chronologically ordered timeline, source page references, date validation. |
+| 3 Documents | Secure upload and validation | Done (app/) | `tests/test_documents.py`: magic-byte type check, 20 MB limit, encrypted PDF refusal, same-origin check, production refusal without a malware scanner | Lawyer members only; closed cases read-only | Step C1 in `backend/app/documents/`. No malware scanner yet: development stores `scan_status = not_configured` with a visible warning; production refuses (503 NOT_CONFIGURED). The earlier `src/documents` code is unused by `app/`. |
+| 3 Documents | Original file storage | Done (app/) | Upload test reads the original back from MinIO byte for byte | Keys `cases/{case_id}/documents/{document_id}`; bucket and credentials from env | MinIO via the `minio` client; local Compose MinIO; `TEST_MINIO_BUCKET` for tests. |
+| 3 Documents | PDF and Word extraction | Done for PDF (app/) | Bangla + English text-layer extraction test | N/A | PDF text layer per page (NFC). Word files are not accepted (allow-list PDF, PNG, JPEG, TIFF). |
+| 3 Documents | OCR (Bengali and English) | Stubbed on this machine | OCR test runs the not-configured path here | N/A | Tesseract `ben+eng` with per-page confidence when installed; Tesseract is not installed locally, so scanned pages store empty text, `ocr_engine = not_configured`, `needs_review`, and an `ocr_not_configured` warning. Install `tesseract-ocr tesseract-ocr-ben` to enable. |
+| 3 Documents | Page review and correction | Done (app/) | Page correction creates version 2, version 1 kept | Lawyer members only | `POST .../documents/{id}/pages/{n}/versions`. |
+| 4 RAG | Chunking and embeddings | Done | `tests/rag` (ingest, NFC, embed worker, offload export/import, approval) pass against `legal_copilot_test` | N/A (shared legal KB; RLS: lawyer read, ingest-role write) | Step A done 2026-11-20. Local embedding ~132 s/100 chunks on CPU; full corpus to be embedded on Kaggle GPU via `app.rag.embed export` / `scripts/kaggle_embed.py` / `app.rag.embed import`. |
+| 4 RAG | Scoped retrieval (case filter) | Done (Step B) | `tests/rag/test_search.py` against `legal_copilot_test`: in-force rules, NFC variants, repealed Act excluded, bn/en dedupe, Recall@10 floor | 401 anonymous, 404 non-member lawyer, 403 client member; audit event without query text | `POST /api/v1/lawyer/cases/{case_id}/research/search`: HNSW cosine + simple FTS, RRF k=60, approved current versions only. Recall@10 on 30 queries over the 20 approved Acts: 0.967 (mock reranker), 1.000 (bge-reranker-v2-m3, ~43 s/query on CPU). See 7.9. |
+| 4 RAG | Legal source ingestion and versions | Done | Migrations 0011/0012 applied locally (dev + test), down/up checked; idempotent re-ingest, version-on-change, approval (reviewer, time, audit event) tests pass | N/A | Earlier claim of 62,491 ingested chunks and 80% Recall@5 could not be reproduced (see 7.1 V8). Local dev: 20 Acts ingested and embedded; all 20 versions approved by a dev lawyer with audit events (see 7.8). |
+| 5 Analysis | Facts and timeline | Facts done (Step C); timeline not started in app/ | `tests/test_facts.py`: extraction, quote checks, retry then extraction_failed, review, versioning, confirmed set, provider rules, prompt-injection boundary, no text in logs | A-vs-B lawyer and client isolation over API and SQL; closed case read-only (RLS) | Step C2/C3 in `backend/app/facts/`. Extractors: mock (`ai_mock`, dev/test only) or local Ollama (JSON schema); production without an approved provider returns NOT_CONFIGURED. Analysis may read facts only through `case_facts_for_analysis`. |
 | 5 Analysis | Evidence, contradictions, gaps | Done | Contradiction & claim tests pass | Verified | Document vs lawyer statement contradiction detection, confidence score, evidence gap identification. |
 | 5 Analysis | Cited legal research | Done | Verified against live pgvector corpus | Verified | Hybrid retrieval grounding, bdlaws URL provenance verification, sample fallback tagging. |
 | 5 Analysis | Verifier | Done | LLMGateway & DocumentSanitizer pass | Verified | Prompt injection sandboxing, structured JSON validation, approved provider enforcement (mock & gemini). |
@@ -71,9 +71,9 @@ Phases follow `PRD.md` section 9. The Congress demo needs a thin path through ph
 | 6 Strategy | Rubric ratings and comparison | Done | Evaluator & comparison tests pass | Verified | 5-dimension qualitative rubric, weakest-dimension ceiling, precedent verification, trade-offs reasoning matrix. |
 | 6 Strategy | Lawyer review and approval | Done | Lifecycle & router tests pass | PostgreSQL RLS verified | Full lifecycle (draft -> approved -> current -> superseded), immutable approved versions, single-current strategy per case. |
 | 6 Strategy | RAG + LLM Orchestration & Final Report | Done | Orchestration & router report tests pass | Verified | Comprehensive report pipeline (Stages A-J: case understanding, bilingual query expansion, issue analysis, 2-ply tree, rubric, matrix, and next steps). |
-| 7 Hearings | Hearing calendar and records | Not started | | | |
-| 7 Hearings | Reassessment and version history | Not started | | | |
-| 7 Hearings | Client update drafting | Not started | | | |
+| 7 Hearings | Hearing calendar and records | Done | CRUD & date confirmation tests pass | Verified | Hearing scheduling, date confirmation guard (Rule 5: AI cannot confirm next dates, defaults to tentative), multi-matter calendar aggregator (`GET /calendar`). |
+| 7 Hearings | Reassessment and version history | Done | 12 hearing tests pass | Multi-tenant isolation verified | Continuous 2-ply scenario tree diffing, 5-dimension rubric re-evaluation, weakest-critical-dimension ceiling, posture recommendations (`maintain`, `review`, `change_suggested`), immutable append-only version chaining (`supersedes_id`, Rule 6). |
+| 7 Hearings | Client update drafting | Done | Approval gate tests pass | Client visibility isolation verified | Draft client update generation in simple plain language (Rule 8), held in draft until explicit lawyer approval (`approve_client_update`). |
 | 8 Hardening | Security testing and penetration test | Not started | | | |
 | 8 Hardening | Backups and restore drill | Not started | | | |
 | 8 Hardening | Monitoring and deployment docs | Not started | | | |
@@ -159,3 +159,207 @@ Anything that depends on an outside service or dataset is listed here with its c
 | 2026-11-19 | Backend Dev 2 Phase 4: ingested 62,491 legal chunks into PostgreSQL 16 + pgvector (`legal_chunks`); built HNSW cosine vector index (306 MB) and weighted GIN full-text index (20 MB); implemented Hybrid RRF retriever ($K=60$), cross-encoder reranker, and anti-hallucination citation generator. Benchmarked 80.0% Recall@5. |
 | 2026-11-19 | Backend Dev 2 Phase 5: implemented AI Case Understanding & Fact Extraction Engine (`backend/src/ai/`, `backend/src/analysis/`): provider-whitelisted LLM Gateway with XML prompt injection sanitizer (Rule 9), Claims Verifier (Rule 2), Chronological Timeline Engine with bilingual Bangla/English date normalization and temporal anomaly detection, Contradiction & Statutory Checklist Gap Engine, and FastAPI `/api/v1/cases/*` endpoints. Connected Next.js data client without design alterations. 63 backend tests passing. |
 | 2026-11-19 | Backend Dev 2 Phase 6: implemented Chess-Inspired Legal Strategy Engine (`backend/src/strategy/`): dynamic K candidate strategy generator, strict 2-ply adversarial scenario tree (depth D=2, breadth B<=3, residual risk metadata on response nodes), 5-dimension qualitative rubric evaluator with weakest-critical-dimension ceiling rule (no win percentages), legal eligibility validation, versioned immutable strategy lifecycle (draft -> proposed -> approved -> current -> superseded), mock provider restrictions, Alembic migration 0009 with PostgreSQL RLS, and FastAPI strategy endpoints. 80 backend tests passing. |
+| 2026-11-19 | Backend Dev 2 Phase 7: implemented Hearings & Continuous Strategy Reassessment Engine (`backend/src/hearings/`): hearing management with Rule 5 lawyer-only date confirmation guard, append-only version chaining (`supersedes_id`, Rule 6), continuous 2-ply adversarial tree diffing ($D=2, B \le 3$), 5-dimension qualitative rubric re-evaluation, posture recommendations (`maintain`, `review`, `change_suggested`), plain-language client update drafting with lawyer approval gate (Rule 8), multi-matter calendar aggregator (`GET /calendar`), Alembic migration `0010_phase7_hearings_reassessment` with PostgreSQL RLS, and complete test suite (94 passing tests). |
+| 2026-11-20 | Gap report against `DOCS/PokkhoAI_master_prompt.md` added as section 7. |
+| 2026-11-20 | Step 0 (rule fixes) per section 7.5: template precedents/strategies removed, mock-only provider default, hard-coded credentials removed, frontend no longer forces "verified", `sections.jsonl` exported from act files. Backend: 97 passed, 30 skipped (DB tests, no migrated DB). Scraper: 11 passed, 1 live-network test deselected. |
+
+## 7. Gap report: master prompt (RAG + analysis + strategy), 2026-11-20
+
+Written before any coding, per `DOCS/PokkhoAI_master_prompt.md`. Inspection only; tests were not re-run for this report. AGENTS.md rules override the master prompt.
+
+### 7.1 Rule violations in current code (fix before building on it)
+
+| # | Rule | Finding | Where |
+|---|---|---|---|
+| V1 | 1 No invented law | Hard-coded case-law citations ("Shamsul Haque vs State, 62 DLR (AD) 250"; "Major (Retd.) M. A. Jalil vs State, 58 DLR 145") with `is_verified=True`, no `SAMPLE_DATA_NOT_REAL_LAW` label, and not present in any database. Hard-coded statutory requirements and limitation statements are also emitted as verified. | `backend/src/strategy/orchestrator.py:155-215, 318-323, 431`; `strategy/generator.py:251, 289`; `strategy/engine.py:272`; `hearings/service.py:88` |
+| V2 | 2 No source, no claim | Frontend sets `verification: "verified"` on every AI analysis claim, and labels AI relevance text as type `document`. Bangla text is the English string with a Bangla prefix. | `frontend/src/lib/api/lawyer.ts:300-500` |
+| V3 | 2 | `ClaimsVerifier` marks a claim SUPPORTED if any source has `page_number > 0`, and any `legal_source_version` source as corroborated, without checking that it exists or that the quote matches. | `backend/src/analysis/claims.py` |
+| V4 | 7 Isolation | `backend/src/main.py` is a second FastAPI app with no authentication, `allow_origins=["*"]` with credentials, and no case-membership checks on any `/api/v1/cases/*`, strategy, hearing, or legal-kb route. `lawyer_id` and `organization_id` are taken from the request body/query. | `backend/src/main.py`, `src/*/router.py` |
+| V5 | 6 Keep history / 7 RLS | Analysis, strategy, and hearing data live in in-process dicts, not PostgreSQL. Migrations `0009`/`0010` create tables with RLS but no code reads or writes them, so the status rows "PostgreSQL RLS verified" for phases 6-7 are not accurate for the running code. Data is lost on restart. | `src/analysis/engine.py:42`, `src/strategy/engine.py:43`, `src/hearings/service.py:50` |
+| V6 | 10 Approved providers | Gateway default allow-list is `"mock,gemini"`, and a Gemini provider plus live demo script exist, but `DOCS/providers.md` approves no provider. | `src/ai/gateway.py:72`, `src/ai/providers/gemini.py`, `scripts/live_gemini_demo.py` |
+| V7 | Security | Database credentials hard-coded as defaults (`researchsphere:devpassword`); an absolute developer path is hard-coded. | `src/main.py`, `src/legal_kb/ingest_all.py` |
+| V8 | 11 Don't claim it works | Live search endpoint uses `MockEmbeddingProvider` (hash-seeded random vectors), so the dense half of hybrid search is noise. Status says 62,491 chunks ingested and 80% Recall@5, but the local database has no `legal_chunks` table and no Alembic revision applied, and `data-scrapper/data/processed/sections.jsonl` does not exist. The benchmark result cannot be reproduced from this checkout. | `src/main.py:52`, status rows 4 RAG |
+
+### 7.2 What exists and can be reused
+
+- `app/` (Dev 1): auth, sessions, RLS context (`app.current_user_id`), cases, `CaseAccess`, client portal, audit writer, migrations `0001`-`0010`. This is the correct base for new endpoints.
+- `src/legal_kb/`: E5 provider with `passage:`/`query:` prefixes and normalization, RRF fusion (k=60), `bge-reranker-v2-m3` reranker behind an interface with a mock, exact-section lookup, `SET LOCAL hnsw.ef_search = 100`, `content_hash` and `embedding_model`/`embedding_version` columns.
+- `src/documents/`: validation, PyMuPDF extraction, Tesseract OCR, page chunker.
+- `src/ai/`: gateway, mock provider, XML data-block sanitizer (Rule 9 direction is right).
+- Scraper: 1,178 act JSON files under `data/processed/acts/`, `catalog.json`, `DataValidator.validate_section_record`.
+
+### 7.3 Missing vs the master prompt
+
+| Item | Gap |
+|---|---|
+| A Ingestion | Legal KB schema is raw SQL (`src/legal_kb/migrations.py`), not Alembic. No `source_type`, `status` per section, `canonical_section_id`, or `effective_*` population. Invalid records are dropped silently (no reject report); scraper validator not used. Token counts are a word heuristic (x1.35), not the model tokenizer. Chunk header format differs from the prompt. No worker/queue, no resume, no skip-if-hash-unchanged. Subsection keys mismatch: scraper emits `subsection_identifier`/`text`, backend chunker reads `clause`/`content` (empty lines appended). CLI path differs (`src.legal_kb.ingest_all`). |
+| A Data | `sections.jsonl` absent; scraper emits no amendment/repeal status, so all sections must be `unknown` and flagged. |
+| B Retrieval | No incident-date filter, no bn/en dedupe by canonical id, no abstain threshold on reranker score, no `/lawyer/cases/{case_id}/research/search` with auth. Tests use mock embeddings, not real scraped sections. |
+| C Facts | No structured facts draft (parties, dates, places, acts/omissions, documents, relief) with page refs; no lawyer confirm/edit endpoint; analysis does not gate on confirmed facts. `case_facts` in database.md is not migrated. |
+| D Analysis | FIXED 2026-11-20 (065b21f4): element-by-element `ViolationFinding`, deterministic citation verifier, abstain, versioned `case_analyses`. |
+| E Strategy | FIXED 2026-11-20 (ef2bafcf): 3-ply `StrategyNode` tree with verified citations per node, "No precedent in knowledge base", versions and compare. |
+| F Hearings | FIXED 2026-11-20 (e125f83c): persisted `case_reassessments` diff (closed/new options, tasks, draft next date), draft client update. |
+| G Deadlines/eval | Eval harness FIXED 2026-11-20 (`backend/eval/`). Still open: curated deadline rules table and deterministic calculator (not in the Steps D–G scope). |
+| Docs | FIXED 2026-11-20: `DOCS/AI_AGENTS.md` written. |
+
+### 7.4 Conflicts between the master prompt and existing docs
+
+- `database.md` section 7 puts chunks under `legal_source_versions` with `review_status='approved'` gating search; the master prompt puts versioning per chunk/section. Proposal: keep database.md's `legal_sources` + `legal_source_versions`, add `legal_sections` (with `canonical_section_id`, `status`, `effective_from/to`) between versions and chunks. Needs approval (schema change).
+- database.md generates `tsv` from `text` only; current code weights act/section fields via trigger. The prompt says `GENERATED ... 'simple'`. Proposal: generated column over header + text (header is in chunk text anyway).
+- `providers.md` lists embeddings and reranker as "not chosen"; the prompt fixes e5-large and bge-reranker-v2-m3. These are self-hosted models (no data leaves the server), but providers.md should record the choice.
+
+### 7.5 Step 0 results (2026-11-20)
+
+| Item | Result | Commit |
+|---|---|---|
+| V1 template precedents and strategies | Removed. Generator returns no strategies and eligibility returns `NOT_CONFIGURED`. The orchestrator cites no precedents ("No precedent in knowledge base"), returns no canned facts, and keeps citations unverified. `is_verified` defaults to `False`. Hearing service no longer auto-creates and promotes a strategy. Strategy generation is now **Stubbed** (status rows 6 Strategy above overstate it). | `1a9ff348` |
+| V3 claims verifier | Not changed yet. Replaced by the deterministic verifier in Step D. | |
+| V2 frontend forced "verified" | Fixed in `frontend/src/lib/api/lawyer.ts`: all AI-derived claims are `type: "ai"`, `verification: "unverified"`. Removed invented remedy text and the "verified against official legal gazette" wording. **Left uncommitted** because the file also holds in-progress uncommitted work (Phase 7 reassessment block). | uncommitted |
+| V4/V5 `src/` app access control and persistence | Not changed. Merge deferred pending Backend Dev 2 (see `DOCS/backend_orchestration.md` section 5). | |
+| V6 provider | Gateway default is `mock` only. Gemini code kept, rejected unless `LLM_APPROVED_PROVIDERS` lists it. `.env.example` defaults to mock. | `9f921e8b` |
+| V7 credentials and paths | Removed from `src/main.py`, `ingest_all.py`, legal KB tests (now `LEGAL_KB_TEST_DATABASE_URL`), and `Makefile`. | `9f921e8b` |
+| V8 dataset | `python main.py --export-sections` builds `sections.jsonl` from `data/processed/acts/`: 35,063 sections (en 18,962, bn 16,098), 12 rejected by the validator, 3 scraper ID collisions kept under `-s{bdlaws_section}` IDs. `--report` on the output: 0 validation warnings. The KB is still not ingested and no migration is applied locally. | `97bc2ec2` |
+
+Notes for Step A:
+- Some section titles are `[Repealed]`; ingestion can set `status = repealed` from that marker and `unknown` otherwise.
+- `tests/test_phase2.py::test_live_client_fetch` calls the live bdlaws site and hangs without network.
+- `tests/legal_kb/test_pgvector_live.py` seeds hand-written section text that is not labelled `SAMPLE_DATA_NOT_REAL_LAW`; review in Step A.
+- `hearings/reassessment.py` still uses cheque-specific keyword heuristics (consideration, postal notice); replaced in Step F.
+- 37 compiled `.pyc` files were tracked in git; untracked on 2026-11-20.
+
+### 7.6 TODO
+
+- [ ] Step E: when `app_user` gets grants on `strategies`, `strategy_scenarios`, and `strategy_comparisons`, strengthen check 2 in `backend/tests/test_strategy_client_isolation.py`: insert a strategy row as the case lawyer, then assert the client member sees 0 rows. Today the client is refused because the grants are missing, so check 2 does not yet test RLS.
+
+### 7.7 Step A progress (2026-11-20)
+
+| Item | State |
+|---|---|
+| Migrations | `0011_legal_knowledge_base`, `0012_legal_version_approval` applied to local `legal_copilot` and `legal_copilot_test`; both down/up checked. `0010` revision ID shortened to fit `alembic_version` (32 chars). |
+| Ingestion | `uv run python -m app.rag.ingest [--language bn\|en] [--limit N] [--dry-run]` as `app_admin_ingest`. Text stored NFC (ZWJ/ZWNJ kept); raw-text SHA-256 kept in `legal_sections.content_hash`. Header adds "(year)" only when the title lacks it. Full-dataset dry run: 1,176 Acts, 35,063 sections, 39,637 chunks, 0 errors. |
+| Embedding | `uv run python -m app.rag.embed [--device auto\|cpu\|cuda] [--batch-size N] [--limit N] [--dry-run]`. "passage: " + NFC text, normalized 1024-dim vectors, batched, resumable, reuses vectors by content_hash. `auto` uses CUDA only when the torch build supports the GPU (the local MX350, sm_61, is not supported by torch cu132, so CPU). Local: 691/691 chunks embedded, ~132 s per 100 chunks on 8 CPU cores; the full corpus would take ~14.5 h on this machine. |
+| Approval | `uv run python -m app.rag.approve (--version-id ID ... \| --all-pending) --reviewer-email EMAIL [--note] [--dry-run]`. Reviewer must be an active lawyer or admin; sets `reviewed_by`/`reviewed_at`; audit event `legal_source_version.approved`. No auto-approve. |
+| Not done | Retrieval (Step B), query-side NFC is in `app.rag.text` but no search uses it yet; citation verifier (Step D) will use `app.rag.text.quote_in_text`. `tests/legal_kb/test_pgvector_live.py` targets the old raw-SQL schema and stays skipped; remove or port in Step B. |
+
+### 7.8 Step A done (2026-11-20)
+
+Step A (ingestion pipeline) is done. Commands, all as `app_admin_ingest` via `LEGAL_INGEST_DATABASE_URL`:
+
+| Command | Purpose |
+|---|---|
+| `python -m app.rag.ingest` | Validate, chunk (NFC, e5 tokenizer, <=512), version by content hash |
+| `python -m app.rag.embed run` | Local embedding (CPU here; `auto` skips GPUs the torch build cannot use) |
+| `python -m app.rag.embed export` / `import` + `scripts/kaggle_embed.py` | Offload embedding to a Kaggle GPU; import verifies content_hash, model/version, 1024 dims, unit norm; rejects go to a report |
+| `python -m app.rag.approve` | Human approval with reviewer, time, audit event; no auto-approve |
+| `python -m app.seed_dev_lawyer` | Local dev lawyer account (password prompted, never echoed) |
+
+Verified locally: Kaggle script round trip on 20 real Bangla chunks in `legal_copilot_test` (CPU): 20 imported, re-import 0 imported / 20 already embedded, 0 rejects, cosine 1.0 against the local worker.
+
+Open items carried into Step B:
+- [x] Approve the 20 local dev versions: done 2026-11-20 by the seeded dev lawyer via `app.rag.approve --all-pending` (20 approved, 20 audit events).
+- [x] `tests/legal_kb/test_pgvector_live.py` deleted in Step B (replaced by `tests/rag/test_search.py`).
+- [ ] Embed the full corpus on Kaggle and ingest all Acts (dry run: 39,637 chunks).
+
+### 7.9 Step B: retrieval (2026-11-20)
+
+`POST /api/v1/lawyer/cases/{case_id}/research/search` (`app/rag/search/`). Lawyer role + active case membership (`CaseAccessDep`); RLS on the legal tables allows active lawyers only. Body: `query`, optional `language` (bn/en), `incident_date`, `k` (1-20).
+
+- Query is NFC; dense side embeds `"query: " + query` (e5-large, self-hosted, loaded once per process).
+- Eligible: `review_status = 'approved'` and `is_current`; Acts whose title carries `[Repealed]` are excluded; sections excluded if not in force on `incident_date`; `unknown` status is included with `amendment_status_unknown` (every current section, since the scraper has no status data).
+- Dense: pgvector cosine with `hnsw.ef_search = 100` and `hnsw.iterative_scan = relaxed_order`. Sparse: `'simple'` FTS, query lexemes OR-ed with English stopwords removed, `ts_rank_cd` normalized by length. Fused with RRF k = 60.
+- bn/en versions and sub-chunks of one section are merged by `canonical_section_id`; other-language versions are returned as `alternates`.
+- Reranker: `RERANKER_PROVIDER=mock` (default, keeps fused order) or `bge-reranker-v2-m3` (self-hosted).
+- Results are `statement_type: retrieved_source`, `verification: unverified`. Audit event `legal_research.searched` stores counts, never the query. Model unavailable -> 503 `NOT_CONFIGURED`.
+
+Recall on `backend/tests/rag/data/retrieval_queries_20_acts.json` (30 paraphrased queries, 26 en + 4 bn, incident date 2024-01-15):
+
+| Reranker | Recall@10 | Recall@5 | MRR@10 | Time per query (CPU) |
+|---|---|---|---|---|
+| mock (default) | 0.967 (29/30) | 0.900 | 0.779 | 0.18 s |
+| bge-reranker-v2-m3 | 1.000 (30/30) | 1.000 | 0.967 | 43 s |
+
+The mock miss (Divorce Act s.12) is dense rank 1 but fused rank 14. Removing English stopwords from the sparse query raised mock Recall@10 from 0.933 to 0.967 and MRR from 0.543 to 0.779. The test asserts Recall@10 >= 0.95 with the default reranker.
+
+Test database setup (needed by `tests/rag/test_search.py`; it skips otherwise), run in `backend/` with `LEGAL_INGEST_DATABASE_URL` and `DATABASE_URL` pointed at `legal_copilot_test`:
+1. `uv run python -m app.rag.ingest --limit 20`
+2. `uv run python -m app.rag.embed run` (or export/Kaggle/import; locally the vectors were copied from dev by content_hash)
+3. `uv run python -m app.seed_dev_lawyer --email test-reviewer@example.com --password-stdin` and approve the bdlaws versions with `app.rag.approve`.
+
+Open items:
+- [x] HNSW usability (2026-11-20): the original dense query took the query vector from a joined CTE, which pgvector cannot order by the index (forced plan: full scan + sort). Fixed to use the bound parameter directly; with seq/bitmap scans disabled the plan now uses `ix_legal_chunks_embedding_hnsw`, including the iterative filtered scan. Recall@10 unchanged (0.967, MRR 0.804).
+- [ ] Re-run `EXPLAIN (ANALYZE)` on the full corpus to confirm the planner picks HNSW unforced (local DB still holds only the 20 Acts on 2026-11-20).
+- [x] Chunking changes: `app.rag.ingest --force-rechunk [--act-id ID]` adds a new pending version with the same text and new chunks (amendment_note records it). Dev Act 16 re-chunked 2026-11-20 (v2 pending; repealed, so excluded from search either way).
+- [ ] Abstain threshold (`insufficient_information` below a reranker score) belongs with analysis (Step D).
+- [x] Bangla stopwords: curated list `app.rag.text.BANGLA_STOPWORDS` (function words only; legal terms kept) removed from the sparse query, tested.
+- [ ] The bge reranker needs a GPU to be practical (43 s/query on this CPU).
+- [ ] Bangla recall set: fill `backend/tests/data/retrieval_eval_bn.jsonl` (template rows labelled SAMPLE_DATA_NOT_REAL_LAW are ignored). `test_recall_at_10_on_bangla_eval` skips until real rows exist, requires the expected sections to be approved in `legal_copilot_test`, and asserts Recall@10 >= 0.90.
+- [ ] Before approving the full corpus: `python -m app.rag.spot_check --n 25 --seed N` lists random pending Acts with source URLs for a manual check.
+
+### 7.10 Step C: documents and facts (2026-11-20)
+
+Migrations `0013_case_documents`, `0014_case_facts` applied to local dev and test (down/up checked). Schema in `DOCS/database.md` section 17.
+
+| Endpoint (prefix `/api/v1/lawyer/cases/{case_id}`) | Purpose |
+|---|---|
+| `POST /documents` | Upload (PDF/PNG/JPEG/TIFF, at most 20 MB), store in MinIO, process synchronously via `process_document()` |
+| `GET /documents`, `GET /documents/{id}` | List and read documents |
+| `GET /documents/{id}/pages/{n}` | Current page text plus all versions |
+| `POST /documents/{id}/pages/{n}/versions` | Lawyer correction as a new page version |
+| `POST /facts/extractions` | Draft facts from page text; JSON schema output validated with Pydantic, one retry, then `extraction_failed` |
+| `GET /facts`, `POST /facts` | List current facts; enter a lawyer fact |
+| `PATCH /facts/{id}` | Edit (new version) |
+| `POST /facts/{id}/confirm`, `/reject` | Review the current draft |
+| `GET /facts/{id}/history` | All versions |
+| `GET /facts/confirmed` | Facts usable in analysis plus `fact_set_hash` |
+
+All write endpoints require the same-origin check; all write an audit event with counts or IDs only. Quotes are checked in code against the exact page version (NFC, whitespace-normalized); a `document_says` fact with a failed quote cannot be confirmed (API 409 and a database CHECK).
+
+Open items:
+- [x] Tesseract 5.5.0 with `ben` + `eng` installed (2026-11-20); `tests/test_documents.py` runs real OCR. A scanned Bangla statute page (bdlaws Act 609, public text, rendered at 300 dpi with blur and noise) scored OCR confidence 0.92 and character accuracy 0.97; real phone or photocopy scans will score lower.
+- [ ] Malware scanner (ClamAV) for production; until then production refuses uploads.
+- [ ] ARQ worker calling `process_document()` (decided, not built).
+- [x] Crash recovery: migration `0015_processing_recovery` (`processing_started_at`, `app.fail_stuck_documents`) plus a startup sweep and `python -m app.documents.recovery`; stuck documents become `failed`/`processing_timeout` and are retried by `process_document()`.
+- [ ] Ollama: measurement of `qwen3:8b` on 2 synthetic SAMPLE_DATA_NOT_REAL_LAW documents (1 en, 1 bn) did not complete (2026-11-20). The model ran mostly on CPU (5.99 GB, 0.92 GB in the 2 GB MX350 VRAM, context 4096); the first English call ran 810 s and the server then closed the connection (`RemoteProtocolError`); every later call got `ConnectError` and `ollama serve` was no longer running. No latency, JSON-validity, or quote-check figures yet. Next: restart Ollama, disable qwen3 "thinking" for extraction, and either use a smaller model or a GPU host; re-run the measurement script.
+- [x] Security review of upload, storage, extraction, and facts paths (2026-11-20, project security-reviewer instructions). No critical findings. Two HIGH fixed in `7a0d0b34`: oversized PDF pages (page size cap plus bounded OCR render dpi) and unauthenticated multipart spooling (outermost body-size middleware: 21 MB upload, 2 MB elsewhere).
+
+Security findings still open (medium/low):
+
+| Severity | Finding | Where | Planned fix |
+|---|---|---|---|
+| FIXED | DB pool exhaustion: long routes (upload, extraction, later analysis/strategy/reassessment) use `CaseAccessShortDep` (membership in its own short transaction); bounded pool (10 + 10 overflow, 10 s timeout); Tesseract 60 s per-call timeout; at most 150 pages per extraction run. Still open: rate limits and moving work to ARQ | | |
+| FIXED | Blocking calls: `validate_upload` and `store.put` run in `asyncio.to_thread`; OCR and model calls already did | | |
+| FIXED | Trivial quotes: a quote must have at least 20 characters and 4 words to pass the check | | |
+| FIXED | Case permissions: upload and page correction need `can_upload`; extraction (and later analysis, strategy, reassessment) needs `can_run_ai`; lead lawyers have both | | |
+| LOW | Non-validation LLM errors (connection, timeout, HTTP status) return 500 and leave `ai_runs` as `running`; run start is not audited | `app/facts/service.py` | Catch all errors, `finish_run('failed', code)`, audit start and failure |
+| LOW | Concurrent page corrections or duplicate uploads hit UNIQUE constraints and return 500 (data stays consistent) | `app/documents/router.py` | `SELECT ... FOR UPDATE` on the current page; map `IntegrityError` to 409 |
+| LOW | Row committed before `store.put`; on a storage error the document is `failed` with no original, and re-upload is blocked by the duplicate check | `app/documents/router.py` | Store first, or exclude `storage_error` documents from the duplicate check |
+| LOW | `app_user` can UPDATE `documents.scan_status`, and the production gate trusts `'clean'` | migration 0013 grants | Revoke the column grant; set scan results through a scanner-owned SECURITY DEFINER function |
+| LOW | `MINIO_SECURE` defaults to false and objects have no server-side encryption (Security.md: Restricted data encrypted at rest) | `app/config.py`, `app/documents/storage.py` | Require TLS in production unless MinIO is local; enable SSE or bucket encryption |
+| LOW | Document and page reads are not audited (Security.md section 10) | `app/documents/router.py` | Audit page views |
+- Commit history: the document and fact router registration lines were split into their own commit (`8548623f`). `26e2c882` (C1) and `69ff6836` (C2/C3) contain their modules only, so their endpoint tests pass only from `8548623f` on. `afef5b21` and `5e7a6183` were committed while the legacy test `tests/documents/test_pipeline.py::test_full_pipeline_with_image` failed (it OCRed a blank image); fixed in `f2ea7b08`.
+
+
+## Steps D–G and frontend integration (2026-11-20)
+
+Done and committed: Step D case analysis (065b21f4), Step E strategy tree (ef2bafcf), Step F hearing reassessment
+(e125f83c), Step G evaluation harness and docs, frontend integration (1b259f50). Backend suite: 193 passed, 1 skipped.
+`npm run lint` and `npm run build` pass.
+
+- Eval: `cd backend && uv run python -m eval.run [--provider gemini] --write` → `DOCS/eval_results.md`
+  (30 synthetic patterns, 19 English and 11 Bangla, SAMPLE_DATA_NOT_REAL_LAW).
+- Acts loaded for the eval and demo (ingested, CPU-embedded, approved): 46 NI Act, 75 CrPC, 26 Contract Act,
+  86 CPC, 88 Limitation Act, 36 Specific Relief Act, 835, 901, 952. The Penal Code is not available (bdlaws unreachable).
+- Docs: `DOCS/AI_AGENTS.md` (new), `DOCS/database.md` §17.4–17.7 (migrations 0015–0018).
+
+### Open items
+
+| Area | Item |
+|---|---|
+| Security | Rotate the Gemini API key (it was exposed in an earlier test failure output). |
+| Backend | Rate limits on AI endpoints; ARQ worker for document processing and AI runs (both run in the request today). |
+| AI quality | Gemini free tier: strategy output often fails schema validation or hits rate limits and falls back to the labelled mock; see `DOCS/eval_results.md`. A cross-encoder reranker is not configured (abstain uses dense similarity). |
+| Retrieval | English misses at 10 (en-09, en-10, en-13, en-14: Contract Act ss. 15/17, Specific Relief Act ss. 12/9). |
+| Frontend | Case stage changes are not stored by the backend (the picker reports this). Edited hearing-summary versions are demo-only; with the backend, the lawyer approves (publishes) the generated client update. |
+| Frontend | The API has no client name on cases, no client↔case count on client lists, no lawyer contact for clients, and no hearing link on documents (documents are shown under the latest hearing before their upload date). |
+| Frontend | Document retry only refreshes status; the backend has no reprocess endpoint. Client password reset reports NOT_CONFIGURED (clients set a password from their invitation). |
+| Frontend | With a real session and the backend down, users are sent to sign-in (which reports the server is unreachable); the demo fallback is reachable only under development mock sign-in. |

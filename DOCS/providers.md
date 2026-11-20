@@ -9,8 +9,12 @@ Last updated: 2026-11-16
 | Provider | Purpose | Data allowed | Status |
 |---|---|---|---|
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
-| (none yet) | LLM | None | No external provider has been reviewed or approved |
-| (none yet) | Embeddings | None | Prefer a self-hosted model; none chosen yet |
+| Ollama (local, OpenAI-compatible API at `LLM_BASE_URL=http://localhost:11434/v1`) | LLM for fact extraction | Client case data, **development only**; runs on this machine, no data leaves it | Approved by Arafath 2026-11-20 for development; see review record. Production use needs a full review |
+| Google Gemini API (free tier), model from `GEMINI_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Fallback chain: gemini -> mock (unusable provider or transport error); mock output is labelled `ai_mock` |
+| (none yet) | External LLM for client data | None | No external provider has been reviewed or approved for client case data |
+| self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
+| self-hosted `BAAI/bge-reranker-v2-m3` (optional) | Reranking legal search results | Runs on our own hardware; no external data transfer | Optional via `RERANKER_PROVIDER`; default is the mock reranker |
+| Kaggle Notebooks (GPU compute) | Running the same e5-large model for the legal knowledge base | Public statute text from `legal_chunks` only (exported by `app.rag.embed export`); never case documents, client data, or prompts | Directed by Arafath 2026-11-20 for legal KB embeddings only; review checklist below not completed |
 | (none yet) | OCR | None | Local Tesseract is the default; no cloud OCR approved |
 
 Until a provider passes the review below, the platform runs with the mock provider or with synthetic data only. Real client documents must not be uploaded to any environment that can reach an unapproved provider.
@@ -74,12 +78,28 @@ Run the evaluation set from `Skills and agents.md` section 7 for every candidate
 
 | Component | Candidates to test | Chosen | Reason |
 |---|---|---|---|
-| Embeddings | A multilingual model with Bangla support, such as BGE-M3 or multilingual-e5 | Not chosen | Test on a labelled Bangla and English legal retrieval set |
+| Embeddings | A multilingual model with Bangla support, such as BGE-M3 or multilingual-e5 | `intfloat/multilingual-e5-large`, self-hosted (2026-11-20, master prompt) | Runs locally via sentence-transformers; weights downloaded once from Hugging Face, no project data leaves the server. Retrieval quality on a labelled bn/en set is still to be measured (Step G eval) |
 | OCR | Tesseract with Bengali and English data; a cloud OCR only if local accuracy is not good enough | Not chosen | Test on real scanned papers; a cloud OCR needs a full review |
 
 ## Review records
 
-No reviews completed yet.
+```
+Provider and product: Ollama, local server, OpenAI-compatible chat completions API
+Region: the developer's own machine (localhost); no network egress for model calls
+Data class approved: Client case data, development environment only
+Review date: 2026-11-20
+Reviewer: Arafath (Backend Dev 2)
+Counsel sign-off (name, date): not recorded; required before any production use with client data
+Checklist answers:
+  1 Where processed: on the local machine only. 2 Retention: none by our code; Ollama keeps no prompt store
+  (keep OLLAMA_DEBUG off so prompts are not written to its logs). 3 Training: no. 4 Access: the machine's user.
+  5 DPA: not applicable (no third party). 6 Breach terms: not applicable. 7 Encryption: localhost traffic only;
+  disk encryption is the machine owner's responsibility. 8 Deletion: local. 9 Logging: our gateway never logs
+  prompts or document text. 10 Sub-processors: none. 11-12 Counsel: pending. 13-15: to be measured on our eval set.
+Conditions: LLM_BASE_URL must point at localhost (enforced in code); model weights are downloaded once;
+  structured output requested with a JSON schema and validated with Pydantic.
+Next review due: before production use, or on any change of host, model, or data class.
+```
 
 Template for each record:
 
@@ -95,11 +115,32 @@ Conditions: (for example "retention disabled", "zero data retention enabled")
 Next review due:
 ```
 
+```
+Provider and product: Google Gemini API (Generative Language API), free tier
+Region: Google-managed; not controlled
+Data class approved: Synthetic only (SAMPLE_DATA_NOT_REAL_LAW). Real client documents must not be uploaded to any
+  environment where LLM_PROVIDER=gemini.
+Review date: 2026-11-20
+Reviewer: Arafath (Backend Dev 2)
+Counsel sign-off: not required for synthetic data; required (and not given) for any other data class
+Conditions: refused when APP_ENV=production (enforced in code); key in a header, never in URLs or logs;
+  Settings.gemini_api_key is a SecretStr; temperature 0; JSON-schema output validated with Pydantic;
+  tests never call Gemini (conftest removes the key).
+Incident 2026-11-20: the key was printed in a pytest failure message during development; reprs were fixed
+  (SecretStr, repr=False). The key must be rotated.
+Next review due: before any non-synthetic use.
+```
+
 ## Environment settings
 
 ```
 LLM_PROVIDER=mock
 LLM_APPROVED_PROVIDERS=mock
+# Development with the approved local Ollama server:
+# LLM_PROVIDER=ollama
+# LLM_APPROVED_PROVIDERS=mock,ollama
+# LLM_BASE_URL=http://localhost:11434/v1
+# LLM_MODEL=<local model name>
 ```
 
 Change these only after a review record exists in this file.

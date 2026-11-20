@@ -6,23 +6,19 @@ from backend.src.strategy.engine import (
     StrategyEngine,
 )
 from backend.src.strategy.schemas import (
+    NO_PRECEDENT_NOTE,
+    NOT_CONFIGURED,
+    STRATEGY_NOT_CONFIGURED_REASON,
     StrategyStatus,
 )
+from backend.tests.sample_strategies import seed_strategies
 
 
 def test_strategy_lifecycle_and_single_current_rule():
     engine = StrategyEngine()
     case_id = "case-lifecycle-1"
 
-    strategies = engine.generate_strategies_for_case(
-        case_id=case_id,
-        case_facts={"case_type": "Cheque Dishonour"},
-        available_documents=[
-            {"filename": "cheque.pdf", "text": "Cheque"},
-            {"filename": "memo.pdf", "text": "Memo"},
-        ],
-    )
-    assert len(strategies) >= 2
+    strategies = seed_strategies(engine, case_id, count=2)
     strat_a = strategies[0]
     strat_b = strategies[1]
 
@@ -61,11 +57,7 @@ def test_strategy_version_immutability():
     engine = StrategyEngine()
     case_id = "case-immutability"
 
-    strategies = engine.generate_strategies_for_case(
-        case_id=case_id,
-        case_facts={"case_type": "Cheque Dishonour"},
-        available_documents=[{"filename": "cheque.pdf", "text": "Cheque"}],
-    )
+    strategies = seed_strategies(engine, case_id, count=1)
     strat_a = strategies[0]
     engine.approve_strategy(case_id, strat_a.id, lawyer_id="lawyer-1")
 
@@ -73,14 +65,14 @@ def test_strategy_version_immutability():
     new_v2 = engine.update_strategy_with_new_version(
         case_id=case_id,
         strategy_id=strat_a.id,
-        updates={"name": "Amended Section 138 Strategy with Added Witness"},
+        updates={"name": "SAMPLE_DATA_NOT_REAL_LAW amended strategy"},
         author_id="lawyer-2",
     )
     assert new_v2.version == 2
     assert new_v2.supersedes_id == strat_a.id
     assert new_v2.lineage_id == strat_a.lineage_id
     assert new_v2.status == StrategyStatus.DRAFT
-    assert new_v2.name == "Amended Section 138 Strategy with Added Witness"
+    assert new_v2.name == "SAMPLE_DATA_NOT_REAL_LAW amended strategy"
 
     # Original version 1 remains intact
     orig_v1 = engine.get_strategy(case_id, strat_a.id)
@@ -112,25 +104,31 @@ def test_mock_strategy_cannot_be_approved_in_production(monkeypatch):
     assert "Mock-generated legal strategies cannot be approved" in str(exc_info.value)
 
 
-def test_comparison_matrix_generation_and_no_win_percentages():
+def test_comparison_without_strategies_is_not_configured():
     engine = StrategyEngine()
-    case_id = "case-comparison-test"
+    case_id = "case-comparison-empty"
 
-    engine.generate_strategies_for_case(
-        case_id=case_id,
-        case_facts={"case_type": "Cheque Dishonour"},
-        available_documents=[
-            {"filename": "cheque.pdf", "text": "Cheque"},
-            {"filename": "memo.pdf", "text": "Dishonoured memo"},
-        ],
-    )
+    assert engine.generate_strategies_for_case(case_id=case_id, case_facts={}, available_documents=[]) == []
     comp = engine.get_latest_comparison(case_id)
     assert comp is not None
-    assert len(comp.strategies) >= 2
-    assert comp.best_supported_strategy_id is not None
-    assert len(comp.trade_offs_analysis) > 0
+    assert comp.strategies == []
+    assert comp.best_supported_strategy_id is None
+    assert comp.recommendation_reason == STRATEGY_NOT_CONFIGURED_REASON
+    assert comp.trade_offs_analysis == NOT_CONFIGURED
+    assert comp.uncertainties == [NO_PRECEDENT_NOTE]
 
-    # Ensure no win percentages or statistical numbers are present
+
+def test_comparison_matrix_over_lawyer_strategies_has_no_win_percentages():
+    engine = StrategyEngine()
+    case_id = "case-comparison-test"
+    seed_strategies(engine, case_id, count=2, with_rubric=True)
+
+    comp = engine._build_and_store_comparison(case_id, "default_org")
+    assert len(comp.strategies) == 2
+    assert comp.best_supported_strategy_id is not None
+    assert "Lawyer review required" in comp.recommendation_reason
+
     comp_json = comp.model_dump_json()
     assert "win_probability" not in comp_json
     assert "win_percentage" not in comp_json
+    assert "%" not in comp_json

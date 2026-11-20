@@ -18,6 +18,7 @@ help:
 	@echo "  make backend-test      Run the full backend test suite with pytest"
 	@echo "  make test-strategy     Run Chess Strategy Engine CLI verification"
 	@echo "  make test-report       Run RAG + LLM Full Legal Strategy Report verification"
+	@echo "  make test-reassessment Run Phase 7 Hearing Reassessment & Tree Diffing verification"
 	@echo "  make test-gemini-live  Run Live Gemini API (gemini-2.5-flash) End-to-End Test"
 	@echo ""
 	@echo "  --- Frontend (Next.js) ---"
@@ -115,6 +116,26 @@ print(f"\n[5] RECOMMENDED NEXT STEPS ({len(rep.recommended_next_steps)}):"); \
 [print(f"  - {step}") for step in rep.recommended_next_steps]; \
 print("\nSUCCESS: RAG + LLM Legal Strategy Report verified!")'
 
+test-reassessment:
+	@echo "Testing Phase 7 Hearing Reassessment & Continuous Tree Diffing..."
+	cd backend && PYTHONPATH=.. uv run python -c '\
+from src.hearings.service import HearingsService; \
+from src.hearings.schemas import HearingCreateRequest, HearingUpdateCreateRequest, HearingDateStatus; \
+from datetime import datetime, timezone; \
+svc = HearingsService(); \
+h = svc.create_hearing("case-demo", HearingCreateRequest(scheduled_at=datetime.now(timezone.utc), purpose="Evidence Recording", date_status=HearingDateStatus.CONFIRMED), lawyer_id="lawyer-1"); \
+up = HearingUpdateCreateRequest(happened="Complainant examined. Court admitted delivery challan exhibit 1.", orders_directions="Cross-examination fixed for next date."); \
+re = svc.submit_hearing_update_and_reassess(str(h.id), up, case_title="Rahman Debt Recovery"); \
+print("\n[1] REASSESSMENT RECOMMENDATION:", re.recommendation.value); \
+print("  Reason:", re.recommendation_reason); \
+print(f"\n[2] SCENARIO TREE DIFFS (BRANCHES EVALUATED: {len(re.tree_diff)}):"); \
+[print(f"  * {d.opponent_argument[:60]}... -> Plausibility: {d.updated_plausibility.value} (Pruned: {d.is_pruned})") for d in re.tree_diff]; \
+print("\n[3] DRAFT CLIENT UPDATE (HEAR-8):"); \
+print("  Title:", re.draft_client_update.title); \
+print("  Summary:", re.draft_client_update.plain_language_summary); \
+print("  Is Approved by Lawyer:", re.draft_client_update.is_approved_by_lawyer); \
+print("\nSUCCESS: Phase 7 Hearing Reassessment verified!")'
+
 test-gemini-live:
 	@echo "Running Live Gemini API End-to-End Demonstration..."
 	cd backend && PYTHONPATH=.. uv run python scripts/live_gemini_demo.py
@@ -144,10 +165,8 @@ ingest-legal-kb:
 
 db-status:
 	@echo "Querying PostgreSQL pgvector chunk and act statistics..."
-	@docker exec -it $$(docker ps -qf "name=postgres") psql -U postgres -d legal_copilot -c "\
-		SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;" 2>/dev/null || \
-	docker exec -it 3cfd4cd523d9 psql -U researchsphere -d legal_copilot_test -c "\
-		SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;"
+	@docker compose exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c \
+		"SELECT count(*) AS total_chunks, count(DISTINCT act_id) AS total_acts, count(DISTINCT section) AS total_sections FROM legal_chunks;"'
 
 scraper-run:
 	@echo "Running Bangladesh Laws Scraper..."
