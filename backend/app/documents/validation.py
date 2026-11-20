@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
+MAX_PDF_PAGE_POINTS = 5_000  # ~69 inches per side; A0 is ~3,370 pt
 
 _SIGNATURES = (
     (b"%PDF-", "application/pdf"),
@@ -69,6 +70,9 @@ def _check_pdf(data: bytes, max_pages: int) -> int:
             raise DocumentRejected("empty_pdf", "The PDF has no pages.")
         if document.page_count > max_pages:
             raise DocumentRejected("too_many_pages", f"PDFs may have at most {max_pages} pages.")
+        for page in document:
+            if max(page.rect.width, page.rect.height) > MAX_PDF_PAGE_POINTS:
+                raise DocumentRejected("page_too_large", "A PDF page is larger than the allowed size.")
         return document.page_count
 
 

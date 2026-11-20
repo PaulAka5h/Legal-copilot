@@ -54,6 +54,14 @@ def detect_language(text: str) -> str:
     return "mixed"  # both scripts carry more than 10% of the letters
 
 
+def render_dpi(width_pt: float, height_pt: float) -> int:
+    """OCR_DPI, lowered so the rendered page never exceeds MAX_IMAGE_PIXELS (memory bound)."""
+    from app.documents.validation import MAX_IMAGE_PIXELS
+
+    area_in2 = max(width_pt / 72 * height_pt / 72, 1e-6)
+    return max(36, min(OCR_DPI, int((MAX_IMAGE_PIXELS / area_in2) ** 0.5)))
+
+
 def _quality(confidence: float | None, text: str) -> str:
     if not text.strip():
         return "needs_review"
@@ -93,7 +101,7 @@ def extract_pages(data: bytes, mime_type: str, languages: str) -> tuple[list[Pag
                 if len("".join(text.split())) >= MIN_TEXT_LAYER_CHARS:
                     pages.append(PageText(index, text, "text_layer", None, None, "ok", detect_language(text)))
                     continue
-                pixmap = page.get_pixmap(dpi=OCR_DPI)
+                pixmap = page.get_pixmap(dpi=render_dpi(page.rect.width, page.rect.height))
                 image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
                 pages.append(_ocr_page(index, image, languages, engine))
     else:

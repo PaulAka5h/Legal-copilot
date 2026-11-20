@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.auth.router import auth_router, identity_router
 from app.cases.router import router as cases_router
 from app.clients.router import router as clients_router
+from app.body_limit import BodySizeLimitMiddleware
 from app.config import Settings
 from app.database import create_database_engine, verify_runtime_role
 from app.errors import register_exception_handlers
@@ -95,6 +96,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     register_exception_handlers(app)
+    # Added last so it is the outermost middleware: body size is enforced before
+    # routing, authentication, and multipart parsing.
+    app.add_middleware(BodySizeLimitMiddleware)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(identity_router)

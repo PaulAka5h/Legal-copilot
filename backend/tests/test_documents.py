@@ -138,3 +138,52 @@ def test_bangla_scanned_statute_page_ocr_quality(api_client):
     assert page["language"] == "bn" and page["quality_flag"] == "ok"
     assert page["ocr_confidence"] >= 0.8  # measured 0.92 on 2026-11-20
     assert accuracy >= 0.9  # measured 0.969
+
+
+def test_oversized_pdf_pages_are_refused_and_renders_are_bounded():
+    import pymupdf
+
+    from app.documents.extraction import render_dpi
+    from app.documents.validation import MAX_IMAGE_PIXELS, DocumentRejected, validate_upload
+
+    huge = pymupdf.open()
+    huge.new_page(width=14400, height=14400)  # 522-byte PDF that would render at 3.6 gigapixels
+    with pytest.raises(DocumentRejected) as rejected:
+        validate_upload(huge.tobytes(), 200)
+    assert rejected.value.code == "page_too_large"
+
+    a4 = (595, 842)
+    assert render_dpi(*a4) == 300  # normal pages keep full OCR resolution
+    for width, height in (a4, (3370, 4768), (5000, 5000)):
+        dpi = render_dpi(width, height)
+        assert (width / 72 * dpi) * (height / 72 * dpi) <= MAX_IMAGE_PIXELS
+
+
+def test_oversized_bodies_are_refused_before_authentication(api_client):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    anonymous = TestClient(create_app(api_client.app.state.settings), base_url="https://testserver",
+                           client=("127.0.9.1", 50000))
+    url = "/api/v1/lawyer/cases/00000000-0000-0000-0000-000000000000/documents"
+    with anonymous:
+        declared = anonymous.post(url, headers={**ORIGIN, "Content-Type": "application/octet-stream"},
+                                  content=b"0" * (22 * 1024 * 1024))
+        assert declared.status_code == 413  # not 401: the body is refused before auth runs
+        assert declared.headers["content-type"] == "application/problem+json"
+
+        def chunks():  # no Content-Length: counted while streaming
+            for _ in range(30):
+                yield b"0" * (1024 * 1024)
+
+        # Multipart is what FastAPI actually reads and spools before auth; non-multipart
+        # bodies are never read on this route.
+        streamed = anonymous.post(url, headers={**ORIGIN, "Content-Type": "multipart/form-data; boundary=x"},
+                                  content=chunks())
+        assert streamed.status_code == 413
+
+        json_route = anonymous.post("/api/v1/auth/login", headers=ORIGIN, content=b"{" + b" " * (3 * 1024 * 1024))
+        assert json_route.status_code == 413  # 2 MB default for other routes
+        assert anonymous.post(url, headers=ORIGIN, files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}
+                              ).status_code == 401  # small bodies still reach auth
