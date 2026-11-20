@@ -193,11 +193,11 @@ Written before any coding, per `DOCS/PokkhoAI_master_prompt.md`. Inspection only
 | A Data | `sections.jsonl` absent; scraper emits no amendment/repeal status, so all sections must be `unknown` and flagged. |
 | B Retrieval | No incident-date filter, no bn/en dedupe by canonical id, no abstain threshold on reranker score, no `/lawyer/cases/{case_id}/research/search` with auth. Tests use mock embeddings, not real scraped sections. |
 | C Facts | No structured facts draft (parties, dates, places, acts/omissions, documents, relief) with page refs; no lawyer confirm/edit endpoint; analysis does not gate on confirmed facts. `case_facts` in database.md is not migrated. |
-| D Analysis | No element-by-element `ViolationFinding`; no deterministic citation verifier (exists-in-DB, in-force, NFC substring quote). |
-| E Strategy | Tree is 2 plies with fixed node types, not the 3-ply `StrategyNode` contract with per-node verified citations; content is hard-coded templates (cheque-dishonour scenario). No "no precedent in knowledge base" behaviour. |
-| F Hearings | Reassessment is in-memory; no `HearingReassessment` diff contract (closed/new options, tasks, draft next date) persisted. |
-| G Deadlines/eval | No curated deadline rules table or deterministic calculator; no `backend/eval/` harness. |
-| Docs | `DOCS/AI_AGENTS.md` does not exist (referenced by AGENTS.md and the prompt). |
+| D Analysis | FIXED 2026-11-20 (065b21f4): element-by-element `ViolationFinding`, deterministic citation verifier, abstain, versioned `case_analyses`. |
+| E Strategy | FIXED 2026-11-20 (ef2bafcf): 3-ply `StrategyNode` tree with verified citations per node, "No precedent in knowledge base", versions and compare. |
+| F Hearings | FIXED 2026-11-20 (e125f83c): persisted `case_reassessments` diff (closed/new options, tasks, draft next date), draft client update. |
+| G Deadlines/eval | Eval harness FIXED 2026-11-20 (`backend/eval/`). Still open: curated deadline rules table and deterministic calculator (not in the Steps D–G scope). |
+| Docs | FIXED 2026-11-20: `DOCS/AI_AGENTS.md` written. |
 
 ### 7.4 Conflicts between the master prompt and existing docs
 
@@ -336,17 +336,27 @@ Security findings still open (medium/low):
 - Commit history: the document and fact router registration lines were split into their own commit (`8548623f`). `26e2c882` (C1) and `69ff6836` (C2/C3) contain their modules only, so their endpoint tests pass only from `8548623f` on. `afef5b21` and `5e7a6183` were committed while the legacy test `tests/documents/test_pipeline.py::test_full_pipeline_with_image` failed (it OCRed a blank image); fixed in `f2ea7b08`.
 
 
-## Open at end of 2026-11-20 session (Steps D–G deadline)
+## Steps D–G and frontend integration (2026-11-20)
 
-- DONE and committed: Step D (065b21f4), Step E (ef2bafcf), Step F (e125f83c). Suite: 193 passed, 1 skipped.
-- Step G, partial: `backend/eval/` holds the labelled synthetic set (19 English and 11 Bangla patterns,
-  SAMPLE_DATA_NOT_REAL_LAW) and the one-command runner `uv run python -m eval.run [--provider gemini] --write`.
-  NOT yet run on the full set: the CPU embedding of Acts 46/75/26/86/88/36/835/901/952 was still in progress,
-  and a 3-pattern smoke run gave recall 0 because those chunks had no embeddings yet. Approve those versions after
-  embedding, then run the eval to write DOCS/eval_results.md.
-- TODO: update DOCS/AI_AGENTS.md (missing) and database.md section 17 (migrations 0015–0018).
-- Frontend integration NOT started beyond type generation: `backend/scripts/export_openapi.py` → `frontend/openapi.json`,
-  `npm run gen:api` → `src/lib/api/schema.d.ts` (openapi-typescript 7.13.0). Still to do: real backend auth/session,
-  replace lib/mock data in lib/api/{lawyer,client}.ts, add the analysis, strategy, hearing-update, fact and upload
-  sections inside MatterWorkspace, demo-data fallback label, then npm run lint and npm run build.
-- Security: rotate the Gemini API key (it was exposed in an earlier test failure output).
+Done and committed: Step D case analysis (065b21f4), Step E strategy tree (ef2bafcf), Step F hearing reassessment
+(e125f83c), Step G evaluation harness and docs, frontend integration (1b259f50). Backend suite: 193 passed, 1 skipped.
+`npm run lint` and `npm run build` pass.
+
+- Eval: `cd backend && uv run python -m eval.run [--provider gemini] --write` → `DOCS/eval_results.md`
+  (30 synthetic patterns, 19 English and 11 Bangla, SAMPLE_DATA_NOT_REAL_LAW).
+- Acts loaded for the eval and demo (ingested, CPU-embedded, approved): 46 NI Act, 75 CrPC, 26 Contract Act,
+  86 CPC, 88 Limitation Act, 36 Specific Relief Act, 835, 901, 952. The Penal Code is not available (bdlaws unreachable).
+- Docs: `DOCS/AI_AGENTS.md` (new), `DOCS/database.md` §17.4–17.7 (migrations 0015–0018).
+
+### Open items
+
+| Area | Item |
+|---|---|
+| Security | Rotate the Gemini API key (it was exposed in an earlier test failure output). |
+| Backend | Rate limits on AI endpoints; ARQ worker for document processing and AI runs (both run in the request today). |
+| AI quality | Gemini free tier: strategy output often fails schema validation or hits rate limits and falls back to the labelled mock; see `DOCS/eval_results.md`. A cross-encoder reranker is not configured (abstain uses dense similarity). |
+| Retrieval | English misses at 10 (en-09, en-10, en-13, en-14: Contract Act ss. 15/17, Specific Relief Act ss. 12/9). |
+| Frontend | Case stage changes are not stored by the backend (the picker reports this). Edited hearing-summary versions are demo-only; with the backend, the lawyer approves (publishes) the generated client update. |
+| Frontend | The API has no client name on cases, no client↔case count on client lists, no lawyer contact for clients, and no hearing link on documents (documents are shown under the latest hearing before their upload date). |
+| Frontend | Document retry only refreshes status; the backend has no reprocess endpoint. Client password reset reports NOT_CONFIGURED (clients set a password from their invitation). |
+| Frontend | With a real session and the backend down, users are sent to sign-in (which reports the server is unreachable); the demo fallback is reachable only under development mock sign-in. |

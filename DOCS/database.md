@@ -956,3 +956,23 @@ The sections above are the original design. This section is what the migrations 
 - `case_facts_for_analysis` (view, `security_invoker = true`, so RLS applies): current facts that are not rejected and are either `lawyer_entered` or `lawyer_reviewed`. Analysis reads facts only through this view.
 - RLS (forced) on all three tables: lawyer members read; inserts and updates need `app.can_write_case`; no client policy (Rule 8); no DELETE grant.
 
+
+### 17.4 Processing recovery (0015)
+
+- `documents.processing_started_at`; `app.fail_stuck_documents(older_than interval)` (SECURITY DEFINER, refuses intervals under 5 minutes) marks documents stuck in `processing` as `failed` with `processing_error = 'processing_timeout'` and writes one audit event per document. Run at startup when `SWEEP_STUCK_DOCUMENTS_ON_STARTUP` is set.
+
+### 17.5 Case analysis (0016)
+
+- `case_analyses`: immutable, versioned per case (`version`, `supersedes_id`, `UNIQUE (case_id, version)`, `UNIQUE (id, case_id)`). `trigger` `manual` or `hearing_update` with `trigger_ref_id`; `status` `succeeded`, `insufficient_information`, `failed`; `fact_set_hash` (SHA-256 of the input fact ids and versions) and `fact_ids uuid[]` record exactly which rows of `case_facts_for_analysis` were used; `incident_date` (the in-force filter), `language`, `provider`, `origin` (`ai` or `ai_mock`), `result` jsonb (findings, elements, citations with verifier outcome, retrieved sources, missing information), `ai_run_id`.
+- RLS (forced): lawyer members read; insert needs `app.can_write_case`; no UPDATE or DELETE grant; no client policy (Rule 8).
+
+### 17.6 Strategy trees (0017)
+
+- `strategy_trees`: immutable, versioned per case; `analysis_id` with composite FK `(analysis_id, case_id)` to `case_analyses`; `tree` jsonb (3-ply game tree, every node with legal basis, requirements, risk/cost/time, strength and reasons, and its verifier outcome); `status` `succeeded` or `insufficient_information`; `trigger`/`trigger_ref_id` as in 0016.
+- RLS as in 0016. The earlier client policy on `strategies` was removed in Step A; clients never read strategy.
+
+### 17.7 Hearing reassessment (0018)
+
+- Grants SELECT and INSERT on `hearing_updates` to `app_user` (append-only; a correction is a new version with `supersedes_id`). The order text is also stored as a `lawyer_entered` case fact so the re-run analysis sees it.
+- `case_reassessments`: one immutable row per hearing update (`UNIQUE (hearing_update_id)`), linking the analysis and strategy-tree versions before and after (composite FKs on `case_id`), the `diff` jsonb (finding changes, closed and new options, tree and analysis versions, tasks, `suggested_next_date` as a draft only), and `client_update_id`, the draft `client_visible_updates` row the lawyer publishes through the existing flow.
+- RLS (forced): lawyer members read; insert needs `app.can_write_case`; no client policy.
