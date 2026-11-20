@@ -88,3 +88,53 @@ def test_scanned_image_uses_ocr_or_flags_not_configured(api_client):
     else:
         assert page["ocr_engine"].startswith("tesseract")
         assert 0 <= page["ocr_confidence"] <= 1 and "SAMPLE" in page["text"]
+
+
+def test_bangla_scanned_statute_page_ocr_quality(api_client):
+    """Public statute text (bdlaws Act 609, not client data), rendered as a scanned page."""
+    import difflib
+    import io
+    import json
+    import random
+    import textwrap
+    import unicodedata
+    from pathlib import Path
+
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+    if ocr_engine_for("ben+eng") is None:
+        pytest.skip("Tesseract with ben+eng is not installed")
+    dataset = Path(__file__).resolve().parents[2] / "data-scrapper" / "data" / "processed" / "sections.jsonl"
+    if not dataset.exists():
+        pytest.skip("sections.jsonl not exported")
+    with open(dataset, encoding="utf-8") as handle:
+        rows = [json.loads(line) for line in handle if '"act_id": "609"' in line]
+    source = "\n".join([r["section_content"] for r in rows if r["language"] == "bn"][:4])
+
+    font = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf", 38,
+                              layout_engine=ImageFont.Layout.RAQM)
+    lines = [w for para in source.split("\n") for w in (textwrap.wrap(para, 70) or [""])]
+    image = Image.new("L", (2480, 120 + 64 * len(lines)), 255)
+    draw = ImageDraw.Draw(image)
+    for i, line in enumerate(lines):
+        draw.text((120, 60 + 64 * i), line, fill=0, font=font)
+    random.seed(7)
+    image = image.filter(ImageFilter.GaussianBlur(0.8))
+    pixels = image.load()
+    for _ in range(image.width * image.height // 400):
+        pixels[random.randrange(image.width), random.randrange(image.height)] = random.choice((0, 255))
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG")
+
+    _, case_id = lawyer_with_case(api_client, "doc-bn-ocr")
+    body = upload(api_client, case_id, buffer.getvalue(), "act-609-scan.png").json()
+    page = api_client.get(
+        f"/api/v1/lawyer/cases/{case_id}/documents/{body['document']['id']}/pages/1"
+    ).json()["current"]
+    norm = lambda s: " ".join(unicodedata.normalize("NFC", s).split())  # noqa: E731
+    accuracy = difflib.SequenceMatcher(None, norm(source), norm(page["text"])).ratio()
+    print(f"\nBangla OCR: confidence={page['ocr_confidence']}, char_accuracy={accuracy:.3f}")
+    assert page["source_method"] == "ocr" and page["ocr_engine"].startswith("tesseract")
+    assert page["language"] == "bn" and page["quality_flag"] == "ok"
+    assert page["ocr_confidence"] >= 0.8  # measured 0.92 on 2026-11-20
+    assert accuracy >= 0.9  # measured 0.969
