@@ -20,6 +20,7 @@ class DocumentResponse(BaseModel):
     processing_error: str | None = Field(description="Error code only; never document text")
     uploaded_by: UUID
     uploaded_at: datetime
+    processing_started_at: datetime | None
     processed_at: datetime | None
 
 

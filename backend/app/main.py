@@ -21,6 +21,18 @@ from app.facts.router import router as facts_router
 from app.logging_config import configure_logging
 
 
+async def _startup_sweep(engine, minutes: int, logger) -> None:
+    """Mark documents left 'processing' by a crash as failed; never blocks startup."""
+    from app.documents.recovery import sweep_stuck_documents
+
+    try:
+        swept = await sweep_stuck_documents(engine, minutes)
+        logger.info("documents.stuck_sweep", extra={"event": "documents.stuck_sweep", "count": swept})
+    except Exception as error:
+        logger.warning("documents.stuck_sweep_failed",
+                       extra={"event": "documents.stuck_sweep_failed", "error_type": type(error).__name__})
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or Settings()
     logger = configure_logging(app_settings.log_level)
@@ -34,6 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine = create_database_engine(app_settings.database_url)
             try:
                 await verify_runtime_role(engine)
+                if app_settings.sweep_stuck_documents_on_startup:
+                    await _startup_sweep(engine, app_settings.stuck_processing_minutes, logger)
                 app.state.session_factory = async_sessionmaker(
                     engine,
                     expire_on_commit=False,

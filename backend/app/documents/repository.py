@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 DOCUMENT_FIELDS = """
     d.id, d.case_id, d.title, d.original_filename, d.mime_type, d.size_bytes, d.storage_key,
     d.doc_type, d.language, d.page_count, d.scan_status, d.processing_status, d.processing_error,
-    d.uploaded_by, d.uploaded_at, d.processed_at
+    d.uploaded_by, d.uploaded_at, d.processing_started_at, d.processed_at
 """
 
 
@@ -64,7 +64,8 @@ async def list_documents(session: AsyncSession, case_id: UUID) -> list[dict]:
 
 
 async def set_processing_state(session: AsyncSession, document_id: UUID, **fields: Any) -> None:
-    allowed = {"processing_status", "processing_error", "page_count", "language", "processed_at"}
+    allowed = {"processing_status", "processing_error", "page_count", "language", "processed_at",
+               "processing_started_at"}
     assert set(fields) <= allowed, fields
     assignments = ", ".join(f"{k} = :{k}" for k in fields)
     await session.execute(

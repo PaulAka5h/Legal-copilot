@@ -1,7 +1,9 @@
 """process_document(document_id): the single processing entry point.
 
 Runs synchronously from the upload request for now; the ARQ worker will call the
-same function later (DOCS/TRD.md). It runs as the requesting user, so RLS
+same function later (DOCS/TRD.md). A crash leaves the document 'processing';
+app.documents.recovery marks it failed after a timeout, and this function then
+retries it (failed documents without pages are processed again). It runs as the requesting user, so RLS
 applies. It is idempotent: only queued or failed documents without pages are
 processed. Errors are stored as codes, never with document text.
 """
@@ -66,7 +68,7 @@ async def process_document(
                                             processing_error="malware_scan_required")
             raise ScannerNotConfigured("Unscanned documents are not processed in production")
         await repo.set_processing_state(session, document_id, processing_status="processing",
-                                        processing_error=None)
+                                        processing_error=None, processing_started_at=datetime.now(UTC))
         organization_id = (await repo.case_status(session, case_id))[1]
 
     try:

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     malware_scanner: Literal["none"] = "none"
     ocr_languages: str = "ben+eng"
     max_pdf_pages: int = Field(default=200, gt=0)
+    # Documents stuck in 'processing' longer than this are marked failed (retryable)
+    # by a sweep at startup and by `python -m app.documents.recovery`.
+    stuck_processing_minutes: int = Field(default=30, ge=5)
+    sweep_stuck_documents_on_startup: bool = True
 
     # Fact extraction LLM. Only providers listed in DOCS/providers.md may be approved.
     llm_provider: Literal["mock", "ollama"] = "mock"
