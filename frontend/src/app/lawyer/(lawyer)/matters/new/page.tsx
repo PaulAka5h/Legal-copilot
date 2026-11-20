@@ -4,9 +4,10 @@ import { createMatterAction } from "@/app/lawyer/actions";
 import { Field } from "@/components/Field";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
-import { listCaseTypes, listClients, listCourts } from "@/lib/api/lawyer";
+import { listBackendClients, listCaseTypes, listClients, listCourts } from "@/lib/api/lawyer";
 import { dictionaries, pick, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -21,7 +22,8 @@ export default async function NewMatterPage({
   const language = await getLanguage();
   const copy = dictionaries[language];
   const { error } = await searchParams;
-  const clients = listClients();
+  const mock = isMockAuthEnabled();
+  const clients = mock ? listClients() : await listBackendClients();
   const courts = listCourts();
   const caseTypes = listCaseTypes();
 
@@ -32,13 +34,13 @@ export default async function NewMatterPage({
         title={copy.newMatter.title}
         subtitle={copy.newMatter.subtitle}
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <form className="panel client-form" action={createMatterAction}>
-        <p className="mock-note">{copy.newMatter.mockNote}</p>
+        {mock ? <p className="mock-note">{copy.newMatter.mockNote}</p> : null}
         {error ? (
           <p className="form-error" role="alert">
-            {copy.newMatter.error}
+            {error === "organization" ? copy.newMatter.organizationError : copy.newMatter.error}
           </p>
         ) : null}
 
@@ -51,6 +53,11 @@ export default async function NewMatterPage({
         </div>
 
         <div className="form-grid">
+          <div className="full">
+            <Field label={copy.newMatter.referenceNo}>
+              <input name="referenceNo" required />
+            </Field>
+          </div>
           <div className="full">
             <Field label={copy.newMatter.caseTitle}>
               <input
@@ -92,14 +99,8 @@ export default async function NewMatterPage({
           <label className="field full">
             <span className="field-label">{copy.newMatter.client}</span>
             <select name="clientId" required defaultValue="">
-              <option value="" disabled>
-                {copy.newMatter.selectClient}
-              </option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {pick(client.name, language)}
-                </option>
-              ))}
+              <option value="" disabled>{copy.newMatter.selectClient}</option>
+              {clients.map((client) => <option key={client.id} value={client.id}>{pick(client.name, language)}</option>)}
             </select>
           </label>
         </div>

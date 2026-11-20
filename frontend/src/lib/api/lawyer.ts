@@ -2,7 +2,11 @@ import {
   MAX_DOCUMENT_BYTES,
   isAllowedDocument,
 } from "@/lib/documents";
-import { fetchCaseAnalysis, queryLegalKnowledgeBase } from "@/lib/api/backendClient";
+import {
+  backendFetch,
+  fetchCaseAnalysis,
+  queryLegalKnowledgeBase,
+} from "@/lib/api/backendClient";
 import { pick } from "@/lib/i18n";
 import { storedSummaries } from "@/lib/mock/client";
 import {
@@ -188,9 +192,130 @@ export type ClientCredentials = {
 export type CreateClientState =
   | null
   | ({ status: "ok" } & ClientCredentials)
-  | { status: "error" };
+  | { status: "error"; message: string };
 
 export type ResetPasswordState = { status: "NOT_CONFIGURED" };
+
+// ============================================================
+// Backend response types and adapters
+// ============================================================
+
+type ApiClient = {
+  id: string;
+  organization_id: string;
+  display_name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  created_at: string;
+};
+
+type ApiCase = {
+  id: string;
+  organization_id: string;
+  reference_no: string;
+  title: string;
+  case_type: string;
+  workflow_template_id: string | null;
+  court: string | null;
+  court_case_no: string | null;
+  jurisdiction: string | null;
+  opposing_party: string | null;
+  description: string | null;
+  internal_notes: string | null;
+  client_objectives: string | null;
+  status: "draft" | "open" | "on_hold" | "closed";
+  current_stage: string | null;
+  key_dates: Record<string, unknown>;
+  closed_at: string | null;
+  closed_by: string | null;
+  retention_until: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ApiLawyerOverview = {
+  active_cases: number;
+  total_matters: number;
+  total_clients: number;
+  next_hearing: null;
+};
+
+type ApiLawyerActivity = {
+  id: string;
+  action: string;
+  object_type: string | null;
+  object_id: string | null;
+  occurred_at: string;
+};
+
+const localized = (value: string | null | undefined): Localized => ({
+  en: value || "—",
+  bn: value || "—",
+});
+
+function adaptClient(record: ApiClient): ClientSummary {
+  return {
+    id: record.id,
+    name: localized(record.display_name),
+    phone: record.phone || "",
+    email: record.email || "",
+    caseCount: 0,
+  };
+}
+
+function adaptClientDetail(record: ApiClient): ClientDetail {
+  return {
+    id: record.id,
+    name: localized(record.display_name),
+    phone: record.phone || "",
+    email: record.email || "",
+    cases: [],
+  };
+}
+
+function adaptCase(record: ApiCase): Matter {
+  const currentStage = record.current_stage || "filed";
+  return {
+    id: record.id,
+    title: localized(record.title),
+    clientId: "",
+    clientName: localized(null),
+    court: localized(record.court),
+    caseType: localized(record.case_type),
+    hearingNumber: 0,
+    status: record.status === "closed" ? "closed" : "active",
+    stages: [{ id: currentStage, label: localized(currentStage) }],
+    currentStageId: currentStage,
+  };
+}
+
+function adaptLawyerStats(record: ApiLawyerOverview): LawyerStats {
+  return {
+    activeCases: record.active_cases,
+    totalMatters: record.total_matters,
+    totalClients: record.total_clients,
+    nextHearing: null,
+  };
+}
+
+function adaptActivity(record: ApiLawyerActivity): Activity {
+  const date = new Date(record.occurred_at);
+  const timeStr = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  const timeStrBn = date.toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return {
+    id: record.id,
+    icon: "document",
+    title: localized(record.action),
+    detail: localized(record.object_type || "—"),
+    time: { en: timeStr, bn: timeStrBn },
+  };
+}
+
+// ============================================================
+// Mock data functions (used when MOCK_AUTH=true)
+// ============================================================
 
 export function listMatters(): Matter[] {
   return [...matters];
@@ -436,7 +561,7 @@ export async function getHearingSummary(
         }
       }
     }
-  } catch (err) {
+  } catch {
     // Graceful fallback to default records if backend is offline
   }
 
@@ -730,4 +855,100 @@ export function listCourts(): Localized[] {
 
 export function listCaseTypes(): Localized[] {
   return [...caseTypes];
+}
+
+// ============================================================
+// Backend API functions (used when MOCK_AUTH=false)
+// ============================================================
+
+export async function listBackendClients(): Promise<ClientSummary[]> {
+  const response = await backendFetch("/api/v1/clients");
+  if (!response.ok) return [];
+  const records = (await response.json()) as ApiClient[];
+  return records.map(adaptClient);
+}
+
+export async function getBackendClient(clientId: string): Promise<ClientDetail | null> {
+  const response = await backendFetch(`/api/v1/clients/${encodeURIComponent(clientId)}`);
+  if (!response.ok) return null;
+  const record = (await response.json()) as ApiClient;
+  return adaptClientDetail(record);
+}
+
+export async function listBackendMatters(): Promise<Matter[]> {
+  const response = await backendFetch("/api/v1/cases");
+  if (!response.ok) return [];
+  return ((await response.json()) as ApiCase[]).map(adaptCase);
+}
+
+export async function getBackendMatter(caseId: string): Promise<Matter | null> {
+  const response = await backendFetch(`/api/v1/cases/${encodeURIComponent(caseId)}`);
+  if (!response.ok) return null;
+  return adaptCase((await response.json()) as ApiCase);
+}
+
+export async function getBackendDashboard(): Promise<LawyerStats> {
+  const response = await backendFetch("/api/v1/lawyer/dashboard/overview");
+  if (!response.ok) {
+    return { activeCases: 0, totalMatters: 0, totalClients: 0, nextHearing: null };
+  }
+  return adaptLawyerStats(await response.json());
+}
+
+export async function getBackendActivity(): Promise<Activity[]> {
+  const response = await backendFetch("/api/v1/lawyer/dashboard/activity");
+  if (!response.ok) return [];
+  return ((await response.json()) as ApiLawyerActivity[]).map(adaptActivity);
+}
+
+export async function getBackendTeam(): Promise<{ user_id: string; full_name: string; email: string; org_role: string }[]> {
+  const response = await backendFetch("/api/v1/lawyer/team");
+  if (!response.ok) return [];
+  return (await response.json()) as { user_id: string; full_name: string; email: string; org_role: string }[];
+}
+
+export async function createBackendClient(input: NewClientInput): Promise<CreateClientState> {
+  const response = await backendFetch("/api/v1/clients", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      display_name: input.name.trim(),
+      phone: input.phone.trim() || null,
+      email: input.email.trim() || null,
+      address: null,
+    }),
+  });
+  if (!response.ok) {
+    const problem = await response.json();
+    if (problem.status === 409) {
+      return { status: "error", message: "organization" };
+    }
+    return { status: "error", message: problem.detail || "Failed to create client" };
+  }
+  const client = adaptClient(await response.json());
+  return { status: "ok", name: client.name.en, clientId: client.id, password: "NOT_CONFIGURED" };
+}
+
+export async function createBackendMatter(input: NewMatterInput): Promise<Matter | { status: "error"; detail: string }> {
+  const response = await backendFetch("/api/v1/cases", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      reference_no: `REF-${Date.now()}`,
+      title: input.title.trim(),
+      case_type: input.caseType,
+      court: input.court || null,
+      court_case_no: null,
+      jurisdiction: null,
+      opposing_party: null,
+      description: null,
+      internal_notes: null,
+      client_objectives: null,
+    }),
+  });
+  if (!response.ok) {
+    const problem = await response.json();
+    return { status: "error", detail: problem.detail || "Failed to create case" };
+  }
+  return adaptCase(await response.json());
 }

@@ -6,7 +6,7 @@ import { AuthLayout } from "@/components/AuthLayout";
 import { SignUpForm } from "@/components/SignUpForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { getSession, isMockAuthEnabled } from "@/lib/session";
+import { getSession, hasSessionCookie, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -20,6 +20,7 @@ export default async function LawyerSignupPage() {
       session.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard",
     );
   }
+  if (await hasSessionCookie()) redirect("/auth/clear?next=/lawyer/signup");
 
   const language = await getLanguage();
   const copy = dictionaries[language].lawyer;

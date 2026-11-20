@@ -22,7 +22,8 @@ import {
   type SummarySection,
   type Verification,
 } from "@/lib/api/lawyer";
-import { getSession } from "@/lib/session";
+import { backendFetch, readProblem } from "@/lib/api/backendClient";
+import { getSession, isMockAuthEnabled } from "@/lib/session";
 
 const claimTypes: ClaimType[] = [
   "document",
@@ -37,6 +38,29 @@ function summaryPath(caseId: string, hearingId: string) {
 }
 
 export async function createMatterAction(formData: FormData) {
+  if (!isMockAuthEnabled()) {
+    const response = await backendFetch("/api/v1/cases", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        reference_no: String(formData.get("referenceNo") ?? "").trim(),
+        title: String(formData.get("title") ?? "").trim(),
+        court: String(formData.get("court") ?? "").trim() || null,
+        case_type: String(formData.get("caseType") ?? "").trim(),
+      }),
+    });
+    if (!response.ok) {
+      const problem = await readProblem(response);
+      if (problem.status === 409) {
+        redirect(`/lawyer/matters/new?error=organization`);
+      }
+      redirect(`/lawyer/matters/new?error=1`);
+    }
+    const matter = (await response.json()) as { id: string };
+    revalidatePath("/lawyer/matters");
+    revalidatePath("/lawyer/dashboard");
+    redirect(`/lawyer/matters/${encodeURIComponent(matter.id)}`);
+  }
   const matter = createMatter({
     title: String(formData.get("title") ?? ""),
     court: String(formData.get("court") ?? ""),
@@ -226,13 +250,35 @@ export async function createClientAction(
   _state: CreateClientState,
   formData: FormData,
 ): Promise<CreateClientState> {
+  if (!isMockAuthEnabled()) {
+    const response = await backendFetch("/api/v1/clients", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        display_name: String(formData.get("name") ?? "").trim(),
+        phone: String(formData.get("phone") ?? "").trim() || null,
+        email: String(formData.get("email") ?? "").trim() || null,
+        address: null,
+      }),
+    });
+    if (!response.ok) {
+      const problem = await readProblem(response);
+      if (problem.status === 409) {
+        return { status: "error", message: "organization" };
+      }
+      return { status: "error", message: "Failed to create client" };
+    }
+    revalidatePath("/lawyer/clients");
+    revalidatePath("/lawyer/dashboard");
+    redirect("/lawyer/clients?created=1");
+  }
   const client = createClient({
     name: String(formData.get("name") ?? ""),
     phone: String(formData.get("phone") ?? ""),
     email: String(formData.get("email") ?? ""),
   });
 
-  if (!client) return { status: "error" };
+  if (!client) return { status: "error", message: "Failed to create client" };
 
   revalidatePath("/lawyer/clients");
   revalidatePath("/lawyer/dashboard");

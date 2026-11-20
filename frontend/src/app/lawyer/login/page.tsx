@@ -10,7 +10,7 @@ import { PasswordField } from "@/components/PasswordField";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { SAMPLE_LAWYER_LOGIN } from "@/lib/sample";
-import { getSession, isMockAuthEnabled } from "@/lib/session";
+import { getSession, hasSessionCookie, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -22,6 +22,7 @@ export default async function LawyerLoginPage() {
   if (session) {
     redirect(session.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard");
   }
+  if (await hasSessionCookie()) redirect("/auth/clear?next=/lawyer/login");
 
   const language = await getLanguage();
   const copy = dictionaries[language].lawyer;
@@ -45,12 +46,17 @@ export default async function LawyerLoginPage() {
       <h2>{copy.welcome}</h2>
       <p className="form-intro">{copy.intro}</p>
       {isMockAuthEnabled() ? <p className="mock-note">{common.mockNotice}</p> : null}
-      <MockLoginForm action={lawyerLogin} notice={common.mockDisabled}>
+      <MockLoginForm
+        action={lawyerLogin}
+        notice={common.mockDisabled}
+        invalidMessage={copy.invalidCredentials}
+        rateLimitedMessage={copy.rateLimited}
+      >
         <Field label={copy.email} icon="mail">
           <input
             type="email"
             name="email"
-            defaultValue={SAMPLE_LAWYER_LOGIN.email}
+            defaultValue={isMockAuthEnabled() ? SAMPLE_LAWYER_LOGIN.email : ""}
             aria-label={copy.email}
             autoComplete="email"
           />
@@ -58,7 +64,7 @@ export default async function LawyerLoginPage() {
         <PasswordField
           label={copy.password}
           ariaLabel={copy.password}
-          defaultValue={SAMPLE_LAWYER_LOGIN.password}
+          defaultValue={isMockAuthEnabled() ? SAMPLE_LAWYER_LOGIN.password : ""}
           showLabel={copy.showPassword}
           hideLabel={copy.hidePassword}
         />
@@ -70,9 +76,9 @@ export default async function LawyerLoginPage() {
             </span>
             {copy.remember}
           </label>
-          <button type="button" className="text-link">
+          <Link className="text-link" href="/lawyer/forgot-password">
             {copy.forgot}
-          </button>
+          </Link>
         </div>
         <button className="primary-button" type="submit">
           {copy.signIn}

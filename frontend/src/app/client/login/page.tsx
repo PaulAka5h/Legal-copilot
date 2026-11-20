@@ -9,7 +9,7 @@ import { MockLoginForm } from "@/components/MockLoginForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { SAMPLE_CLIENT_LOGIN } from "@/lib/sample";
-import { getSession, isMockAuthEnabled } from "@/lib/session";
+import { getSession, hasSessionCookie, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -21,6 +21,7 @@ export default async function ClientLoginPage() {
   if (session) {
     redirect(session.role === "client" ? "/client/dashboard" : "/lawyer/dashboard");
   }
+  if (await hasSessionCookie()) redirect("/auth/clear?next=/client/login");
 
   const language = await getLanguage();
   const copy = dictionaries[language].client;
@@ -36,20 +37,26 @@ export default async function ClientLoginPage() {
       <h2>{copy.title}</h2>
       <p className="form-intro">{copy.intro}</p>
       {isMockAuthEnabled() ? <p className="mock-note">{common.mockNotice}</p> : null}
-      <MockLoginForm action={clientLogin} notice={common.mockDisabled}>
-        <Field label={copy.clientId} icon="user">
+      <MockLoginForm
+        action={clientLogin}
+        notice={common.mockDisabled}
+        invalidMessage={copy.invalidCredentials}
+        rateLimitedMessage={copy.rateLimited}
+      >
+        <Field label={copy.clientId} icon="mail">
           <input
-            name="clientId"
-            defaultValue={SAMPLE_CLIENT_LOGIN.clientId}
+            type="email"
+            name="email"
+            defaultValue={isMockAuthEnabled() ? SAMPLE_CLIENT_LOGIN.email : ""}
             aria-label={copy.clientId}
-            autoComplete="username"
+            autoComplete="email"
           />
         </Field>
         <Field label={copy.password} icon="lock">
           <input
             type="password"
             name="password"
-            defaultValue={SAMPLE_CLIENT_LOGIN.password}
+            defaultValue={isMockAuthEnabled() ? SAMPLE_CLIENT_LOGIN.password : ""}
             aria-label={copy.password}
             autoComplete="current-password"
           />

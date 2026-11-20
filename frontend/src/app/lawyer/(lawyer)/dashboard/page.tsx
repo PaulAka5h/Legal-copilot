@@ -5,9 +5,12 @@ import { PageHeading } from "@/components/lawyer/PageHeading";
 import { QuickActions } from "@/components/lawyer/QuickActions";
 import {
   getLawyerProfile,
+  getBackendDashboard,
   getLawyerStats,
   getRecentActivity,
   getRecentMatters,
+  listBackendMatters,
+  getBackendActivity,
 } from "@/lib/api/lawyer";
 import {
   dictionaries,
@@ -17,6 +20,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { getSession, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -52,10 +56,14 @@ export default async function LawyerDashboardPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.dashboard;
-  const profile = getLawyerProfile();
-  const stats = getLawyerStats();
-  const recentMatters = getRecentMatters();
-  const activities = getRecentActivity();
+  const mock = isMockAuthEnabled();
+  const session = await getSession();
+  const profile = mock
+    ? getLawyerProfile()
+    : { firstName: { en: session?.full_name || "", bn: session?.full_name || "" }, name: { en: session?.full_name || "", bn: session?.full_name || "" }, email: session?.email || "", firm: { en: "", bn: "" }, location: { en: "", bn: "" } };
+  const stats = mock ? getLawyerStats() : await getBackendDashboard();
+  const recentMatters = mock ? getRecentMatters() : (await listBackendMatters()).slice(0, 3);
+  const activities = mock ? getRecentActivity() : await getBackendActivity();
 
   const nextValue = stats.nextHearing
     ? `${numberFor(language, stats.nextHearing.day)} ${pick(stats.nextHearing.month, language)}`
@@ -80,7 +88,7 @@ export default async function LawyerDashboardPage() {
         }
       />
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="stats-grid">
         <Stat

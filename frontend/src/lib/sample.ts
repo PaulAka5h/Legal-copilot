@@ -4,6 +4,6 @@ export const SAMPLE_LAWYER_LOGIN = {
 } as const;
 
 export const SAMPLE_CLIENT_LOGIN = {
-  clientId: "CL-7842-BD",
+  email: "client@example.bd",
   password: "J7q9fL2x",
 } as const;

@@ -3,6 +3,7 @@ import {
   clientProfile,
   storedSummaries,
 } from "@/lib/mock/client";
+import { backendFetch } from "@/lib/api/backendClient";
 
 export type Localized = { en: string; bn: string };
 export type StageState = "complete" | "current" | "upcoming";
@@ -78,6 +79,74 @@ export type ClientCase = {
   documents: SharedDocument[];
   summaries: ClientSummary[];
 };
+
+export type BackendClientCase = {
+  id: string;
+  title: string;
+  status: "draft" | "open" | "on_hold" | "closed";
+  case_type: string;
+  court: string | null;
+};
+
+export type BackendClientHearing = {
+  id: string;
+  scheduled_at: string;
+  purpose: string | null;
+  court_room: string | null;
+};
+
+export type BackendClientDocument = {
+  id: string;
+  document_id: string;
+  display_name: string;
+  shared_at: string;
+};
+
+export type BackendClientUpdate = {
+  id: string;
+  version: number;
+  title: string;
+  body: string;
+  language: "en" | "bn";
+  published_at: string | null;
+};
+
+export type BackendClientTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  status: "open" | "done" | "cancelled";
+};
+
+export async function listBackendClientCases(): Promise<BackendClientCase[]> {
+  const response = await backendFetch("/api/v1/client/cases");
+  return response.ok ? (await response.json()) as BackendClientCase[] : [];
+}
+
+export async function fetchClientHearing(caseId: string): Promise<BackendClientHearing | null> {
+  const response = await backendFetch(`/api/v1/client/cases/${encodeURIComponent(caseId)}/hearing`);
+  if (!response.ok) return null;
+  return (await response.json()) as BackendClientHearing | null;
+}
+
+export async function fetchClientDocuments(caseId: string): Promise<BackendClientDocument[]> {
+  const response = await backendFetch(`/api/v1/client/cases/${encodeURIComponent(caseId)}/documents`);
+  if (!response.ok) return [];
+  return (await response.json()) as BackendClientDocument[];
+}
+
+export async function fetchClientUpdates(caseId: string): Promise<BackendClientUpdate[]> {
+  const response = await backendFetch(`/api/v1/client/cases/${encodeURIComponent(caseId)}/updates`);
+  if (!response.ok) return [];
+  return (await response.json()) as BackendClientUpdate[];
+}
+
+export async function fetchClientTasks(caseId: string): Promise<BackendClientTask[]> {
+  const response = await backendFetch(`/api/v1/client/cases/${encodeURIComponent(caseId)}/tasks`);
+  if (!response.ok) return [];
+  return (await response.json()) as BackendClientTask[];
+}
 
 function approvedSummaries(): ClientSummary[] {
   return storedSummaries

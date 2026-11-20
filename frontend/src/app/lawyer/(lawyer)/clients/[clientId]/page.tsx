@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ResetPasswordButton } from "@/components/lawyer/ResetPasswordButton";
-import { getClientDetail } from "@/lib/api/lawyer";
+import { getBackendClient, getClientDetail } from "@/lib/api/lawyer";
 import {
   dictionaries,
   numberFor,
@@ -11,6 +11,7 @@ import {
   titleFor,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -25,7 +26,8 @@ export default async function ClientDetailPage({
   const { clientId } = await params;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const client = getClientDetail(clientId);
+  const mock = isMockAuthEnabled();
+  const client = mock ? getClientDetail(clientId) : await getBackendClient(clientId);
 
   if (!client) notFound();
 
@@ -51,7 +53,7 @@ export default async function ClientDetailPage({
         </div>
       </div>
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="panel matters-panel">
         <div className="panel-head padded">
@@ -59,7 +61,7 @@ export default async function ClientDetailPage({
             <h2>{copy.clientDetail.casesTitle}</h2>
             <p>{copy.clientDetail.casesSub}</p>
           </div>
-          <ResetPasswordButton language={language} />
+          {mock ? <ResetPasswordButton language={language} /> : null}
         </div>
 
         {client.cases.length ? (

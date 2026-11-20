@@ -11,6 +11,7 @@ import { Icon } from "@/components/Icon";
 import { MatterWorkspace } from "@/components/lawyer/MatterWorkspace";
 import {
   getCase,
+  getBackendMatter,
   listDocuments,
   listHearings,
   type Matter,
@@ -25,6 +26,7 @@ import {
   type Language,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -72,7 +74,8 @@ export default async function LawyerMatterPage({
   const { hearingError, noteError } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const matter = getCase(caseId);
+  const mock = isMockAuthEnabled();
+  const matter = mock ? getCase(caseId) : await getBackendMatter(caseId);
 
   if (!matter) notFound();
 
@@ -110,7 +113,7 @@ export default async function LawyerMatterPage({
           </p>
         </div>
 
-        <div className="stage-picker">
+        {mock ? <div className="stage-picker">
           <label className="stage-label" htmlFor="case-stage">
             {copy.caseDetail.stageLabel}
           </label>
@@ -140,10 +143,10 @@ export default async function LawyerMatterPage({
               number: numberFor(language, matter.hearingNumber),
             })}
           </span>
-        </div>
+        </div> : <div className="stage-picker"><span className="stage-help">{copy.caseDetail.notAvailableYet}</span></div>}
       </div>
 
-      <p className="mock-note">{copy.common.mockData}</p>
+      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
 
       <div className="case-layout">
         <div className="panel progress-panel">
@@ -170,16 +173,20 @@ export default async function LawyerMatterPage({
           />
         </div>
 
-        <MatterWorkspace
-          key={matter.id}
-          caseId={matter.id}
-          hearings={hearings}
-          initialDocuments={listDocuments(caseId)}
-          language={language}
-          copy={copy.caseDetail}
-          locked={locked}
-          error={hearingFormError}
-        />
+        {mock ? (
+          <MatterWorkspace
+            key={matter.id}
+            caseId={matter.id}
+            hearings={hearings}
+            initialDocuments={listDocuments(caseId)}
+            language={language}
+            copy={copy.caseDetail}
+            locked={locked}
+            error={hearingFormError}
+          />
+        ) : (
+          <div className="panel empty-note">{copy.caseDetail.notAvailableYet}</div>
+        )}
       </div>
     </>
   );

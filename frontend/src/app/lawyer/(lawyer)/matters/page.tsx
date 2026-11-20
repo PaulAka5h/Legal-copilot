@@ -3,9 +3,10 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { MattersTable } from "@/components/lawyer/MattersTable";
 import { PageHeading } from "@/components/lawyer/PageHeading";
-import { listMatters } from "@/lib/api/lawyer";
+import { listBackendMatters, listMatters } from "@/lib/api/lawyer";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
+import { isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -15,7 +16,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LawyerMattersPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const matters = listMatters();
+  const mock = isMockAuthEnabled();
+  const matters = mock ? listMatters() : await listBackendMatters();
 
   return (
     <>
@@ -30,7 +32,7 @@ export default async function LawyerMattersPage() {
           </Link>
         }
       />
-      <p className="mock-note">{copy.common.mockData}</p>
+      {mock ? <p className="mock-note">{copy.common.mockData}</p> : null}
       <MattersTable language={language} matters={matters} />
     </>
   );

@@ -14,7 +14,7 @@ export function SignUpForm({ copy }: { copy: Dictionary["lawyer"] }) {
 
   return (
     <form action={formAction}>
-      {state?.status === "NOT_CONFIGURED" ? (
+      {state?.status === "error" ? (
         <p className="form-error" role="alert">
           {state.message}
         </p>
@@ -52,39 +52,6 @@ export function SignUpForm({ copy }: { copy: Dictionary["lawyer"] }) {
           autoComplete="email"
           aria-invalid={errors.email ? true : undefined}
           aria-describedby={errors.email ? "signup-email-error" : undefined}
-        />
-      </Field>
-
-      <Field
-        label={signup.phone}
-        icon="user"
-        error={errors.phone}
-        errorId="signup-phone-error"
-      >
-        <input
-          type="tel"
-          name="phone"
-          aria-label={signup.phone}
-          aria-required="true"
-          autoComplete="tel"
-          aria-invalid={errors.phone ? true : undefined}
-          aria-describedby={errors.phone ? "signup-phone-error" : undefined}
-        />
-      </Field>
-
-      <Field label={signup.firm} icon="briefcase">
-        <input
-          name="firm"
-          aria-label={signup.firm}
-          autoComplete="organization"
-        />
-      </Field>
-
-      <Field label={signup.barEnrollment} icon="document">
-        <input
-          name="barEnrollment"
-          aria-label={signup.barEnrollment}
-          autoComplete="off"
         />
       </Field>
 
