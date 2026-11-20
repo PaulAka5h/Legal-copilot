@@ -279,6 +279,8 @@ A closed case sets client memberships to `revoked` (or `read_only` if the policy
 
 ## 6. Documents, pages, chunks
 
+> Implemented schema differs from the design below; see section 17 (migrations 0011-0014).
+
 ```sql
 CREATE TABLE documents (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -358,6 +360,8 @@ Retrieval always includes `WHERE case_id = :case_id AND is_active`. See `TRD.md`
 
 ## 7. Legal knowledge base (shared, not case-scoped)
 
+> Implemented schema differs from the design below; see section 17 (migrations 0011-0014).
+
 ```sql
 CREATE TABLE legal_sources (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -422,6 +426,8 @@ Only versions with `review_status = 'approved'` are searchable. The search skill
 
 ## 8. Case understanding
 
+> Implemented schema differs from the design below; see section 17 (migrations 0011-0014).
+
 ```sql
 CREATE TABLE evidence_items (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -469,6 +475,8 @@ CREATE INDEX ON case_events (case_id, event_date);
 ```
 
 ## 9. Analyses, claims, verification, AI runs
+
+> Implemented schema differs from the design below; see section 17 (migrations 0011-0014).
 
 ```sql
 CREATE TABLE ai_runs (
@@ -911,3 +919,40 @@ The API opens a transaction per request and runs `SELECT set_config('app.current
 ## 16. Seed and test data
 
 Seed data must be synthetic. Any legal source row created for tests must have `source_name = 'SAMPLE_DATA_NOT_REAL_LAW'`. Isolation tests create two organizations, two lawyers, two clients, and near-identical document text in two cases, then verify that each user can reach only their own rows through the API, retrieval, downloads, and views.
+
+## 17. Implemented schema (migrations 0011-0014, 2026-11-20)
+
+The sections above are the original design. This section is what the migrations create; where they differ, this section wins.
+
+### 17.1 Legal knowledge base (0011, 0012)
+
+- `legal_sources`: adds `external_id` (bdlaws Act ID) with `UNIQUE (source_name, external_id, language)`; `current_status` is set to `repealed` from the bdlaws title marker, otherwise `unknown`.
+- `legal_source_versions`: as designed; a version is searchable only when `review_status = 'approved'` and `is_current`.
+- `legal_sections` (new): per-section NFC text, `section_key`, `position`, `canonical_section_id` (shared by the bn and en record of a section), `status`, `status_basis`, `effective_from/to`, `source_url`, `content_hash` (SHA-256 of the raw scraped text).
+- `legal_chunks`: adds `legal_section_id`, `token_count`, `content_hash` (SHA-256 of the stored chunk text, used to reuse embeddings), `embedded_at`; `embedding` is NULL until embedded. Indexes: HNSW (`vector_cosine_ops`), GIN on `tsv` (`'simple'`), pending-embedding partial index.
+- RLS (forced): `app_user` may SELECT when `app.is_active_lawyer()`; `app_admin_ingest` may SELECT/INSERT and UPDATE only listed columns; no DELETE.
+- Approval (0012): `app.find_legal_reviewer(email)` and `app.approve_legal_source_version(version, email, note)` (SECURITY DEFINER, EXECUTE for `app_admin_ingest`) set `reviewed_by/reviewed_at` and write `legal_source_version.approved` to `audit_logs`.
+
+### 17.2 Case documents (0013)
+
+- `app.can_write_case(case_id)`: active lawyer member **and** case not closed. All insert/update policies on case-scoped tables below use it; reads use `app.is_lawyer_member(case_id)`.
+- `documents`: as section 6, plus `scan_status` value `not_configured` (development without a malware scanner; production refuses), `processed_at`, `UNIQUE (id, case_id)`; MIME allow-list PDF, PNG, JPEG, TIFF; size at most 20 MB. `storage_key` is `cases/{case_id}/documents/{document_id}` in the MinIO bucket from the environment.
+- `extracted_pages`: as section 6 (versioned, `ocr_confidence` per page), plus composite FK `(document_id, case_id)` and `UNIQUE (id, case_id)`; checks tie `ocr_engine` to `source_method = 'ocr'` and `edited_by` to `lawyer_edit`. Only `is_current` is updatable; a correction inserts a new version.
+- `document_chunks` is not created yet (Step D).
+- No client policy; no DELETE grant.
+
+### 17.3 Facts and AI runs (0014)
+
+- `ai_runs`: as section 9 with `case_id` required, run type `fact_extraction`, statuses `extraction_failed` and `not_configured`, `attempts`; stores provider, model, prompt version and an input hash, never prompts or document text.
+- `case_facts` (replaces the section 8 `case_facts` design):
+  - versioned: `lineage_id`, `version`, `supersedes_id`, `is_current`; `UNIQUE (lineage_id) WHERE is_current`. Content columns are never updated: an edit inserts a new version. Updatable: `is_current`, `review_status`, `review_note`, `reviewed_by`, `reviewed_at`.
+  - `category`: party, date, place, act_or_omission, document, relief_sought, other; `attributes` jsonb object.
+  - `statement_type` (AGENTS.md Rule 3): `document_says`, `lawyer_entered`, `ai_inference`, `assumption`. Only `origin = 'lawyer'` may be `lawyer_entered`.
+  - `origin` (provenance): `ai`, `ai_mock`, `lawyer`; `extraction_run_id` is set exactly when origin is not `lawyer`.
+  - `fact_status` (standing): `undisputed`, `disputed`, `needs_clarification`, `verified_record`. This replaces the section 8 values, which mixed statement type and standing.
+  - `source_check`: `passed`, `failed`, `not_applicable`. A `document_says` fact can be `lawyer_reviewed` only if `source_check = 'passed'`.
+  - `review_status`: `draft`, `lawyer_reviewed`, `lawyer_rejected`; reviewer and time are set exactly when not draft.
+- `case_fact_sources` (replaces `claim_sources` for facts): `source_kind` `document_page` or `lawyer_note`; `document_page` rows pin `document_id`, `page_id` (a specific `extracted_pages` version) and `page_no`, with the `quote` and its deterministic `quote_check`. Composite FKs on `(fact_id, case_id)`, `(document_id, case_id)`, `(page_id, case_id)`. Immutable.
+- `case_facts_for_analysis` (view, `security_invoker = true`, so RLS applies): current facts that are not rejected and are either `lawyer_entered` or `lawyer_reviewed`. Analysis reads facts only through this view.
+- RLS (forced) on all three tables: lawyer members read; inserts and updates need `app.can_write_case`; no client policy (Rule 8); no DELETE grant.
+
