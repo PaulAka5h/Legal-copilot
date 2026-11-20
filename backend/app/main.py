@@ -21,6 +21,7 @@ from app.documents.router import router as documents_router
 from app.facts.router import router as facts_router
 from app.case_analysis.router import router as analysis_router
 from app.strategy_tree.router import router as strategy_tree_router
+from app.hearing_updates.router import router as hearing_updates_router
 from app.logging_config import configure_logging
 
 
@@ -114,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(facts_router)
     app.include_router(analysis_router)
     app.include_router(strategy_tree_router)
+    app.include_router(hearing_updates_router)
     return app
 
 
