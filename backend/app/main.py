@@ -16,6 +16,8 @@ from app.lawyer.router import router as lawyer_router
 from app.client_portal.router import router as client_portal_router
 from app.cases.visibility_router import router as visibility_router
 from app.rag.search.router import router as research_router
+from app.documents.router import router as documents_router
+from app.facts.router import router as facts_router
 from app.logging_config import configure_logging
 
 
@@ -88,6 +90,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(client_portal_router)
     app.include_router(visibility_router)
     app.include_router(research_router)
+    app.include_router(documents_router)
+    app.include_router(facts_router)
     return app
 
 
