@@ -323,10 +323,10 @@ Security findings still open (medium/low):
 
 | Severity | Finding | Where | Planned fix |
 |---|---|---|---|
-| MEDIUM | DB pool exhaustion: `CaseAccessDep` holds a pooled connection for the whole request while upload/extraction open more; OCR has no Tesseract timeout and extraction has no batch cap, so ~8 concurrent long requests can stall the API | `app/auth/dependencies.py`, `app/documents/router.py`, `app/facts/service.py` | Short membership transaction; move processing and extraction to the ARQ worker; `pytesseract` timeouts; cap pages per extraction run; rate limits |
-| MEDIUM | Blocking calls on the event loop: `validate_upload` (PyMuPDF open/repair) and `store.put` run synchronously | `app/documents/router.py` | Wrap in `asyncio.to_thread` |
-| MEDIUM | A trivial quote (e.g. "the") passes the quote check, so an injected or careless fact can be confirmed as `document_says` with a meaningless source | `app/facts/schemas.py`, `app/facts/service.py` | Minimum quote length (~20 characters or 3 words) and key-term overlap between statement and quote |
-| MEDIUM | Case permissions not enforced: upload, page correction, extraction, and confirmation check membership only, not `can_upload` / `can_run_ai` (TRD, Security.md 5.1.3) | `app/documents/router.py`, `app/facts/router.py` | Check `access.role` and `access.permissions` as `app/cases/router.py` does |
+| FIXED | DB pool exhaustion: long routes (upload, extraction, later analysis/strategy/reassessment) use `CaseAccessShortDep` (membership in its own short transaction); bounded pool (10 + 10 overflow, 10 s timeout); Tesseract 60 s per-call timeout; at most 150 pages per extraction run. Still open: rate limits and moving work to ARQ | | |
+| FIXED | Blocking calls: `validate_upload` and `store.put` run in `asyncio.to_thread`; OCR and model calls already did | | |
+| FIXED | Trivial quotes: a quote must have at least 20 characters and 4 words to pass the check | | |
+| FIXED | Case permissions: upload and page correction need `can_upload`; extraction (and later analysis, strategy, reassessment) needs `can_run_ai`; lead lawyers have both | | |
 | LOW | Non-validation LLM errors (connection, timeout, HTTP status) return 500 and leave `ai_runs` as `running`; run start is not audited | `app/facts/service.py` | Catch all errors, `finish_run('failed', code)`, audit start and failure |
 | LOW | Concurrent page corrections or duplicate uploads hit UNIQUE constraints and return 500 (data stays consistent) | `app/documents/router.py` | `SELECT ... FOR UPDATE` on the current page; map `IntegrityError` to 409 |
 | LOW | Row committed before `store.put`; on a storage error the document is `failed` with no original, and re-upload is blocked by the duplicate check | `app/documents/router.py` | Store first, or exclude `storage_error` documents from the duplicate check |

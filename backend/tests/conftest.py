@@ -14,6 +14,11 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 APP_ORIGIN = "http://localhost:3000"
 
 load_dotenv(BACKEND_DIR / ".env")
+# Tests never reach external providers and never see provider keys, whatever .env says.
+for _secret in ("GEMINI_API_KEY",):
+    os.environ.pop(_secret, None)
+os.environ["LLM_PROVIDER"] = "mock"
+os.environ["LLM_APPROVED_PROVIDERS"] = "mock"
 
 
 @pytest.fixture
@@ -44,6 +49,9 @@ def api_client(local_app_user_database_url: str):
             app_origin=APP_ORIGIN,
             session_cookie_secure=True,
             minio_bucket=os.getenv("TEST_MINIO_BUCKET") or None,
+            # Tests never call external providers, whatever backend/.env says.
+            llm_provider="mock",
+            llm_approved_providers="mock",
         )
     )
     client = TestClient(

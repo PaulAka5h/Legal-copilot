@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, Body, File, Form, HTTPException, Path, R
 
 from app.auth.dependencies import require_same_origin, LawyerDep, SessionFactoryDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
-from app.cases.dependencies import CaseAccessDep
+import asyncio
+
+from app.cases.dependencies import CaseAccessDep, CaseAccessShortDep, require_case_permission
 from app.database import user_transaction
 from app.documents import repository as repo
 from app.documents.processing import ScannerNotConfigured, process_document, scan_status_for
@@ -56,16 +58,17 @@ async def _writable_case(session, case_id: UUID) -> UUID:
 )
 async def upload_document(
     request: Request,
-    access: CaseAccessDep,
+    access: CaseAccessShortDep,
     user: LawyerDep,
     session_factory: SessionFactoryDep,
     file: Annotated[UploadFile, File(description="The document file")],
     title: Annotated[str | None, Form(max_length=300, description="Display title; defaults to the filename")] = None,
 ) -> UploadResponse:
+    require_case_permission(access, "can_upload")
     settings = request.app.state.settings
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     try:
-        upload = validate_upload(data, settings.max_pdf_pages)
+        upload = await asyncio.to_thread(validate_upload, data, settings.max_pdf_pages)
         scan_status = scan_status_for(settings)
         store = get_store(settings)
     except DocumentRejected as error:
@@ -97,7 +100,7 @@ async def upload_document(
         )
 
     try:
-        store.put(key, data, upload.mime_type)
+        await asyncio.to_thread(store.put, key, data, upload.mime_type)
     except Exception as error:
         async with user_transaction(session_factory, user.id) as session:
             await repo.set_processing_state(session, document_id, processing_status="failed",
@@ -184,6 +187,7 @@ async def correct_page(
     page_no: Annotated[int, Path(ge=1, description="1-based page number")],
     payload: Annotated[PageCorrectionRequest, Body(description="Corrected text")],
 ) -> PageResponse:
+    require_case_permission(access, "can_upload")
     organization_id = await _writable_case(session, access.case_id)
     versions = await repo.page_versions(session, access.case_id, document_id, page_no)
     current = next((v for v in versions if v["is_current"]), None)

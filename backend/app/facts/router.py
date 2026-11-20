@@ -3,16 +3,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Body, HTTPException, Path, Query, Request, status
 
-from app.ai.llm import LLMNotConfigured, resolve_provider
+from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_provider
 from app.auth.dependencies import require_same_origin, LawyerDep, SessionFactoryDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
-from app.cases.dependencies import CaseAccessDep
+from app.cases.dependencies import CaseAccessDep, CaseAccessShortDep, require_case_permission
 from app.database import user_transaction
 from app.documents import repository as docs
 from app.errors import problem_responses
 from app.facts import repository as repo
 from app.facts import service
-from app.facts.extractor import LLMFactExtractor, MockFactExtractor
+from app.facts.extractor import FallbackFactExtractor, LLMFactExtractor, MockFactExtractor
 from app.facts.schemas import (
     ConfirmedFactSet,
     ExtractionRequest,
@@ -78,18 +78,24 @@ async def _audit(session, request: Request, user_id: UUID, case_id: UUID, action
 )
 async def extract_facts(
     request: Request,
-    access: CaseAccessDep,
+    access: CaseAccessShortDep,
     user: LawyerDep,
     session_factory: SessionFactoryDep,
     payload: Annotated[ExtractionRequest, Body(description="Which documents to read")],
 ) -> ExtractionResponse:
+    require_case_permission(access, "can_run_ai")
     try:
         llm = resolve_provider(request.app.state.settings, getattr(request.app.state, "llm_transport", None))
     except LLMNotConfigured as error:
         raise HTTPException(status_code=503, detail=f"NOT_CONFIGURED: {error}") from error
-    extractor = getattr(request.app.state, "fact_extractor", None) or (
-        MockFactExtractor() if llm is None else LLMFactExtractor(llm)
-    )
+    settings = request.app.state.settings
+    if llm is None:
+        default_extractor = MockFactExtractor()
+    elif mock_allowed(settings):
+        default_extractor = FallbackFactExtractor(LLMFactExtractor(llm), MockFactExtractor())
+    else:
+        default_extractor = LLMFactExtractor(llm)
+    extractor = getattr(request.app.state, "fact_extractor", None) or default_extractor
     async with user_transaction(session_factory, user.id) as session:
         organization_id = await _open_case(session, access.case_id)
     try:

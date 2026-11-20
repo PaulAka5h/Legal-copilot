@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # Object storage (MinIO / S3). Keys are cases/{case_id}/documents/{document_id}.
     minio_endpoint: str | None = None
     minio_access_key: str | None = None
-    minio_secret_key: str | None = None
+    minio_secret_key: SecretStr | None = None
     minio_bucket: str | None = None
     minio_secure: bool = False
 
@@ -40,11 +40,14 @@ class Settings(BaseSettings):
     sweep_stuck_documents_on_startup: bool = True
 
     # Fact extraction LLM. Only providers listed in DOCS/providers.md may be approved.
-    llm_provider: Literal["mock", "ollama"] = "mock"
+    llm_provider: Literal["mock", "ollama", "gemini"] = "mock"
     llm_approved_providers: str = "mock"
     llm_base_url: str | None = None
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(default=120, gt=0)
+    # Gemini: free tier, SYNTHETIC SAMPLE DATA ONLY (DOCS/providers.md); refused in production.
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str | None = None
 
     @property
     def secure_session_cookie(self) -> bool:

@@ -24,7 +24,9 @@ def create_database_engine(database_url: str) -> AsyncEngine:
     url = make_url(database_url)
     if url.drivername != "postgresql+asyncpg" or url.username != "app_user":
         raise ValueError("DATABASE_URL must use postgresql+asyncpg as app_user")
-    return create_async_engine(database_url, pool_pre_ping=True)
+    # Bounded pool with a short wait: when exhausted, requests fail fast (503)
+    # instead of queueing indefinitely behind slow work.
+    return create_async_engine(database_url, pool_pre_ping=True, pool_size=10, max_overflow=10, pool_timeout=10)
 
 
 async def verify_runtime_role(engine: AsyncEngine) -> None:

@@ -15,6 +15,7 @@ from app.rag.text import nfc
 MIN_TEXT_LAYER_CHARS = 25
 OCR_DPI = 300
 OCR_NOT_CONFIGURED = "not_configured"
+OCR_TIMEOUT_SECONDS = 60  # per call; a timeout fails processing instead of hanging
 
 
 @dataclass(frozen=True)
@@ -75,9 +76,10 @@ def _ocr(image, languages: str, engine: str | None) -> tuple[str, float | None, 
         return "", None, OCR_NOT_CONFIGURED
     import pytesseract
 
-    data = pytesseract.image_to_data(image, lang=languages, output_type=pytesseract.Output.DICT)
+    data = pytesseract.image_to_data(image, lang=languages, output_type=pytesseract.Output.DICT,
+                                     timeout=OCR_TIMEOUT_SECONDS)
     confidences = [float(c) for c, w in zip(data["conf"], data["text"]) if w.strip() and float(c) >= 0]
-    text = pytesseract.image_to_string(image, lang=languages)
+    text = pytesseract.image_to_string(image, lang=languages, timeout=OCR_TIMEOUT_SECONDS)
     confidence = round(sum(confidences) / len(confidences) / 100, 3) if confidences else 0.0
     return text, confidence, engine
 

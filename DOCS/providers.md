@@ -10,7 +10,8 @@ Last updated: 2026-11-16
 |---|---|---|---|
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
 | Ollama (local, OpenAI-compatible API at `LLM_BASE_URL=http://localhost:11434/v1`) | LLM for fact extraction | Client case data, **development only**; runs on this machine, no data leaves it | Approved by Arafath 2026-11-20 for development; see review record. Production use needs a full review |
-| (none yet) | External LLM | None | No external provider has been reviewed or approved |
+| Google Gemini API (free tier), model from `GEMINI_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Fallback chain: gemini -> mock (unusable provider or transport error); mock output is labelled `ai_mock` |
+| (none yet) | External LLM for client data | None | No external provider has been reviewed or approved for client case data |
 | self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
 | self-hosted `BAAI/bge-reranker-v2-m3` (optional) | Reranking legal search results | Runs on our own hardware; no external data transfer | Optional via `RERANKER_PROVIDER`; default is the mock reranker |
 | Kaggle Notebooks (GPU compute) | Running the same e5-large model for the legal knowledge base | Public statute text from `legal_chunks` only (exported by `app.rag.embed export`); never case documents, client data, or prompts | Directed by Arafath 2026-11-20 for legal KB embeddings only; review checklist below not completed |
@@ -112,6 +113,22 @@ Counsel sign-off (name, date) or "not required for this data class":
 Checklist answers: (link to the filled table)
 Conditions: (for example "retention disabled", "zero data retention enabled")
 Next review due:
+```
+
+```
+Provider and product: Google Gemini API (Generative Language API), free tier
+Region: Google-managed; not controlled
+Data class approved: Synthetic only (SAMPLE_DATA_NOT_REAL_LAW). Real client documents must not be uploaded to any
+  environment where LLM_PROVIDER=gemini.
+Review date: 2026-11-20
+Reviewer: Arafath (Backend Dev 2)
+Counsel sign-off: not required for synthetic data; required (and not given) for any other data class
+Conditions: refused when APP_ENV=production (enforced in code); key in a header, never in URLs or logs;
+  Settings.gemini_api_key is a SecretStr; temperature 0; JSON-schema output validated with Pydantic;
+  tests never call Gemini (conftest removes the key).
+Incident 2026-11-20: the key was printed in a pytest failure message during development; reprs were fixed
+  (SecretStr, repr=False). The key must be rotated.
+Next review due: before any non-synthetic use.
 ```
 
 ## Environment settings

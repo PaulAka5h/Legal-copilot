@@ -156,11 +156,15 @@ def test_document_text_is_data_and_never_logged(api_client, caplog):
 
 # ------------------------------------------------------------- providers
 def test_provider_rules_and_ollama_json_schema_call():
+    assert resolve_provider(Settings(llm_provider="ollama", llm_approved_providers="mock")) is None  # -> mock
     with pytest.raises(LLMNotConfigured):
-        resolve_provider(Settings(llm_provider="ollama", llm_approved_providers="mock"))
+        resolve_provider(Settings(llm_provider="ollama", llm_approved_providers="ollama"))
     with pytest.raises(LLMNotConfigured):
         resolve_provider(Settings(llm_provider="ollama", llm_approved_providers="ollama",
                                   llm_base_url="http://10.0.0.5:11434/v1", llm_model="m"))
+    with pytest.raises(LLMNotConfigured):  # gemini is synthetic-only: never production
+        resolve_provider(Settings(app_env="production", llm_provider="gemini", llm_approved_providers="gemini",
+                                  gemini_api_key="k", gemini_model="m"))
     with pytest.raises(LLMNotConfigured):
         resolve_provider(Settings(app_env="production", llm_provider="mock", llm_approved_providers="mock"))
     assert resolve_provider(Settings()) is None  # mock in development

@@ -124,3 +124,30 @@ class MockFactExtractor:
                 if len(facts) >= 50:
                     break
         return json.dumps({"facts": facts}, ensure_ascii=False)
+
+
+class FallbackFactExtractor:
+    """Fallback chain gemini/ollama -> mock per batch on transport errors.
+
+    Invalid JSON is not a transport error: it goes through the normal one-retry
+    path. `last_origin` tells the service which extractor produced the batch, so
+    mock output is always labelled ai_mock.
+    """
+
+    def __init__(self, primary: "FactExtractor", fallback: "FactExtractor"):
+        self.primary, self.fallback = primary, fallback
+        self.origin, self.provider, self.model = primary.origin, primary.provider, primary.model
+        self.last_origin = primary.origin
+        self.fallbacks = 0
+
+    def extract_batch(self, pages: list[PageInput]) -> str:
+        import httpx
+
+        try:
+            raw = self.primary.extract_batch(pages)
+            self.last_origin = self.primary.origin
+            return raw
+        except httpx.HTTPError:
+            self.fallbacks += 1
+            self.last_origin = self.fallback.origin
+            return self.fallback.extract_batch(pages)

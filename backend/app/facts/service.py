@@ -25,6 +25,9 @@ from app.facts.schemas import ExtractionOutput, FactSourceIn
 from app.rag.text import normalize_for_match, quote_in_text
 
 MAX_ATTEMPTS = 2  # first try plus one retry
+MAX_PAGES_PER_RUN = 150
+MIN_QUOTE_CHARS = 20
+MIN_QUOTE_WORDS = 4
 
 
 class FactError(Exception):
@@ -51,12 +54,18 @@ def _input_hash(pages: list[PageInput]) -> bytes:
     return digest.digest()
 
 
+def substantive_quote(quote: str) -> bool:
+    """A quote must be long enough to support a fact (stops trivial quotes such as "the")."""
+    normalized = normalize_for_match(quote)
+    return len(normalized) >= MIN_QUOTE_CHARS and len(normalized.split()) >= MIN_QUOTE_WORDS
+
+
 def check_sources(statement_type: str, sources: list[dict], pages: dict[tuple[UUID, int], PageInput]) -> tuple[str, list[dict]]:
     """Attach page ids and quote_check to each source; return (fact source_check, sources)."""
     checked = []
     for source in sources:
         page = pages.get((UUID(str(source["document_id"])), source["page_no"]))
-        passed = page is not None and quote_in_text(source["quote"], page.text)
+        passed = page is not None and substantive_quote(source["quote"]) and quote_in_text(source["quote"], page.text)
         checked.append({**source, "page_id": page.page_id if page else None,
                         "quote_check": "passed" if passed else "failed"})
     if not checked:
@@ -89,6 +98,8 @@ async def run_extraction(
                  for r in rows if r["text"].strip()]
         if not pages:
             raise FactError(409, "No processed page text to read in the selected documents.")
+        if len(pages) > MAX_PAGES_PER_RUN:
+            raise FactError(422, f"Select documents with at most {MAX_PAGES_PER_RUN} pages per extraction run.")
         run_id = await repo.create_run(session, {
             "case_id": case_id, "organization_id": organization_id, "requested_by": user_id,
             "provider": extractor.provider, "model": extractor.model, "prompt_version": PROMPT_VERSION,
@@ -113,6 +124,7 @@ async def run_extraction(
                     request_id=None, details={"attempts": attempts_total, "pages": len(pages)},
                 )
             return ExtractionResult(run_id, "extraction_failed", attempts_total, len(pages), [], 0)
+        batch_origin = getattr(extractor, "last_origin", extractor.origin)
         batch_pages_by_key = {(p.document_id, p.page_no): p for p in batch}
         for fact in output.facts:
             key = (fact.category, normalize_for_match(fact.statement))
@@ -122,7 +134,7 @@ async def run_extraction(
             source_check, sources = check_sources(
                 fact.statement_type, [s.model_dump() for s in fact.sources], batch_pages_by_key
             )
-            planned.append({"fact": fact, "source_check": source_check, "sources": sources})
+            planned.append({"fact": fact, "source_check": source_check, "sources": sources, "origin": batch_origin})
 
     fact_ids: list[UUID] = []
     async with user_transaction(session_factory, user_id) as session:
@@ -132,7 +144,7 @@ async def run_extraction(
                 "case_id": case_id, "organization_id": organization_id, "lineage_id": uuid4(), "version": 1,
                 "supersedes_id": None, "category": fact.category, "statement": fact.statement,
                 "attributes": fact.attributes.model_dump(exclude_none=True),
-                "statement_type": fact.statement_type, "fact_status": "undisputed", "origin": extractor.origin,
+                "statement_type": fact.statement_type, "fact_status": "undisputed", "origin": item["origin"],
                 "source_check": item["source_check"], "extraction_run_id": run_id, "created_by": user_id,
             })
             for source in item["sources"]:
@@ -144,7 +156,8 @@ async def run_extraction(
             session, action="facts.extracted", actor_user_id=user_id, actor_role="lawyer", object_type="ai_run",
             object_id=run_id, case_id=case_id, ip_address=None, user_agent=None, request_id=None,
             details={"facts": len(fact_ids), "source_check_failed": failed, "pages": len(pages),
-                     "attempts": attempts_total, "origin": extractor.origin},
+                     "attempts": attempts_total, "origin": extractor.origin,
+                     "fallback_batches": getattr(extractor, "fallbacks", 0)},
         )
     return ExtractionResult(run_id, "succeeded", attempts_total, len(pages), fact_ids, failed)
 
