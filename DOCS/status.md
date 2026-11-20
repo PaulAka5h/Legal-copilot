@@ -335,3 +335,18 @@ Security findings still open (medium/low):
 | LOW | Document and page reads are not audited (Security.md section 10) | `app/documents/router.py` | Audit page views |
 - Commit history: the document and fact router registration lines were split into their own commit (`8548623f`). `26e2c882` (C1) and `69ff6836` (C2/C3) contain their modules only, so their endpoint tests pass only from `8548623f` on. `afef5b21` and `5e7a6183` were committed while the legacy test `tests/documents/test_pipeline.py::test_full_pipeline_with_image` failed (it OCRed a blank image); fixed in `f2ea7b08`.
 
+
+## Open at end of 2026-11-20 session (Steps D–G deadline)
+
+- DONE and committed: Step D (065b21f4), Step E (ef2bafcf), Step F (e125f83c). Suite: 193 passed, 1 skipped.
+- Step G, partial: `backend/eval/` holds the labelled synthetic set (19 English and 11 Bangla patterns,
+  SAMPLE_DATA_NOT_REAL_LAW) and the one-command runner `uv run python -m eval.run [--provider gemini] --write`.
+  NOT yet run on the full set: the CPU embedding of Acts 46/75/26/86/88/36/835/901/952 was still in progress,
+  and a 3-pattern smoke run gave recall 0 because those chunks had no embeddings yet. Approve those versions after
+  embedding, then run the eval to write DOCS/eval_results.md.
+- TODO: update DOCS/AI_AGENTS.md (missing) and database.md section 17 (migrations 0015–0018).
+- Frontend integration NOT started beyond type generation: `backend/scripts/export_openapi.py` → `frontend/openapi.json`,
+  `npm run gen:api` → `src/lib/api/schema.d.ts` (openapi-typescript 7.13.0). Still to do: real backend auth/session,
+  replace lib/mock data in lib/api/{lawyer,client}.ts, add the analysis, strategy, hearing-update, fact and upload
+  sections inside MatterWorkspace, demo-data fallback label, then npm run lint and npm run build.
+- Security: rotate the Gemini API key (it was exposed in an earlier test failure output).
