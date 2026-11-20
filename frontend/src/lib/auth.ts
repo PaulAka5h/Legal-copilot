@@ -1,10 +1,31 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { backendFetch, readProblem, relaySessionCookie } from "./api/backendClient";
+import {
+  BackendUnavailable,
+  backendRequest,
+} from "./api/backendClient";
 import { dictionaries } from "./i18n";
 import { getLanguage } from "./language";
-import { isMockAuthEnabled, setMockSession } from "./session";
+import {
+  isMockAuthEnabled,
+  setMockSession,
+  signInWithBackend,
+} from "./session";
+
+type Problem = {
+  status?: number;
+  errors?: Array<{ loc?: Array<string | number> }>;
+};
+
+async function readProblem(response: Response): Promise<Problem> {
+  try {
+    const problem = (await response.json()) as Problem;
+    return { ...problem, status: problem.status ?? response.status };
+  } catch {
+    return { status: response.status };
+  }
+}
 
 export type SignUpField =
   | "fullName"
@@ -54,16 +75,23 @@ export async function signUpLawyer(
     redirect("/lawyer/dashboard");
   }
 
-  const response = await backendFetch("/api/v1/auth/register", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      full_name: text("fullName"),
-      email,
-      password,
-      preferred_language: await getLanguage(),
-    }),
-  });
+  let response: Response;
+  try {
+    response = await backendRequest("/api/v1/auth/register", {
+      method: "POST",
+      json: {
+        full_name: text("fullName"),
+        email,
+        password,
+        preferred_language: await getLanguage(),
+      },
+    });
+  } catch (error) {
+    if (error instanceof BackendUnavailable) {
+      return { status: "error", message: copy.errors.general };
+    }
+    throw error;
+  }
   if (!response.ok) {
     const problem = await readProblem(response);
     const field = problem.errors?.[0]?.loc?.at(-1);
@@ -73,12 +101,9 @@ export async function signUpLawyer(
     return { status: "invalid", errors };
   }
 
-  const login = await backendFetch("/api/v1/auth/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!login.ok) return { status: "error", message: copy.errors.general };
-  await relaySessionCookie(login);
+  const login = await signInWithBackend(email, password);
+  if (!login || "status" in login) {
+    return { status: "error", message: copy.errors.general };
+  }
   redirect("/lawyer/dashboard");
 }

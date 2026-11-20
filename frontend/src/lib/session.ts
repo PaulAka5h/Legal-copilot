@@ -34,6 +34,10 @@ export function isMockAuthEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.MOCK_AUTH === "true";
 }
 
+export async function hasSessionCookie(): Promise<boolean> {
+  return Boolean((await cookies()).get(SESSION_COOKIE)?.value);
+}
+
 function roleFor(user: Api["UserResponse"]): Role {
   return user.role === "client" ? "client" : "lawyer";
 }

@@ -41,11 +41,11 @@ export default async function ClientLoginPage() {
           INVALID: common.loginInvalid,
           UNAVAILABLE: common.loginUnavailable,
         }}>
-        <Field label={copy.clientId} icon="user">
+        <Field label={copy.email} icon="user">
           <input
-            name="clientId"
-            defaultValue={SAMPLE_CLIENT_LOGIN.clientId}
-            aria-label={copy.clientId}
+            name="email"
+            defaultValue={SAMPLE_CLIENT_LOGIN.email}
+            aria-label={copy.email}
             autoComplete="username"
           />
         </Field>
