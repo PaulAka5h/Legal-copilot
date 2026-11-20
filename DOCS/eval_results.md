@@ -26,7 +26,7 @@ Retrieval misses at 10 (mock run): en-09, en-10, en-13, en-14
 
 ## Reading the results (2026-11-20)
 
-- Retrieval is the same for both providers (the model is not involved): Recall@10 0.867 (Bangla 1.0, English 0.789), MRR@10 0.67. The four English misses are Contract Act ss. 15/17 and Specific Relief Act ss. 9/12: these short definition sections lose to longer neighbouring sections. A cross-encoder reranker is the next step.
+- Retrieval is the same for both providers (the model is not involved): Recall@10 0.867 (Bangla 1.0, English 0.789), MRR@10 0.67. The four English misses are Contract Act ss. 15/17 and Specific Relief Act ss. 9/12. The cause has not been investigated yet; trying a cross-encoder reranker is a candidate next step.
 - One pattern abstains (`insufficient_information`): 0.033.
 - Gemini free tier: most mock fallbacks are provider errors (rate limits and 5xx: 9 of 29 analysis calls, 21 of 29 strategy calls), not invalid output. Every analysis answer the model returned validated. Strategy answers validated 3 of 8 times; the nested 3-ply schema is the weak point. Only 10% of patterns got both analysis and strategy from the model. Every fallback is labelled `ai_mock` in the product.
 - Citation verification on Gemini output: 0.833. Failed citations are kept, marked unverified and capped at `insufficient`. They are never shown as verified.
