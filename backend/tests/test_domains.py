@@ -75,10 +75,6 @@ def test_client_and_case_endpoints_enforce_tenant_isolation(api_client) -> None:
     second_client = TestClient(
         create_app(api_client.app.state.settings),
         base_url="https://testserver",
-        client=(
-            f"127.0.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}",
-            50002,
-        ),
     )
     with second_client:
         register_and_login(second_client)
@@ -236,10 +232,6 @@ def test_case_scoped_rls_hides_other_users_rows(api_client) -> None:
     second_client = TestClient(
         create_app(api_client.app.state.settings),
         base_url="https://testserver",
-        client=(
-            f"127.0.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}",
-            50003,
-        ),
     )
     with second_client:
         register_and_login(second_client)

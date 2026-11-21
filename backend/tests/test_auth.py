@@ -207,10 +207,6 @@ def test_logout_all_revokes_sessions_on_other_clients(api_client) -> None:
     second_client = TestClient(
         create_app(api_client.app.state.settings),
         base_url="https://testserver",
-        client=(
-            f"127.0.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}",
-            50001,
-        ),
     )
     with second_client:
         second_login = second_client.post(

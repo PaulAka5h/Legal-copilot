@@ -164,8 +164,7 @@ def test_oversized_bodies_are_refused_before_authentication(api_client):
 
     from app.main import create_app
 
-    anonymous = TestClient(create_app(api_client.app.state.settings), base_url="https://testserver",
-                           client=("127.0.9.1", 50000))
+    anonymous = TestClient(create_app(api_client.app.state.settings), base_url="https://testserver")
     url = "/api/v1/lawyer/cases/00000000-0000-0000-0000-000000000000/documents"
     with anonymous:
         declared = anonymous.post(url, headers={**ORIGIN, "Content-Type": "application/octet-stream"},

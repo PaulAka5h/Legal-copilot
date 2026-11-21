@@ -47,8 +47,7 @@ def sample_png(text_line: str) -> bytes:
 
 
 def new_client(app_client: TestClient, octet: int) -> TestClient:
-    return TestClient(create_app(app_client.app.state.settings), base_url="https://testserver",
-                      client=(f"127.0.6.{octet}", 50000))
+    return TestClient(create_app(app_client.app.state.settings), base_url="https://testserver")
 
 
 def lawyer_with_case(client: TestClient, label: str) -> tuple[UUID, str]:
