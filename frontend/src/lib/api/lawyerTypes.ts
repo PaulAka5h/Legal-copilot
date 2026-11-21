@@ -156,20 +156,32 @@ export type NewClientInput = {
   name: string;
   phone: string;
   email: string;
+  /** Empty: the backend generates a temporary password. */
+  password: string;
+  /** Empty: no case is linked. */
+  caseId: string;
 };
 
+/** Shown to the lawyer once; never stored by the frontend. */
 export type ClientCredentials = {
   name: string;
-  clientId: string;
+  email: string;
   password: string;
+  linkedCaseTitle: string | null;
 };
+
+export type CreateClientError = "invalid" | "password" | "email_taken" | "case" | "general";
 
 export type CreateClientState =
   | null
   | ({ status: "ok" } & ClientCredentials)
-  | { status: "error" };
+  | { status: "error"; reason: CreateClientError };
 
-export type ResetPasswordState = { status: "NOT_CONFIGURED" };
+export type ResetPasswordState =
+  | null
+  | { status: "ok"; email: string; password: string }
+  | { status: "error" }
+  | { status: "NOT_CONFIGURED" };
 
 // Case intelligence (Steps C–F). Statement types and strengths follow AGENTS.md Rules 3 and 4.
 export type Strength = "strong" | "moderate" | "weak" | "insufficient";

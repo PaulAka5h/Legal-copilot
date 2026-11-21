@@ -84,6 +84,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password/change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the signed-in user's password
+         * @description Verifies the current password and sets a new one (at least 12 characters, different from the current one). Clears the PASSWORD_CHANGE_REQUIRED state of a lawyer-set temporary password and revokes the user's other sessions. Allowed while a password change is required.
+         */
+        post: operations["change_password_api_v1_auth_password_change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password/forgot": {
         parameters: {
             query?: never;
@@ -258,10 +278,30 @@ export interface paths {
         get: operations["list_clients_endpoint_api_v1_clients_get"];
         put?: never;
         /**
-         * Create a client profile
-         * @description Creates a lawyer-managed client profile in the active organization.
+         * Create a client profile and portal login
+         * @description Creates a lawyer-managed client profile in the active organization. When an email is given, it also creates the client's portal login: the lawyer's `password` (12+ characters) or, if empty, a generated 16-character one. The plain password is returned once in `temporary_password` and is never stored or logged; the client must change it at first sign-in (PASSWORD_CHANGE_REQUIRED). With `case_id`, the client is linked to that case at once (lead lawyer of an open case only), so no invitation is needed.
          */
         post: operations["create_client_endpoint_api_v1_clients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clients/{client_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset a client's portal password
+         * @description Generates a new 16-character temporary password, signs the client out of every session, and requires a password change at next sign-in. Creates the login first if the client has an email but no login yet. The plain password is returned once and is never stored or logged.
+         */
+        post: operations["reset_client_password_endpoint_api_v1_clients__client_id__password_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1700,12 +1740,66 @@ export interface components {
         ClientCreate: {
             /** Display Name */
             display_name: string;
-            /** Email */
+            /**
+             * Email
+             * @description Sign-in email. When given, a client login is created.
+             */
             email?: string | null;
             /** Phone */
             phone?: string | null;
             /** Address */
             address?: string | null;
+            /**
+             * Password
+             * @description Optional temporary password (12+ characters). Empty means the server generates one. The client must change it at first sign-in.
+             */
+            password?: string | null;
+            /**
+             * Case Id
+             * @description Optional case to link the client to (lead lawyer only).
+             */
+            case_id?: string | null;
+        };
+        /** ClientCreatedResponse */
+        ClientCreatedResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Address */
+            address: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Has Account
+             * @description True when the client has a portal login.
+             */
+            has_account: boolean;
+            /**
+             * Temporary Password
+             * @description Shown once. Present when a login was created; never stored or retrievable again.
+             */
+            temporary_password: string | null;
+            /**
+             * Linked Case Id
+             * @description The case the client was linked to, if one was chosen.
+             */
+            linked_case_id: string | null;
         };
         /** ClientDocumentResponse */
         ClientDocumentResponse: {
@@ -1765,6 +1859,34 @@ export interface components {
              */
             created_at: string;
         };
+        /** ClientPasswordResetResponse */
+        ClientPasswordResetResponse: {
+            /**
+             * Client Id
+             * Format: uuid
+             */
+            client_id: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Temporary Password
+             * @description Shown once; never stored.
+             */
+            temporary_password: string;
+            /**
+             * Created Account
+             * @description True when this call created the client's first login.
+             */
+            created_account: boolean;
+            /**
+             * Sessions Revoked
+             * @description Client sessions that were signed out.
+             */
+            sessions_revoked: number;
+        };
         /** ClientPatch */
         ClientPatch: {
             /** Display Name */
@@ -1801,6 +1923,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Has Account
+             * @description True when the client has a portal login.
+             */
+            has_account: boolean;
         };
         /** ClientTaskCreate */
         ClientTaskCreate: {
@@ -2563,6 +2690,13 @@ export interface components {
              */
             created_at: string;
         };
+        /** PasswordChangeRequest */
+        PasswordChangeRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
         /** PasswordForgotRequest */
         PasswordForgotRequest: {
             /**
@@ -3058,6 +3192,12 @@ export interface components {
              * @enum {string}
              */
             preferred_language: "en" | "bn";
+            /**
+             * Must Change Password
+             * @description True until the user replaces a password a lawyer set for them.
+             * @default false
+             */
+            must_change_password: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -3500,6 +3640,155 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_password_change_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4590,7 +4879,205 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClientResponse"];
+                    "application/json": components["schemas"]["ClientCreatedResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    reset_client_password_endpoint_api_v1_clients__client_id__password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Client profile ID */
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientPasswordResetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
                 };
             };
             /** @description Unauthorized */

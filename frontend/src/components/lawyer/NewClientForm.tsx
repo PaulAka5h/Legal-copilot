@@ -5,26 +5,74 @@ import { useActionState, useState } from "react";
 import { createClientAction } from "@/app/lawyer/actions";
 import { Field } from "@/components/Field";
 import { Icon } from "@/components/Icon";
-import type { CreateClientState } from "@/lib/api/lawyer";
+import type { CreateClientError, CreateClientState } from "@/lib/api/lawyer";
 import { dictionaries, format, type Language } from "@/lib/i18n";
 
-export function NewClientForm({ language }: { language: Language }) {
+export type CaseOption = { id: string; title: string };
+
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const GENERATED_LENGTH = 16;
+
+/** 16 letters and digits from the browser CSPRNG, without modulo bias. */
+function generatePassword(): string {
+  const limit = 256 - (256 % ALPHABET.length);
+  let password = "";
+  while (password.length < GENERATED_LENGTH) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(32))) {
+      if (byte < limit && password.length < GENERATED_LENGTH) {
+        password += ALPHABET[byte % ALPHABET.length];
+      }
+    }
+  }
+  return password;
+}
+
+function CredentialRow({
+  label,
+  value,
+  copyLabel,
+  copiedLabel,
+}: {
+  label: string;
+  value: string;
+  copyLabel: string;
+  copiedLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <div>
+      <small>{label}</small>
+      <b className="credential-value">{value}</b>
+      <button type="button" onClick={copy} aria-label={`${copyLabel} ${label}`}>
+        <Icon name="copy" size={18} />
+        {copied ? copiedLabel : copyLabel}
+      </button>
+    </div>
+  );
+}
+
+export function NewClientForm({
+  language,
+  cases,
+}: {
+  language: Language;
+  cases: CaseOption[];
+}) {
   const copy = dictionaries[language].newClient;
-  const [state, formAction] = useActionState<CreateClientState, FormData>(
+  const [state, formAction, pending] = useActionState<CreateClientState, FormData>(
     createClientAction,
     null,
   );
   const [dismissed, setDismissed] = useState(false);
-  const [copied, setCopied] = useState<"id" | "password" | null>(null);
-
-  async function copyValue(value: string, field: "id" | "password") {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(field);
-    } catch {
-      return;
-    }
-  }
+  const [password, setPassword] = useState("");
 
   if (state?.status === "ok" && !dismissed) {
     return (
@@ -38,45 +86,35 @@ export function NewClientForm({ language }: { language: Language }) {
           <p>{copy.shareWithClient}</p>
 
           <div className="credentials">
-            <div>
-              <small>{copy.clientId}</small>
-              <b>{state.clientId}</b>
-              <button
-                type="button"
-                onClick={() => copyValue(state.clientId, "id")}
-                aria-label={`${copy.copy} ${copy.clientId}`}
-              >
-                <Icon name="copy" size={18} />
-                {copied === "id" ? copy.copied : copy.copy}
-              </button>
-            </div>
-            <div>
-              <small>{copy.temporaryPassword}</small>
-              <b>{state.password}</b>
-              <button
-                type="button"
-                onClick={() => copyValue(state.password, "password")}
-                aria-label={`${copy.copy} ${copy.temporaryPassword}`}
-              >
-                <Icon name="copy" size={18} />
-                {copied === "password" ? copy.copied : copy.copy}
-              </button>
-            </div>
+            <CredentialRow
+              label={copy.signInEmail}
+              value={state.email}
+              copyLabel={copy.copy}
+              copiedLabel={copy.copied}
+            />
+            <CredentialRow
+              label={copy.temporaryPassword}
+              value={state.password}
+              copyLabel={copy.copy}
+              copiedLabel={copy.copied}
+            />
           </div>
 
-          <div className="security-callout">
+          <div className="security-callout" role="note">
             <Icon name="lock" size={18} />
             {copy.securityCallout}
           </div>
 
-          <p className="mock-note">{copy.mockGenerated}</p>
+          {state.linkedCaseTitle ? (
+            <p>{format(copy.linkedCase, { title: state.linkedCaseTitle })}</p>
+          ) : null}
 
           <button
             className="primary-button"
             type="button"
             onClick={() => {
               setDismissed(true);
-              setCopied(null);
+              setPassword("");
             }}
           >
             {copy.addAnother}
@@ -87,6 +125,14 @@ export function NewClientForm({ language }: { language: Language }) {
     );
   }
 
+  const errors: Record<CreateClientError, string> = {
+    invalid: copy.error,
+    general: copy.error,
+    password: copy.passwordError,
+    email_taken: copy.emailTaken,
+    case: copy.caseError,
+  };
+
   return (
     <form
       className="panel client-form"
@@ -95,9 +141,7 @@ export function NewClientForm({ language }: { language: Language }) {
     >
       {state?.status === "error" ? (
         <p className="form-error" role="alert">
-          {"message" in state && state.message === "organization"
-            ? copy.organizationError
-            : copy.error}
+          {errors[state.reason]}
         </p>
       ) : null}
 
@@ -135,8 +179,49 @@ export function NewClientForm({ language }: { language: Language }) {
             type="email"
             required
             placeholder={copy.emailPlaceholder}
-            autoComplete="email"
+            autoComplete="off"
           />
+        </Field>
+        <div>
+          <Field
+            label={copy.password}
+            icon="lock"
+            action={
+              <button
+                type="button"
+                className="field-action text-action"
+                onClick={() => setPassword(generatePassword())}
+              >
+                {copy.generate}
+              </button>
+            }
+          >
+            <input
+              name="password"
+              type="text"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={12}
+              maxLength={256}
+              placeholder={copy.passwordPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              aria-describedby="client-password-hint"
+            />
+          </Field>
+          <small className="field-hint" id="client-password-hint">
+            {copy.passwordHint}
+          </small>
+        </div>
+        <Field label={copy.caseLabel}>
+          <select name="caseId" defaultValue="">
+            <option value="">{copy.noCase}</option>
+            {cases.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 
@@ -144,7 +229,7 @@ export function NewClientForm({ language }: { language: Language }) {
         <Link className="ghost-button" href="/lawyer/clients">
           {copy.cancel}
         </Link>
-        <button className="primary-button fit" type="submit">
+        <button className="primary-button fit" type="submit" disabled={pending}>
           {copy.save}
           <Icon name="arrow" size={18} />
         </button>

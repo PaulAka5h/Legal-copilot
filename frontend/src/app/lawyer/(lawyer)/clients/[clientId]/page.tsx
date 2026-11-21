@@ -60,7 +60,7 @@ export default async function ClientDetailPage({
             <h2>{copy.clientDetail.casesTitle}</h2>
             <p>{copy.clientDetail.casesSub}</p>
           </div>
-          <ResetPasswordButton language={language} />
+          <ResetPasswordButton language={language} clientId={client.id} />
         </div>
 
         {client.cases.length ? (

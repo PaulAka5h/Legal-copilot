@@ -15,6 +15,7 @@ import {
   getDocumentStatus,
   getHearingSummary,
   rejectFact,
+  resetClientPassword,
   runAnalysis,
   runStrategy,
   saveHearingSummaryVersion,
@@ -27,6 +28,7 @@ import {
   type CreateClientState,
   type DocumentStatus,
   type FactCategory,
+  type ResetPasswordState,
   type SummarySection,
   type Verification,
 } from "@/lib/api/lawyer";
@@ -337,22 +339,32 @@ export async function createClientAction(
   formData: FormData,
 ): Promise<CreateClientState> {
   const session = await getSession();
-  if (!session || session.role !== "lawyer") return { status: "error" };
+  if (!session || session.role !== "lawyer") return { status: "error", reason: "general" };
 
-  const language = await getLanguage();
-  const client = await createClient(
-    {
-      name: String(formData.get("name") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
-      email: String(formData.get("email") ?? ""),
-    },
-    dictionaries[language].newClient.invitationPassword,
-  );
+  const result = await createClient({
+    name: String(formData.get("name") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    // Passwords are never trimmed.
+    password: String(formData.get("password") ?? ""),
+    caseId: String(formData.get("caseId") ?? ""),
+  });
 
-  if (!client) return { status: "error" };
+  if ("error" in result) return { status: "error", reason: result.error };
 
   revalidatePath("/lawyer/clients");
   revalidatePath("/lawyer/dashboard");
 
-  return { status: "ok", ...client };
+  return { status: "ok", ...result };
+}
+
+export async function resetClientPasswordAction(
+  _state: ResetPasswordState,
+  formData: FormData,
+): Promise<ResetPasswordState> {
+  const session = await getSession();
+  if (!session || session.role !== "lawyer") return { status: "error" };
+  const clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) return { status: "error" };
+  return resetClientPassword(clientId);
 }

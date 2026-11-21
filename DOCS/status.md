@@ -361,5 +361,26 @@ Done and committed: Step D case analysis (065b21f4), Step E strategy tree (ef2ba
 | Retrieval | English misses at 10 (en-09, en-10, en-13, en-14: Contract Act ss. 15/17, Specific Relief Act ss. 12/9). |
 | Frontend | Case stage changes are not stored by the backend (the picker reports this). Edited hearing-summary versions are demo-only; with the backend, the lawyer approves (publishes) the generated client update. |
 | Frontend | The API has no client name on cases, no client↔case count on client lists, no lawyer contact for clients, and no hearing link on documents (documents are shown under the latest hearing before their upload date). |
-| Frontend | Document retry only refreshes status; the backend has no reprocess endpoint. Client password reset reports NOT_CONFIGURED (clients set a password from their invitation). |
+| Frontend | Document retry only refreshes status; the backend has no reprocess endpoint. |
 | Frontend | With a real session and the backend down, users are sent to sign-in (which reports the server is unreachable); the demo fallback is reachable only under development mock sign-in. |
+
+## Client onboarding without email (2026-11-22)
+
+Lawyers create the client's portal login directly; invitations are optional.
+
+- Migration `0020_client_password_onboarding`: `users.must_change_password`; `app.lookup_session` returns it;
+  SECURITY DEFINER `app.set_client_temporary_password` (create or reset a client login, org lawyers only;
+  reset revokes the client's sessions and unused reset tokens) and `app.complete_password_change` (clears the
+  flag, revokes the user's other sessions); `app.accept_case_invitation` accepts profiles that already have a login.
+- `POST /api/v1/clients`: optional `password` (12+ chars; empty = 16 random letters+digits from `secrets`) and
+  `case_id` (lead lawyer, open case). The plain password is returned once (`temporary_password`, `no-store`);
+  only the Argon2 hash is stored. Audit: `client.account_created`, `case.client_linked` (no password).
+- `POST /api/v1/clients/{id}/password-reset`: new temporary password, shown once; audit `client.password_reset`.
+- While `must_change_password` is set, every endpoint except `POST /api/v1/auth/password/change`, `/logout`,
+  and `/logout-all` returns 403 `PASSWORD_CHANGE_REQUIRED`. Login returns `must_change_password`.
+- Frontend: New Client form has an optional password with Generate and an optional case; credentials (email +
+  password) are shown once with Copy. Client portal redirects to `/client/set-password`. Client detail page
+  "Reset password" is live.
+- Tests: `backend/tests/test_client_password.py` (7). Auth, invitation, and isolation suites still pass.
+  `tests/test_analysis.py::test_analysis_falls_back_to_keyword_search_and_is_labelled` fails locally with and
+  without this change (pre-existing).
