@@ -9,7 +9,7 @@ import { MockLoginForm } from "@/components/MockLoginForm";
 import { PasswordField } from "@/components/PasswordField";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { getSession } from "@/lib/session";
+import { getSession, readyDestination } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -18,9 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function LawyerLoginPage() {
   const session = await getSession();
-  if (session) {
-    redirect(session.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard");
-  }
+  const destination = await readyDestination(session);
+  if (destination) redirect(destination);
 
   const language = await getLanguage();
   const copy = dictionaries[language].lawyer;

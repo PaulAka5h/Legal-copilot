@@ -8,6 +8,7 @@ import {
 import { ClientDocuments } from "@/components/client/ClientDocuments";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
+import { SignOutButton } from "@/components/SignOutButton";
 import { getClientCase } from "@/lib/api/client";
 import {
   dictionaries,
@@ -18,7 +19,6 @@ import {
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { usedDemoData } from "@/lib/api/backendClient";
-import { notFound } from "next/navigation";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -30,7 +30,18 @@ export default async function ClientDashboardPage() {
   const copy = dictionaries[language];
   const dashboard = copy.clientDashboard;
   const caseData = await getClientCase();
-  if (!caseData) notFound();
+  if (!caseData) {
+    return (
+      <div className="panel empty-state">
+        <Icon name="briefcase" size={28} />
+        <h1>{dashboard.noCaseTitle}</h1>
+        <p>{dashboard.noCase}</p>
+        <div className="empty-state-actions">
+          <SignOutButton label={copy.common.signOut} />
+        </div>
+      </div>
+    );
+  }
 
   const stages: CaseProgressStage[] = caseData.stages.map((stage) => ({
     id: stage.id,

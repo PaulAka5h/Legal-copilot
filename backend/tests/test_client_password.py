@@ -361,3 +361,83 @@ def test_invitation_never_overwrites_a_password_the_client_chose(api_client) -> 
     )
     assert refused.status_code == 400
     _login(api_client, created["email"], NEW_CLIENT_PASSWORD)
+
+
+def test_client_without_case_sees_no_cases(api_client) -> None:
+    _register_login(api_client)
+    created = _create_client(api_client)
+    _login(api_client, created["email"], created["temporary_password"])
+    assert _change_password(
+        api_client, created["temporary_password"], NEW_CLIENT_PASSWORD
+    ).status_code == 200
+    cases = api_client.get("/api/v1/client/cases")
+    assert cases.status_code == 200
+    assert cases.json() == []
+
+
+def test_lawyer_links_existing_client_to_case(api_client) -> None:
+    lawyer_email, _ = _register_login(api_client)
+    case_id = _create_case(api_client)
+    created = _create_client(api_client)
+    client_id = created["id"]
+
+    # Origin check (CSRF) applies.
+    assert api_client.post(
+        f"/api/v1/clients/{client_id}/cases", json={"case_id": case_id}
+    ).status_code == 403
+
+    linked = api_client.post(
+        f"/api/v1/clients/{client_id}/cases", headers=ORIGIN, json={"case_id": case_id}
+    )
+    assert linked.status_code == 201, linked.text
+    assert linked.json()["case_id"] == case_id
+    # Idempotent.
+    again = api_client.post(
+        f"/api/v1/clients/{client_id}/cases", headers=ORIGIN, json={"case_id": case_id}
+    )
+    assert again.status_code == 201
+    assert again.json()["case_member_id"] == linked.json()["case_member_id"]
+
+    members = api_client.get(f"/api/v1/cases/{case_id}/members").json()
+    assert [m["role"] for m in members].count("client") == 1
+
+    _login(api_client, created["email"], created["temporary_password"])
+    assert _change_password(
+        api_client, created["temporary_password"], NEW_CLIENT_PASSWORD
+    ).status_code == 200
+    # A client cannot link itself to anything.
+    assert api_client.post(
+        f"/api/v1/clients/{client_id}/cases", headers=ORIGIN, json={"case_id": case_id}
+    ).status_code == 403
+    assert [c["id"] for c in api_client.get("/api/v1/client/cases").json()] == [case_id]
+    del lawyer_email
+
+
+def test_link_client_rejects_other_lawyers_case_and_clients(api_client) -> None:
+    _register_login(api_client)
+    own_case = _create_case(api_client)
+    own_client = _create_client(api_client)["id"]
+    no_login = api_client.post(
+        "/api/v1/clients", headers=ORIGIN, json={"display_name": "SAMPLE_DATA_NOT_REAL_LAW NoLogin"}
+    ).json()["id"]
+    assert api_client.post(
+        f"/api/v1/clients/{no_login}/cases", headers=ORIGIN, json={"case_id": own_case}
+    ).status_code == 400
+
+    _register_login(api_client)
+    other_case = _create_case(api_client)
+    other_client = _create_client(api_client)["id"]
+
+    # Another organization's client, and another lawyer's case, look absent.
+    assert api_client.post(
+        f"/api/v1/clients/{own_client}/cases", headers=ORIGIN, json={"case_id": other_case}
+    ).status_code == 404
+    assert api_client.post(
+        f"/api/v1/clients/{other_client}/cases", headers=ORIGIN, json={"case_id": own_case}
+    ).status_code == 404
+    assert api_client.post(
+        f"/api/v1/clients/{no_login}/cases", headers=ORIGIN, json={"case_id": other_case}
+    ).status_code == 404
+    assert api_client.post(
+        f"/api/v1/clients/{other_client}/cases", headers=ORIGIN, json={"case_id": "not-a-uuid"}
+    ).status_code == 422

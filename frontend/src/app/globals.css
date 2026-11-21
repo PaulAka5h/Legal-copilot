@@ -2584,3 +2584,41 @@
     width: 100%;
   }
 }
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.empty-state p {
+  max-width: 420px;
+  margin: 0;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.client-access-panel {
+  grid-column: 1 / -1;
+  padding: 20px;
+}
+
+.client-access-panel .mock-note,
+.client-access-panel .form-error {
+  margin: 14px 0 0;
+}
+
+.client-access-form {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.client-access-form .field {
+  flex: 1 1 260px;
+  margin-bottom: 0;
+}

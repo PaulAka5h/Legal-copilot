@@ -762,6 +762,40 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   );
 }
 
+export type LinkableClient = { id: string; name: string };
+export type LinkClientResult = "ok" | "no_login" | "error" | "NOT_CONFIGURED";
+
+/** Clients with a portal login: only they can be given access to a case. */
+export async function listLinkableClients(): Promise<LinkableClient[]> {
+  return withDemoFallback(
+    async () =>
+      (await backend<Api["ClientResponse"][]>("/api/v1/clients"))
+        .filter((row) => row.has_account)
+        .map((row) => ({ id: row.id, name: row.email ? `${row.display_name} (${row.email})` : row.display_name })),
+    () => [],
+  );
+}
+
+/** Make an existing client a member (role client) of a case the lawyer leads. */
+export async function linkClientToCase(caseId: string, clientId: string): Promise<LinkClientResult> {
+  if (!caseId || !clientId) return "error";
+  return withDemoFallback<LinkClientResult>(
+    async () => {
+      try {
+        await backend<Api["ClientCaseLinkResponse"]>(
+          `/api/v1/clients/${encodeURIComponent(clientId)}/cases`,
+          { method: "POST", json: { case_id: caseId } satisfies Api["ClientCaseLinkCreate"] },
+        );
+        return "ok";
+      } catch (error) {
+        if (!(error instanceof BackendError)) throw error;
+        return error.status === 400 ? "no_login" : "error";
+      }
+    },
+    () => "NOT_CONFIGURED",
+  );
+}
+
 /**
  * Create the client and, with an email, their portal login. The backend returns
  * the temporary password once; it is passed straight to the lawyer's screen.

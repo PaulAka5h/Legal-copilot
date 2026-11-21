@@ -24,6 +24,8 @@ from app.clients.repository import (
     set_client_temporary_password,
 )
 from app.clients.schemas import (
+    ClientCaseLinkCreate,
+    ClientCaseLinkResponse,
     ClientCreate,
     ClientCreatedResponse,
     ClientPasswordResetResponse,
@@ -233,6 +235,64 @@ async def reset_client_password_endpoint(
         temporary_password=temporary_password,
         created_account=outcome == "created",
         sessions_revoked=result["result_revoked_sessions"],
+    )
+
+
+@router.post(
+    "/{client_id}/cases",
+    summary="Link an existing client to a case",
+    description=(
+        "Gives an existing client (one with a portal login) access to a case as a "
+        "case member with role `client`. Only the lead lawyer of an open case in "
+        "the client's organization may do this. Linking an already linked client "
+        "is idempotent and reactivates a revoked membership."
+    ),
+    response_model=ClientCaseLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=problem_responses(400, 401, 403, 404, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def link_client_case_endpoint(
+    request: Request,
+    client_id: Annotated[UUID, Path(description="Client profile ID")],
+    user: LawyerDep,
+    session: UserSessionDep,
+    payload: Annotated[ClientCaseLinkCreate, Body(description="Case to link")],
+) -> ClientCaseLinkResponse:
+    client = await get_client(session, acting_user_id=user.id, client_id=client_id)
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client profile was not found.",
+        )
+    if not client.has_account:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This client has no portal login yet. Set a password first.",
+        )
+    member_id = await link_client_to_case(
+        session,
+        acting_user_id=user.id,
+        case_id=payload.case_id,
+        client_id=client_id,
+    )
+    if member_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case was not found, is closed, or you are not its lead lawyer.",
+        )
+    await write_audit_event(
+        session,
+        action="case.client_linked",
+        object_type="case_member",
+        object_id=member_id,
+        organization_id=client.organization_id,
+        case_id=payload.case_id,
+        details={"client_profile_id": str(client_id)},
+        **_audit(request, user),
+    )
+    return ClientCaseLinkResponse(
+        client_id=client_id, case_id=payload.case_id, case_member_id=member_id
     )
 
 

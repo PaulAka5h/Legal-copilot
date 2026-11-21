@@ -93,6 +93,18 @@ class ClientCreatedResponse(ClientResponse):
     )
 
 
+class ClientCaseLinkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID = Field(description="Open case, led by the acting lawyer, to link the client to.")
+
+
+class ClientCaseLinkResponse(BaseModel):
+    client_id: UUID
+    case_id: UUID
+    case_member_id: UUID = Field(description="The client's case membership (role `client`).")
+
+
 class ClientPasswordResetResponse(BaseModel):
     client_id: UUID
     email: EmailStr

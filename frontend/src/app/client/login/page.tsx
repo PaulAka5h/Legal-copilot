@@ -8,7 +8,7 @@ import { Icon } from "@/components/Icon";
 import { MockLoginForm } from "@/components/MockLoginForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { getSession } from "@/lib/session";
+import { getSession, readyDestination } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -17,9 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ClientLoginPage() {
   const session = await getSession();
-  if (session) {
-    redirect(session.role === "client" ? "/client/dashboard" : "/lawyer/dashboard");
-  }
+  const destination = await readyDestination(session);
+  if (destination) redirect(destination);
 
   const language = await getLanguage();
   const copy = dictionaries[language].client;

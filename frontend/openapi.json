@@ -842,6 +842,51 @@
        }
       }
      },
+     "429": {
+      "description": "Too Many Requests",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
      "503": {
       "description": "Service Unavailable",
       "content": {
@@ -3137,6 +3182,323 @@
      },
      "409": {
       "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/clients/{client_id}/cases": {
+   "post": {
+    "tags": [
+     "clients"
+    ],
+    "summary": "Link an existing client to a case",
+    "description": "Gives an existing client (one with a portal login) access to a case as a case member with role `client`. Only the lead lawyer of an open case in the client's organization may do this. Linking an already linked client is idempotent and reactivates a revoked membership.",
+    "operationId": "link_client_case_endpoint_api_v1_clients__client_id__cases_post",
+    "parameters": [
+     {
+      "name": "client_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Client profile ID",
+       "title": "Client Id"
+      },
+      "description": "Client profile ID"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ClientCaseLinkCreate",
+        "description": "Case to link"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClientCaseLinkResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad Request",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
       "content": {
        "application/problem+json": {
         "schema": {
@@ -19184,6 +19546,49 @@
      "warnings"
     ],
     "title": "CitationOut"
+   },
+   "ClientCaseLinkCreate": {
+    "properties": {
+     "case_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Case Id",
+      "description": "Open case, led by the acting lawyer, to link the client to."
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "case_id"
+    ],
+    "title": "ClientCaseLinkCreate"
+   },
+   "ClientCaseLinkResponse": {
+    "properties": {
+     "client_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Client Id"
+     },
+     "case_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Case Id"
+     },
+     "case_member_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Case Member Id",
+      "description": "The client's case membership (role `client`)."
+     }
+    },
+    "type": "object",
+    "required": [
+     "client_id",
+     "case_id",
+     "case_member_id"
+    ],
+    "title": "ClientCaseLinkResponse"
    },
    "ClientCaseResponse": {
     "properties": {

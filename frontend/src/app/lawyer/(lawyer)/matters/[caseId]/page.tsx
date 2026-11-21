@@ -8,6 +8,7 @@ import {
   type CaseProgressStage,
 } from "@/components/CaseProgress";
 import { Icon } from "@/components/Icon";
+import { ClientAccessPanel } from "@/components/lawyer/ClientAccessPanel";
 import {
   MatterWorkspace,
   type WorkspaceNotice,
@@ -19,6 +20,8 @@ import {
   getCaseIntelligence,
   listDocuments,
   listHearings,
+  listLinkableClients,
+  type LinkClientResult,
   type Matter,
 } from "@/lib/api/lawyer";
 import {
@@ -79,10 +82,11 @@ export default async function LawyerMatterPage({
     tab?: string;
     ai?: string;
     detail?: string;
+    clientLink?: string;
   }>;
 }) {
   const { caseId } = await params;
-  const { hearingError, noteError, stageError, tab, ai, detail } =
+  const { hearingError, noteError, stageError, tab, ai, detail, clientLink } =
     await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
@@ -91,10 +95,13 @@ export default async function LawyerMatterPage({
   if (!matter) notFound();
 
   const stages = stagesFor(matter, language, copy.caseDetail);
-  const [hearings, intelligence] = await Promise.all([
+  const [hearings, intelligence, linkableClients] = await Promise.all([
     listHearings(caseId),
     getCaseIntelligence(caseId),
+    listLinkableClients(),
   ]);
+  const linkResults: LinkClientResult[] = ["ok", "no_login", "error", "NOT_CONFIGURED"];
+  const clientLinkResult = linkResults.find((value) => value === clientLink) ?? null;
   const documents = await listDocuments(caseId, hearings);
   const demo = usedDemoData();
   const initialTab: WorkspaceTab =
@@ -200,6 +207,15 @@ export default async function LawyerMatterPage({
             completeLabel={copy.caseDetail.complete}
           />
         </div>
+
+        <ClientAccessPanel
+          caseId={matter.id}
+          clients={linkableClients}
+          locked={locked}
+          result={clientLinkResult}
+          copy={copy.caseDetail.clientAccess}
+          notConfigured={copy.common.notAvailableYet}
+        />
 
         <MatterWorkspace
           key={`${matter.id}-${initialTab}-${ai ?? ""}`}

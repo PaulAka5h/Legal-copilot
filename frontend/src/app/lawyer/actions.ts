@@ -14,6 +14,7 @@ import {
   extractFacts,
   getDocumentStatus,
   getHearingSummary,
+  linkClientToCase,
   rejectFact,
   resetClientPassword,
   runAnalysis,
@@ -367,4 +368,16 @@ export async function resetClientPasswordAction(
   const clientId = String(formData.get("clientId") ?? "");
   if (!clientId) return { status: "error" };
   return resetClientPassword(clientId);
+}
+
+/** Give an existing client access to this case (case membership, role client). */
+export async function linkClientToCaseAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  if (!caseId) redirect("/lawyer/matters");
+  const result = await linkClientToCase(caseId, field(formData, "clientId"));
+  const path = `/lawyer/matters/${encodeURIComponent(caseId)}`;
+  revalidatePath(path);
+  revalidatePath("/lawyer/clients");
+  redirect(`${path}?clientLink=${result}#client-access`);
 }

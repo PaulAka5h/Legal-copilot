@@ -143,3 +143,24 @@ export async function clearSession() {
   }
   store.set(SESSION_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
 }
+
+/**
+ * Where a signed-in user should land from a login page, or null to show the
+ * login form. Login pages only redirect when that page can load: a session
+ * whose dashboard data fails would otherwise bounce the user back and forth.
+ */
+export async function readyDestination(session: Session | null): Promise<string | null> {
+  if (!session) return null;
+  if (session.passwordChangeRequired) return "/client/set-password";
+  const dashboard = session.role === "client" ? "/client/dashboard" : "/lawyer/dashboard";
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token || token.startsWith(MOCK_PREFIX)) return dashboard;
+
+  const probe = session.role === "client" ? "/api/v1/client/cases" : "/api/v1/lawyer/dashboard/overview";
+  try {
+    return (await backendRequest(probe, { token })).ok ? dashboard : null;
+  } catch (error) {
+    if (error instanceof BackendUnavailable) return null;
+    throw error;
+  }
+}

@@ -386,3 +386,22 @@ Lawyers create the client's portal login directly; invitations are optional.
 - Tests: `backend/tests/test_client_password.py` (7). Auth, invitation, and isolation suites still pass.
   `tests/test_analysis.py::test_analysis_falls_back_to_keyword_search_and_is_labelled` fails locally with and
   without this change (pre-existing).
+
+## Client portal without a case, and no dead ends (2026-11-22)
+
+- `POST /api/v1/clients/{client_id}/cases` (`{case_id}`): lead lawyer of an open case adds an existing client
+  with a portal login as a case member (role `client`). Idempotent; 400 without a login; 404 for another
+  organization's client or a case the lawyer does not lead. Same-origin check. Audit `case.client_linked`.
+- Matter page: "Client access" panel to add an existing client to the case. Creating a client with a case
+  still links at once (unchanged, covered by the existing test).
+- Client dashboard: no linked case shows a bilingual empty state ("No case is linked to your account yet.
+  Please contact your lawyer.") with Sign out, instead of a 404.
+- `not-found.tsx` in the `(client)` and `(lawyer)` groups (Back + Sign out) and at the root (Back + link to
+  `/logout`). `GET /logout` ends the backend session, clears the cookie and redirects to the matching login
+  page (`/` when the session is unknown).
+- Login pages redirect a signed-in user only when the dashboard's data loads (probe of `/api/v1/client/cases`
+  or `/api/v1/lawyer/dashboard/overview`); otherwise they show the form.
+- Tests: `backend/tests/test_client_password.py` (+3: no-case client sees `[]`, linking works and is
+  idempotent, cross-org/no-login rejections). Frontend has no test runner; verified with `tsc`, `eslint`,
+  `next build` and a curl run against a live backend (no-case empty state in EN/BN, linked dashboard,
+  not-found pages, `/logout` for client, lawyer, missing and invalid cookies).
