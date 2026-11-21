@@ -66,6 +66,10 @@ services:
         sync: false               # REQUIRED: legal search embeds queries with it
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
+      # Tried after GEMINI_MODEL keeps answering 429/503 (3 retries: 2 s, 5 s, 10 s), before
+      # the labelled mock. gemini-2.5-flash answers 404 for new keys (checked 2026-11-21).
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.5-flash
 
       # --- Documents ---
       - key: MALWARE_SCANNER

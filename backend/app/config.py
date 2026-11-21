@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # Gemini: free tier, SYNTHETIC SAMPLE DATA ONLY (DOCS/providers.md); refused in production.
     gemini_api_key: SecretStr | None = None
     gemini_model: str | None = None
+    # Second Gemini model, tried after GEMINI_MODEL keeps answering 429/503 (or fails);
+    # e.g. gemini-2.5-flash. Unset = straight to the labelled mock.
+    gemini_fallback_model: str | None = Field(default=None, min_length=1)
 
     # Embeddings. local / hf_api: intfloat/multilingual-e5-large (on this server / on the
     # Hugging Face API). gemini: GEMINI_EMBEDDING_MODEL on the Gemini API (uses

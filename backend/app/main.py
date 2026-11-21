@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.ai.structured import start_request_budget
 from app.auth.router import auth_router, identity_router
 from app.cases.router import router as cases_router
 from app.clients.router import router as clients_router
@@ -80,6 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError:
             request_id = str(uuid4())
         request.state.request_id = request_id
+        start_request_budget()  # LLM calls in this request share one deadline (app.ai.structured)
 
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id

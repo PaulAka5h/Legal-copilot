@@ -89,8 +89,11 @@ Free tier, synthetic data only. The same key serves two things:
   demo knowledge base in `deploy/demo_data.dump` was embedded with the same model
   (`RETRIEVAL_DOCUMENT`), so the vectors match. Without a key, search answers
   `503 NOT_CONFIGURED`.
-- **Analysis (optional).** `LLM_PROVIDER=gemini` (`gemini-3.5-flash-lite`); if the
-  model is unavailable the analysis falls back to the labelled mock (`ai_mock`).
+- **Analysis (optional).** `LLM_PROVIDER=gemini`: `GEMINI_MODEL=gemini-3.5-flash-lite`.
+  On 429/503 it is retried 3 times (2 s, 5 s, 10 s), then `GEMINI_FALLBACK_MODEL=gemini-3.5-flash`
+  gets the same treatment, then the labelled mock (`ai_mock`). All LLM calls in one request
+  share a 100 s budget, so the API answers inside Vercel's `BACKEND_TIMEOUT_MS=120000`.
+  Render logs show `llm.answered` with the model that answered, or `llm.fallback_to_mock`.
 
 No Hugging Face account is needed any more.
 
@@ -197,6 +200,7 @@ only if it shares at least 3 content words with the fact (a heuristic, not calib
 | `connect() got an unexpected keyword argument` | You are on an old commit; this branch translates `sslmode` |
 | `/health/ready` is 503 | Wrong Neon password/host, or the `-pooler` host. Use the direct host |
 | Search answers `503 NOT_CONFIGURED` | `GEMINI_API_KEY` missing/invalid, or the Gemini free-tier quota is used up (wait for the reset). Render → Logs shows `provider.unavailable` |
+| Analysis findings labelled AI mock | Both Gemini models answered 429/503 (free-tier overload) through all retries, or the 100 s budget ran out. Render → Logs: `llm.fallback_to_mock`; the analysis warnings list each `provider_error:...@model`. Run it again later |
 | Analysis shows "Keyword-only search" | Gemini embedding quota (1,000/day, 100/min on the free tier) is used up or the API is down; results are full-text only until it recovers. Not an error |
 | Search answers `503 EMBEDDING_MODEL_MISMATCH` | The database holds vectors from another model than `EMBEDDING_PROVIDER`/`GEMINI_EMBEDDING_MODEL` (e.g. an old e5 dump). Rebuild the dump from a Gemini-embedded knowledge base (`deploy/make_demo_dump.sh` prints `Embeddings: gemini-embedding-001 v1`) and restore it into a fresh Neon database, or set the provider that matches the dump |
 | Every POST answers 403 "Request origin is not allowed" | `APP_ORIGIN` differs between Render and Vercel (check `https`, no trailing `/`) |

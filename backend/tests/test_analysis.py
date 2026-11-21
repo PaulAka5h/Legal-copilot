@@ -137,8 +137,8 @@ def test_structured_generation_retries_then_falls_back_to_labelled_mock():
     ok = asyncio.run(generate_structured(FakeLLM(["not json", valid]), AnalysisDraft, "s", "u", mock, True))
     assert (ok.origin, ok.attempts, ok.value.missing_information) == ("ai", 2, ["SAMPLE"])
     request = httpx.Request("POST", "http://x")
-    down = asyncio.run(generate_structured(
-        FakeLLM([httpx.HTTPStatusError("503", request=request, response=httpx.Response(503, request=request))]),
+    down = asyncio.run(generate_structured(  # a transport error is not retried (429/503 are: test_structured_retries)
+        FakeLLM([httpx.ConnectError("down", request=request)]),
         AnalysisDraft, "s", "u", mock, True))
     assert down.origin == "ai_mock" and "fallback_to_mock" in down.warnings
     with pytest.raises(Exception):
