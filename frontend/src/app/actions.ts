@@ -46,6 +46,7 @@ async function signIn(
 
   const result = await signInWithBackend(email, password);
   if (result && "role" in result) {
+    if (result.mustChangePassword) redirect("/client/set-password");
     // The backend decides the role, whichever portal the form was on.
     redirect(result.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard");
   }
@@ -63,7 +64,7 @@ export async function clientLogin(
   _state: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  // Clients sign in with the email their invitation was sent to.
+  // Clients sign in with the email their lawyer registered for them.
   return signIn("client", "email", formData);
 }
 
@@ -169,4 +170,46 @@ export async function acceptClientInvitation(
   }
 
   return { status: "error" };
+}
+
+export type SetPasswordState =
+  | { status: "mismatch" }
+  | { status: "length" }
+  | { status: "same" }
+  | { status: "current" }
+  | { status: "error" }
+  | null;
+
+/** Replace a temporary password; required before the backend serves anything else. */
+export async function setNewPassword(
+  _state: SetPasswordState,
+  formData: FormData,
+): Promise<SetPasswordState> {
+  const current = String(formData.get("currentPassword") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+  if (password.length < 12) return { status: "length" };
+  if (password !== confirm) return { status: "mismatch" };
+  if (password === current) return { status: "same" };
+
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token || token.startsWith(MOCK_PREFIX)) redirect("/client/login");
+
+  let response: Response;
+  try {
+    response = await backendRequest("/api/v1/auth/password/change", {
+      method: "POST",
+      json: { current_password: current, new_password: password },
+      token,
+    });
+  } catch (error) {
+    if (error instanceof BackendUnavailable) return { status: "error" };
+    throw error;
+  }
+  if (response.status === 401) redirect("/client/login");
+  if (response.status === 400) return { status: "current" };
+  if (response.status === 422) return { status: "length" };
+  if (!response.ok) return { status: "error" };
+  const user = (await response.json()) as { role?: string };
+  redirect(user.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard");
 }

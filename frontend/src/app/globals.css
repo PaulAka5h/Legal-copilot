@@ -356,6 +356,35 @@
   background: none;
 }
 
+.field-action.text-action {
+  flex: none;
+  color: var(--color-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.input-wrap select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+  font-size: 13px;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.credentials .credential-value {
+  padding-right: 56px;
+  word-break: break-all;
+}
+
 .form-row {
   display: flex;
   align-items: center;

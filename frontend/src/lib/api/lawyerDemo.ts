@@ -367,11 +367,11 @@ export function createClient(input: NewClientInput): ClientCredentials | null {
   if (!name || !phone || !/\S+@\S+\.\S+/.test(email)) return null;
 
   const clientId = `CL-${Math.floor(1000 + Math.random() * 9000)}-BD`;
-  const password = globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  const password = input.password || globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
   clients.unshift({ id: clientId, name: { en: name, bn: name }, phone, email });
 
-  return { name, clientId, password };
+  return { name, email, password, linkedCaseTitle: null };
 }
 
 export function resetClientPassword(): ResetPasswordState {

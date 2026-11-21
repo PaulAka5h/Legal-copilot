@@ -19,6 +19,7 @@ import type {
   Citation,
   ClientCredentials,
   ClientDetail,
+  CreateClientError,
   ClientSummary,
   DocumentStatus,
   Hearing,
@@ -33,6 +34,7 @@ import type {
   NewHearingInput,
   NewMatterInput,
   Reassessment,
+  ResetPasswordState,
   Strength,
   StrategyMove,
   StrategyTree,
@@ -761,30 +763,67 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
 }
 
 /**
- * Backend clients have no password: they sign in after accepting a case
- * invitation sent to their email. `passwordNote` is shown in place of one.
+ * Create the client and, with an email, their portal login. The backend returns
+ * the temporary password once; it is passed straight to the lawyer's screen.
  */
 export async function createClient(
   input: NewClientInput,
-  passwordNote: string,
-): Promise<ClientCredentials | null> {
+): Promise<ClientCredentials | { error: CreateClientError }> {
   const name = input.name.trim();
   const email = input.email.trim();
-  if (!name || !/\S+@\S+\.\S+/.test(email)) return null;
-  return withDemoFallback(
+  if (!name || !/\S+@\S+\.\S+/.test(email)) return { error: "invalid" };
+  if (input.password && input.password.length < 12) return { error: "password" };
+  return withDemoFallback<ClientCredentials | { error: CreateClientError }>(
     async () => {
       try {
-        const row = await backend<Api["ClientResponse"]>("/api/v1/clients", {
+        const row = await backend<Api["ClientCreatedResponse"]>("/api/v1/clients", {
           method: "POST",
-          json: { display_name: name, email, phone: input.phone.trim() || null } satisfies Api["ClientCreate"],
+          json: {
+            display_name: name,
+            email,
+            phone: input.phone.trim() || null,
+            password: input.password || null,
+            case_id: input.caseId || null,
+          } satisfies Api["ClientCreate"],
         });
-        return { name: row.display_name, clientId: row.email ?? row.id, password: passwordNote };
+        if (!row.temporary_password || !row.email) return { error: "general" };
+        const linked = row.linked_case_id
+          ? (await listMatters()).find((matter) => matter.id === row.linked_case_id)
+          : undefined;
+        return {
+          name: row.display_name,
+          email: row.email,
+          password: row.temporary_password,
+          linkedCaseTitle: linked ? linked.title.en : null,
+        };
       } catch (error) {
-        if (error instanceof BackendError) return null;
+        if (!(error instanceof BackendError)) throw error;
+        if (error.status === 409) return { error: "email_taken" };
+        if (error.status === 404) return { error: "case" };
+        if (error.status === 422) return { error: "invalid" };
+        return { error: "general" };
+      }
+    },
+    () => demo.createClient(input) ?? { error: "invalid" },
+  );
+}
+
+/** New temporary password for a client; the backend signs the client out everywhere. */
+export async function resetClientPassword(clientId: string): Promise<ResetPasswordState> {
+  return withDemoFallback<ResetPasswordState>(
+    async () => {
+      try {
+        const row = await backend<Api["ClientPasswordResetResponse"]>(
+          `/api/v1/clients/${encodeURIComponent(clientId)}/password-reset`,
+          { method: "POST" },
+        );
+        return { status: "ok", email: row.email, password: row.temporary_password };
+      } catch (error) {
+        if (error instanceof BackendError) return { status: "error" };
         throw error;
       }
     },
-    () => demo.createClient(input),
+    () => demo.resetClientPassword(),
   );
 }
 

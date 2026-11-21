@@ -976,3 +976,11 @@ The sections above are the original design. This section is what the migrations 
 - Grants SELECT and INSERT on `hearing_updates` to `app_user` (append-only; a correction is a new version with `supersedes_id`). The order text is also stored as a `lawyer_entered` case fact so the re-run analysis sees it.
 - `case_reassessments`: one immutable row per hearing update (`UNIQUE (hearing_update_id)`), linking the analysis and strategy-tree versions before and after (composite FKs on `case_id`), the `diff` jsonb (finding changes, closed and new options, tree and analysis versions, tasks, `suggested_next_date` as a draft only), and `client_update_id`, the draft `client_visible_updates` row the lawyer publishes through the existing flow.
 - RLS (forced): lawyer members read; insert needs `app.can_write_case`; no client policy.
+
+### 17.8 Lawyer-set client passwords (0020)
+
+- `users.must_change_password boolean NOT NULL DEFAULT false`. True for a client login a lawyer created or reset; the API refuses everything but password change and logout until it is cleared. `app.lookup_session` returns it.
+- `app.set_client_temporary_password(profile_id, password_hash)` (SECURITY DEFINER): requires `app.is_org_lawyer` on the profile's organization. Creates a `client` user for a profile with an email and no login (`email_taken` if any user has that email), or resets a linked `client` user: new hash, flag set, lockout cleared, all sessions revoked, unused reset tokens used up. Returns a status (`created`, `reset`, `not_found`, `no_email`, `email_taken`), never the password.
+- `app.complete_password_change(password_hash, keep_session_id)` (SECURITY DEFINER): for `app.current_user_id()` only; sets the hash, clears the flag, revokes the user's other sessions.
+- `app.accept_case_invitation`: a profile whose login still has a lawyer-set temporary password (`must_change_password`) can accept; the invitation sets the client's own password, clears the flag, revokes the login's earlier sessions and unused reset tokens, and adds case membership. A login whose client already chose a password is refused (never overwritten).
+- Linking a new client to a case is a plain `case_members` insert under the existing `case_members_create` policy (lead lawyer).
