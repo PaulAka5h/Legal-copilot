@@ -405,3 +405,35 @@ Lawyers create the client's portal login directly; invitations are optional.
   idempotent, cross-org/no-login rejections). Frontend has no test runner; verified with `tsc`, `eslint`,
   `next build` and a curl run against a live backend (no-case empty state in EN/BN, linked dashboard,
   not-found pages, `/logout` for client, lawyer, missing and invalid cookies).
+
+## e5-small ONNX embeddings, fusion tuning, LLM query rewriting (2026-11-22, branch feat/full-corpus-e5small)
+
+Not deployed; Render and Neon unchanged. Full-corpus rollout paused: see DOCS/eval_results.md (Recall@10 mean
+0.945 vs Gemini 1.000 on the 19-Act set, 5.5 points; the agreed bar was 5).
+
+- `EMBEDDING_PROVIDER=e5_small_onnx` (new default): intfloat/multilingual-e5-small, ONNX int8 (U8U8 dynamic
+  quantization of the authors' ONNX export, pinned revision and SHA-256; `scripts/export_e5_small_onnx.py`,
+  output git-ignored in `backend/models/`), onnxruntime only, 384 dims, NFC, "query: "/"passage: ", mean pooling,
+  L2. Each text is encoded alone (dynamic quantization scales per tensor, so batching changed vectors);
+  vectors are identical across machines and thread counts. `local`, `hf_api` and `gemini` remain selectable.
+- Migration `0021_e5_small_embeddings`: `legal_chunks.embedding` is `vector` (any dimension) with one partial
+  HNSW cosine index per dimension (384, 1024); vectors are kept; the model/version mismatch guard is unchanged.
+  Switching providers = re-embed (`python -m app.rag.embed reembed --provider ...`). Up/down/up checked.
+- Search: weighted RRF k=30, dense weight 1.5 (was k=60, 1:1). `rewritten_search`: the configured LLM rewrites
+  each new query once into Bangla + English + keywords (`SEARCH_QUERY_REWRITE`, 8 s timeout, cached); on failure
+  the plain query is searched (`rewrite_failed` warning). Analysis rewrites each fact statement (one call per
+  fact); the audit event records `query_rewrite_llm_calls`. With the mock LLM nothing changes.
+- Embedding: `python -m app.rag.embed run` (several processes share the queue), export/import carry and check
+  `model_sha256`; `scripts/kaggle_embed_e5small.py` runs the same int8 model on CPU (a GPU cannot run the int8
+  kernels and fp32 would give different vectors).
+- Chunking counts tokens with the bundled XLM-R tokenizer (same ids as e5-large; it keeps a trailing-whitespace
+  token, so ~5% of long sections split one word differently from older chunks).
+- Local data: `legal_copilot_full` holds all 1,176 Acts (35,063 sections, 39,587 chunks, 0 rejects, 187 sections
+  repealed by title marker), all embedded with e5-small (27.6 min, 4 workers x 2 threads), versions still
+  pending (not approved). 319 MB on disk. `legal_copilot_test` re-embedded with e5-small.
+- Tests: `tests/rag/test_e5_small_and_rewrite.py` (19); the suite runs with `TEST_EMBEDDING_PROVIDER`
+  (default e5_small_onnx). `psycopg2-binary` is in the dev group. Same failures as before the change
+  (MinIO not configured locally, fact/recovery/security tests that need it).
+- Open: peak RAM in a 512 MB container (search + analysis + OCR) is not measured; Dockerfile.render does not
+  bundle the model yet; effective dates stay NULL (the scraper has `enactment_date` only, which is not a
+  commencement date).

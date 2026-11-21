@@ -20,9 +20,10 @@ for _secret in ("GEMINI_API_KEY",):
     os.environ.pop(_secret, None)
 os.environ["LLM_PROVIDER"] = "mock"
 os.environ["LLM_APPROVED_PROVIDERS"] = "mock"
-# EMBEDDING_PROVIDER=hf_api runs the suite through the hf_api code path. The HTTP
-# call never leaves the machine: _mock_hf_api answers it (see below).
-os.environ.setdefault("EMBEDDING_PROVIDER", "local")
+# The suite runs with TEST_EMBEDDING_PROVIDER (default e5_small_onnx, the product default;
+# legal_copilot_test must be embedded with that model). TEST_EMBEDDING_PROVIDER=hf_api runs
+# the hf_api code path; its HTTP call never leaves the machine: _mock_hf_api answers it.
+os.environ["EMBEDDING_PROVIDER"] = os.environ.get("TEST_EMBEDDING_PROVIDER", "e5_small_onnx")
 if os.environ["EMBEDDING_PROVIDER"] == "hf_api":
     os.environ["HF_API_TOKEN"] = "hf_mock_token_for_tests"
 

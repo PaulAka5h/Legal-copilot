@@ -52,8 +52,8 @@ def test_bangla_round_trip_and_header(counter, tmp_path):
 
 def test_prefix_is_counted(counter):
     tokenizer = counter.tokenizer
-    assert counter.count("x") == len(tokenizer(PASSAGE_PREFIX + "x")["input_ids"])
-    assert counter.count("x") > len(tokenizer("x")["input_ids"])
+    assert counter.count("x") == len(tokenizer.encode(PASSAGE_PREFIX + "x").ids)
+    assert counter.count("x") > len(tokenizer.encode("x").ids)
 
 
 def test_long_section_sub_chunks_under_512_tokens_with_overlap(counter):

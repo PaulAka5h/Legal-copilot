@@ -1,13 +1,15 @@
 """Hybrid legal search over approved legal_chunks.
 
-1. Query is NFC-normalized; the dense side embeds "query: " + query (e5-large).
+1. Query is NFC-normalized; the dense side embeds it with EMBEDDING_PROVIDER's model.
 2. Eligible versions: review_status 'approved', is_current, source language filter,
    and not out of force on the incident date at source/version level.
-3. Dense: HNSW cosine (pgvector, iterative scan) within those versions.
+3. Dense: HNSW cosine (pgvector, iterative scan, the index for the query's dimension)
+   within those versions.
    Sparse: 'simple' full-text, query lexemes OR-ed with English and Bangla
    (app.rag.text.BANGLA_STOPWORDS) stopwords removed,
    ranked by length-normalized ts_rank_cd.
-4. Reciprocal Rank Fusion, k = 60, over both ranked lists.
+4. Weighted Reciprocal Rank Fusion over both ranked lists (FusionConfig: k = 30, dense
+   weight 1.5, sparse 1.0).
 5. Section-level in-force check on the incident date; `unknown` status is
    included but flagged; repealed text is excluded unless its end date is known
    and on/after the incident date.
@@ -22,12 +24,15 @@ If the embedder is temporarily unavailable (EmbeddingUnavailable: quota 429, out
 search falls back to the full-text side only, flagged with KEYWORD_ONLY_WARNING and
 retrieval_mode "keyword_only" so the UI can label it. A model mismatch never falls
 back: it is a configuration error and stays a 503.
+rewritten_search runs the query plus its LLM rewrites (Bangla, English, keywords;
+app.rag.search.query_rewrite) and fuses those result lists by canonical section.
 Query text is never logged.
 """
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -38,9 +43,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.rag.embed.worker import vector_literal
 from app.rag.search.errors import EmbeddingModelMismatch, EmbeddingUnavailable
 from app.rag.search.providers import QueryEmbedder, Reranker
+from app.rag.search.query_rewrite import QueryRewriter, Rewrite
 from app.rag.text import BANGLA_STOPWORDS, nfc
 
-RRF_K = 60
+# Tuned 2026-11-22 for e5-small on the 19-Act set (33 queries; DOCS/eval_results.md):
+# k=30 with the dense list weighted 1.5 beat k=60 / 1:1 (Recall@10 0.909 vs 0.879).
+RRF_K = 30
+DENSE_WEIGHT = 1.5
 DENSE_K = 50
 SPARSE_K = 50
 FUSED_K = 60
@@ -91,23 +100,25 @@ TSQUERY_SQL = """
       AND NOT (l = ANY(CAST(:bn_stopwords AS text[])))
 """
 
+# {dim} is the query vector's size (an int from code). The cast expression and the
+# vector_dims predicate match the per-dimension partial HNSW index (migration 0021), and the
+# query vector must be a bound parameter, not a joined column: pgvector can only order by
+# the index against a constant/parameter.
 _DENSE = f"""
       SELECT d.id, d.dist, row_number() OVER (ORDER BY d.dist) AS r
       FROM (
-        -- The query vector must be a bound parameter, not a joined column:
-        -- pgvector can only order by the HNSW index against a constant/parameter.
-        SELECT c.id, c.embedding <=> CAST(:qvec AS vector) AS dist
+        SELECT c.id, CAST(c.embedding AS vector({{dim}})) <=> CAST(:qvec AS vector({{dim}})) AS dist
         FROM public.legal_chunks c
-        WHERE c.is_active AND c.embedding IS NOT NULL
+        WHERE c.is_active AND c.embedding IS NOT NULL AND vector_dims(c.embedding) = {{dim}}
           AND c.embedding_model = :model AND c.embedding_version = :model_version
           AND c.legal_source_version_id = ANY(CAST(:versions AS uuid[]))
-        ORDER BY c.embedding <=> CAST(:qvec AS vector)
+        ORDER BY CAST(c.embedding AS vector({{dim}})) <=> CAST(:qvec AS vector({{dim}}))
         LIMIT {DENSE_K}
       ) d
 """
 _NO_DENSE = "SELECT NULL::uuid AS id, NULL::float8 AS dist, NULL::bigint AS r WHERE false"
 
-_FUSED = f"""sparse AS (
+_SPARSE = f"""
       SELECT s.id, row_number() OVER (ORDER BY s.rank DESC, s.id) AS r
       FROM (
         SELECT c.id, ts_rank_cd(c.tsv, q.ts, 1) AS rank  -- 1: divide by 1 + log(length)
@@ -117,19 +128,10 @@ _FUSED = f"""sparse AS (
         ORDER BY rank DESC, c.id
         LIMIT {SPARSE_K}
       ) s
-    ),
-    fused AS (
-      SELECT id, sum(1.0 / ({RRF_K} + r)) AS score, min(dense_r) AS dense_rank, min(sparse_r) AS sparse_rank,
-             min(dist) AS dense_distance
-      FROM (
-        SELECT id, r, r AS dense_r, NULL::bigint AS sparse_r, dist FROM dense
-        UNION ALL
-        SELECT id, r, NULL::bigint, r, NULL::float8 FROM sparse
-      ) both_lists
-      GROUP BY id
-      ORDER BY score DESC, id
-      LIMIT {FUSED_K}
-    )
+"""
+_NONE = "SELECT NULL::uuid AS id, NULL::bigint AS r WHERE false"
+
+_SELECT_FUSED = """
     SELECT f.id AS chunk_id, f.score, f.dense_rank, f.sparse_rank, f.dense_distance,
            c.text, c.chunk_index, c.provision_label,
            sec.id AS section_id, sec.canonical_section_id, sec.section_number, sec.heading,
@@ -147,12 +149,42 @@ _FUSED = f"""sparse AS (
 """
 
 
-def _hybrid_sql(dense: bool):
-    return text(f"WITH q AS (SELECT ({TSQUERY_SQL}) AS ts), dense AS ({_DENSE if dense else _NO_DENSE}), {_FUSED}")
+@dataclass(frozen=True)
+class FusionConfig:
+    """Weighted Reciprocal Rank Fusion: score = sum(weight / (rrf_k + rank)) over the lists.
+
+    A weight of 0 leaves that list out of the query entirely.
+    """
+
+    rrf_k: int = RRF_K
+    dense: float = DENSE_WEIGHT
+    sparse: float = 1.0
 
 
-_HYBRID = _hybrid_sql(dense=True)
-_KEYWORD_ONLY = _hybrid_sql(dense=False)
+DEFAULT_FUSION = FusionConfig()
+
+
+@lru_cache(maxsize=32)
+def _hybrid_sql(dense: bool, fusion: FusionConfig, dim: int = 0):
+    lists = {
+        "dense": (_DENSE.format(dim=int(dim)) if dense and fusion.dense else _NO_DENSE, fusion.dense),
+        "sparse": (_SPARSE if fusion.sparse else _NONE, fusion.sparse),
+    }
+    ctes = ", ".join(f"{name} AS ({sql})" for name, (sql, _) in lists.items())
+    k = int(fusion.rrf_k)
+    union = " UNION ALL ".join(
+        f"SELECT id, {float(weight)!r} / ({k} + r) AS s, "
+        + ("r AS dense_r, dist" if name == "dense" else "NULL::bigint AS dense_r, NULL::float8 AS dist")
+        + (", r AS sparse_r" if name == "sparse" else ", NULL::bigint AS sparse_r")
+        + f" FROM {name}"
+        for name, (_, weight) in lists.items()
+    )
+    return text(
+        f"WITH q AS (SELECT ({TSQUERY_SQL}) AS ts), {ctes}, "
+        f"fused AS (SELECT id, sum(s) AS score, min(dense_r) AS dense_rank, min(sparse_r) AS sparse_rank, "
+        f"min(dist) AS dense_distance FROM ({union}) all_lists GROUP BY id ORDER BY score DESC, id "
+        f"LIMIT {FUSED_K}) {_SELECT_FUSED}"
+    )
 
 
 @dataclass
@@ -243,6 +275,7 @@ async def hybrid_search(
     incident_date: date | None = None,
     k: int = 10,
     keyword_fallback: bool = True,
+    fusion: FusionConfig = DEFAULT_FUSION,
 ) -> SearchResult:
     query = nfc(query).strip()
     response_warnings = [] if incident_date else ["no_incident_date: in-force status not checked against a date"]
@@ -257,10 +290,11 @@ async def hybrid_search(
 
     await check_embedding_model(session, embedder, versions)
     params = {"qtext": query, "versions": versions, "bn_stopwords": BN_STOPWORDS}
-    mode = "hybrid"
+    mode, dim = "hybrid", 0
     try:
         # Off the event loop: local inference is CPU-bound, remote providers block on HTTP.
-        qvec = vector_literal(await asyncio.to_thread(embedder.embed_query, query))
+        vector = await asyncio.to_thread(embedder.embed_query, query)
+        qvec, dim = vector_literal(vector), len(vector)
     except EmbeddingUnavailable as error:
         if not keyword_fallback:
             raise
@@ -270,7 +304,7 @@ async def hybrid_search(
         response_warnings.append(KEYWORD_ONLY_WARNING)
     if mode == "hybrid":
         params.update(qvec=qvec, model=embedder.model_name, model_version=embedder.embedding_version)
-    rows = (await session.execute(_HYBRID if mode == "hybrid" else _KEYWORD_ONLY, params)).mappings().all()
+    rows = (await session.execute(_hybrid_sql(mode == "hybrid", fusion, dim), params)).mappings().all()
 
     merged: dict[UUID, SearchHit] = {}
     for row in rows:
@@ -294,6 +328,52 @@ async def hybrid_search(
         hit.rerank_score = None if reranker.name == "mock" else score
     ranked = [h for _, h in sorted(zip(scores, pool), key=lambda pair: -pair[0])]
     return SearchResult(ranked[:k], response_warnings, reranker.name, embedder.model_name, len(versions), mode)
+
+
+REWRITE_FAILED_WARNING = "rewrite_failed: query rewriting was unavailable; searched the query as typed"
+VARIANT_POOL = 30  # hits taken from each query variant before fusing
+
+
+async def rewritten_search(
+    session: AsyncSession,
+    *,
+    query: str,
+    rewriter: QueryRewriter,
+    embedder: QueryEmbedder,
+    reranker: Reranker,
+    language: str | None = None,
+    incident_date: date | None = None,
+    k: int = 10,
+    keyword_fallback: bool = True,
+    fusion: FusionConfig = DEFAULT_FUSION,
+) -> tuple[SearchResult, Rewrite]:
+    """hybrid_search for the query and its LLM variants, fused by canonical section (RRF).
+
+    One LLM call per new query (cached); without a usable LLM this is hybrid_search alone.
+    """
+    rewrite = await asyncio.to_thread(rewriter.rewrite, query)
+    results = [
+        await hybrid_search(session, query=q, embedder=embedder, reranker=reranker, language=language,
+                            incident_date=incident_date, k=VARIANT_POOL, keyword_fallback=keyword_fallback,
+                            fusion=fusion)
+        for q in rewrite.queries
+    ]
+    first = results[0]
+    if len(results) == 1:
+        extra = [REWRITE_FAILED_WARNING] if rewrite.failed else []
+        return replace(first, hits=first.hits[:k], warnings=[*first.warnings, *extra]), rewrite
+    scores: dict[UUID, float] = {}
+    best: dict[UUID, SearchHit] = {}
+    for result in results:
+        for rank, hit in enumerate(result.hits, start=1):
+            scores[hit.canonical_section_id] = scores.get(hit.canonical_section_id, 0.0) + 1.0 / (fusion.rrf_k + rank)
+            best.setdefault(hit.canonical_section_id, hit)
+    ranked = sorted(best, key=lambda c: (-scores[c], str(c)))
+    warnings = list(dict.fromkeys(w for r in results for w in r.warnings))
+    mode = "keyword_only" if any(r.retrieval_mode == "keyword_only" for r in results) else "hybrid"
+    merged = SearchResult([best[c] for c in ranked[:k]], warnings, first.reranker, first.embedding_model,
+                          first.eligible_versions, mode)
+    return merged, rewrite
 
 
 def _hit(row: Any, status: str, warnings: list[str]) -> SearchHit:

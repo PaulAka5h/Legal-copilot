@@ -274,7 +274,9 @@ def test_recall_at_10_on_bangla_eval(lawyer_case):
 
 
 def test_query_model_mismatch_is_refused_with_503(lawyer_case, monkeypatch):
-    """legal_copilot_test holds e5 vectors: a gemini query embedder must not be compared with them."""
+    """legal_copilot_test holds e5-small vectors: a gemini query embedder must not be compared with them."""
+    from app.config import Settings
+    from app.rag.search.providers import embedding_target
     from app.rag.search import router as search_router
 
     class OtherModel:
@@ -291,18 +293,20 @@ def test_query_model_mismatch_is_refused_with_503(lawyer_case, monkeypatch):
                            json={"query": "cheque dishonour"})
     assert response.status_code == 503, response.text
     detail = response.json()["detail"]
-    assert detail.startswith("EMBEDDING_MODEL_MISMATCH") and "intfloat/multilingual-e5-large v1" in detail
+    target = embedding_target(Settings())
+    assert detail.startswith("EMBEDDING_MODEL_MISMATCH") and f"{target.model} v{target.version}" in detail
     assert OtherModel.calls == 0
 
 
 def test_embedding_outage_falls_back_to_keyword_only_and_says_so(lawyer_case, monkeypatch):
-    from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION
+    from app.config import Settings
+    from app.rag.search.providers import embedding_target
     from app.rag.search import router as search_router
     from app.rag.search.errors import EmbeddingUnavailable
     from app.rag.search.retrieval import KEYWORD_ONLY_WARNING
 
     class QuotaExhausted:
-        model_name, embedding_version = EMBEDDING_MODEL, EMBEDDING_VERSION
+        model_name, embedding_version = embedding_target(Settings()).model, embedding_target(Settings()).version
 
         def embed_query(self, query):
             raise EmbeddingUnavailable("Gemini answered HTTP 429")
@@ -315,13 +319,14 @@ def test_embedding_outage_falls_back_to_keyword_only_and_says_so(lawyer_case, mo
 
 
 def test_keyword_fallback_can_be_disabled(lawyer_case):
-    from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION
+    from app.config import Settings
+    from app.rag.search.providers import embedding_target
     from app.rag.search.errors import EmbeddingUnavailable
     from app.rag.search.providers import get_reranker
     from app.rag.search.retrieval import hybrid_search
 
     class QuotaExhausted:
-        model_name, embedding_version = EMBEDDING_MODEL, EMBEDDING_VERSION
+        model_name, embedding_version = embedding_target(Settings()).model, embedding_target(Settings()).version
 
         def embed_query(self, query):
             raise EmbeddingUnavailable("Gemini answered HTTP 429")

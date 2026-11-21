@@ -1,7 +1,9 @@
 """Query embedder and reranker providers for legal search.
 
 EMBEDDING_PROVIDER selects the query embedder:
-- `local` (default): intfloat/multilingual-e5-large via sentence-transformers on
+- `e5_small_onnx` (default): intfloat/multilingual-e5-small as an ONNX int8 model on
+  this server (app.rag.search.e5_small_onnx), 384 dims, no torch, no API key.
+- `local`: intfloat/multilingual-e5-large via sentence-transformers on
   this server. Needs the optional `ml` dependency group (torch).
 - `hf_api`: the same e5 model on the Hugging Face Inference API (hf-inference
   provider); same vectors as `local`.
@@ -30,12 +32,27 @@ import httpx
 from app.config import Settings
 from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION, MAX_TOKENS
 from app.rag.search.errors import EmbeddingModelMismatch, EmbeddingUnavailable, ProviderNotConfigured
-from app.rag.search.gemini_embeddings import GEMINI_EMBEDDING_VERSION, GeminiEmbeddingClient, GeminiQueryEmbedder
+from app.rag.search.e5_small_onnx import (
+    E5_SMALL_DIM,
+    E5_SMALL_MODEL,
+    E5_SMALL_VERSION,
+    E5SmallOnnx,
+    E5SmallQueryEmbedder,
+)
+from app.rag.search.gemini_embeddings import (
+    GEMINI_DIM,
+    GEMINI_EMBEDDING_VERSION,
+    GeminiEmbeddingClient,
+    GeminiQueryEmbedder,
+)
 from app.rag.text import nfc
 
 QUERY_PREFIX = "query: "
 EMBEDDING_DIM = 1024
-EMBEDDING_PROVIDERS = ("local", "hf_api", "gemini")
+EMBEDDING_PROVIDERS = ("e5_small_onnx", "local", "hf_api", "gemini")
+# Vector size per provider; legal_chunks.embedding takes any of them (migration 0021).
+PROVIDER_DIMENSIONS = {"e5_small_onnx": E5_SMALL_DIM, "local": EMBEDDING_DIM, "hf_api": EMBEDDING_DIM,
+                       "gemini": GEMINI_DIM}
 OFF_SERVER_PROVIDERS = ("hf_api", "gemini")
 HF_FEATURE_EXTRACTION_URL = (
     f"https://router.huggingface.co/hf-inference/models/{EMBEDDING_MODEL}/pipeline/feature-extraction"
@@ -56,12 +73,17 @@ class EmbeddingTarget:
     provider: str
     model: str
     version: int
+    dimension: int
 
 
 def embedding_target(settings: Settings) -> EmbeddingTarget:
-    if settings.embedding_provider == "gemini":
-        return EmbeddingTarget("gemini", settings.gemini_embedding_model, GEMINI_EMBEDDING_VERSION)
-    return EmbeddingTarget(settings.embedding_provider, EMBEDDING_MODEL, EMBEDDING_VERSION)
+    provider = settings.embedding_provider
+    dimension = PROVIDER_DIMENSIONS[provider]
+    if provider == "e5_small_onnx":
+        return EmbeddingTarget(provider, E5_SMALL_MODEL, E5_SMALL_VERSION, dimension)
+    if provider == "gemini":
+        return EmbeddingTarget(provider, settings.gemini_embedding_model, GEMINI_EMBEDDING_VERSION, dimension)
+    return EmbeddingTarget(provider, EMBEDDING_MODEL, EMBEDDING_VERSION, dimension)
 
 
 def gemini_client(settings: Settings, **kwargs: Any) -> GeminiEmbeddingClient:
@@ -206,6 +228,11 @@ class CrossEncoderReranker:
 
 def build_query_embedder(settings: Settings) -> QueryEmbedder:
     provider = settings.embedding_provider
+    if provider == "e5_small_onnx":
+        try:
+            return E5SmallQueryEmbedder(E5SmallOnnx(threads=settings.e5_onnx_threads))
+        except Exception as error:  # model files missing or not the pinned build, out of memory
+            raise ProviderNotConfigured(f"Query embedder unavailable: {type(error).__name__}: {error}") from error
     if provider in OFF_SERVER_PROVIDERS and settings.app_env == "production":
         raise ProviderNotConfigured(f"{provider} sends query text off the server; not approved in production")
     if provider == "gemini":

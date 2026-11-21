@@ -8,7 +8,8 @@ from app.auth.repository import write_audit_event
 from app.cases.dependencies import CaseAccessDep
 from app.errors import problem_responses
 from app.rag.search.providers import ProviderNotConfigured, get_query_embedder, get_reranker
-from app.rag.search.retrieval import hybrid_search
+from app.rag.search.query_rewrite import get_query_rewriter
+from app.rag.search.retrieval import rewritten_search
 from app.rag.search.schemas import ResearchSearchHit, ResearchSearchRequest, ResearchSearchResponse
 
 router = APIRouter(prefix="/api/v1/lawyer", tags=["legal-research"])
@@ -18,9 +19,13 @@ router = APIRouter(prefix="/api/v1/lawyer", tags=["legal-research"])
     "/cases/{case_id}/research/search",
     summary="Search approved Bangladesh statutes for a case",
     description=(
-        "Hybrid search over the legal knowledge base: e5-large vector search (HNSW, cosine) "
-        "and 'simple' full-text search fused with Reciprocal Rank Fusion (k=60), then a "
-        "reranker (mock by default). Only approved, current statute versions are searched. "
+        "Hybrid search over the legal knowledge base: vector search with EMBEDDING_PROVIDER's "
+        "model (multilingual-e5-small by default; HNSW, cosine) and 'simple' full-text search, "
+        "fused with weighted Reciprocal Rank Fusion (k=30, vector weight 1.5), then a reranker "
+        "(mock by default). The query is also rewritten once by the configured LLM into Bangla, "
+        "English and legal keywords, and those result lists are fused too (one LLM call per new "
+        "query, cached; without an LLM, or if it fails, the query is searched as typed and the "
+        "`rewrite_failed` warning says so). Only approved, current statute versions are searched. "
         "With `incident_date`, sections not in force on that date are excluded; sections whose "
         "status is unknown are included and flagged. Bangla and English versions of the same "
         "section are merged and returned as alternates. Results are retrieved sources, not "
@@ -47,9 +52,10 @@ async def search_case_research(
             detail="NOT_CONFIGURED: legal search models are not available on this server.",
         ) from error
 
-    result = await hybrid_search(
+    result, rewrite = await rewritten_search(
         session,
         query=payload.query,
+        rewriter=get_query_rewriter(),
         embedder=embedder,
         reranker=reranker,
         language=payload.language,
@@ -73,6 +79,8 @@ async def search_case_research(
             "language": payload.language,
             "incident_date": payload.incident_date.isoformat() if payload.incident_date else None,
             "reranker": result.reranker,
+            "query_variants": len(rewrite.queries),
+            "llm_calls": int(rewrite.llm_called),
         },
     )
     return ResearchSearchResponse(

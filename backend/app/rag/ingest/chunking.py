@@ -4,25 +4,26 @@ Every chunk is `header + body slice`, where the body slice is an exact
 substring of the section text (word boundaries, no re-encoding), so quotes can
 later be checked against stored text. Token counts include the "passage: "
 prefix and special tokens, which is exactly what the embedder will encode.
+The tokenizer is the one bundled with the e5-small ONNX model (XLM-R, the same token ids
+as e5-large). It keeps a trailing-whitespace token that transformers drops, so a few
+sections split one word differently from chunks made before 2026-11-22; both fit 512.
 """
 
 import re
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
+from app.rag.search.e5_small_onnx import E5_SMALL_MAX_TOKENS, PASSAGE_PREFIX, load_tokenizer
 from app.rag.text import nfc
 
+# Label of the 1024-dim e5 providers (EMBEDDING_PROVIDER=local / hf_api). New chunks are
+# labelled with the configured provider's model (pipeline.configured_embedding_label).
 EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
 EMBEDDING_VERSION = 1
-PASSAGE_PREFIX = "passage: "
-MAX_TOKENS = 512
+MAX_TOKENS = E5_SMALL_MAX_TOKENS  # 512 for e5-small and e5-large (same XLM-R tokenizer)
 MAX_WORDS = 400
 OVERLAP = 0.15
 _WORD = re.compile(r"\S+")
-
-
-class Tokenizer(Protocol):
-    def __call__(self, text: str, **kwargs: Any) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -33,19 +34,20 @@ class Chunk:
 
 
 class TokenCounter:
-    """Counts tokens the way the embedder sees them: prefix + text + special tokens."""
+    """Counts tokens the way the embedder sees them: prefix + text + special tokens.
 
-    def __init__(self, tokenizer: Tokenizer):
+    `tokenizer` is a `tokenizers.Tokenizer` without truncation or padding.
+    """
+
+    def __init__(self, tokenizer: Any):
         self.tokenizer = tokenizer
 
     def count(self, text: str) -> int:
-        return len(self.tokenizer(PASSAGE_PREFIX + text)["input_ids"])
+        return len(self.tokenizer.encode(PASSAGE_PREFIX + text).ids)
 
     def word_token_ends(self, body: str, words: list[tuple[int, int]]) -> list[int]:
         """Cumulative body-token count at the end of each word (no prefix/specials)."""
-        offsets = self.tokenizer(body, add_special_tokens=False, return_offsets_mapping=True)[
-            "offset_mapping"
-        ]
+        offsets = self.tokenizer.encode(body, add_special_tokens=False).offsets
         ends, t = [], 0
         for _, word_end in words:
             while t < len(offsets) and offsets[t][0] < word_end:
@@ -54,14 +56,8 @@ class TokenCounter:
         return ends
 
 
-def load_counter(model_name: str = EMBEDDING_MODEL) -> TokenCounter:
-    from transformers import AutoTokenizer
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    # We only measure here; MAX_TOKENS is enforced by chunk_section. This silences
-    # the "longer than maximum sequence length" warning for whole-section counts.
-    tokenizer.model_max_length = 10**9
-    return TokenCounter(tokenizer)
+def load_counter() -> TokenCounter:
+    return TokenCounter(load_tokenizer())
 
 
 _BN_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")

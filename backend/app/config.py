@@ -8,7 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # e5 (2026-11-20, 20-Act set): relevant queries' best cosine >= 0.80, unrelated <= 0.78.
 # gemini-embedding-001 v1 (2026-11-21, 19-Act demo set, eval/retrieval.py): 33 relevant
 # queries' best cosine >= 0.658, 12 off-topic <= 0.589; midpoint of the gap = 0.624.
-DEFAULT_MIN_SIMILARITY = {"local": 0.79, "hf_api": 0.79, "gemini": 0.624}
+# e5_small_onnx (2026-11-22, 19-Act set, rewrite + k=30/dense 1.5, eval/retrieval.py): relevant best
+# cosine >= 0.83, off-topic <= 0.81, midpoint 0.82. PROVISIONAL: recalibrate on the full corpus.
+DEFAULT_MIN_SIMILARITY = {"e5_small_onnx": 0.82, "local": 0.79, "hf_api": 0.79, "gemini": 0.624}
 
 
 class Settings(BaseSettings):
@@ -65,16 +67,26 @@ class Settings(BaseSettings):
     # e.g. gemini-2.5-flash. Unset = straight to the labelled mock.
     gemini_fallback_model: str | None = Field(default=None, min_length=1)
 
-    # Embeddings. local / hf_api: intfloat/multilingual-e5-large (on this server / on the
+    # Embeddings. e5_small_onnx (default): intfloat/multilingual-e5-small, ONNX int8, on this
+    # server (no API key; model bundle from scripts/export_e5_small_onnx.py, E5_ONNX_DIR).
+    # local / hf_api: intfloat/multilingual-e5-large (on this server / on the
     # Hugging Face API). gemini: GEMINI_EMBEDDING_MODEL on the Gemini API (uses
     # GEMINI_API_KEY). hf_api and gemini send text off the server: synthetic demo data
     # only, refused in production (DOCS/providers.md). The legal knowledge base must be
     # embedded with the same model: search refuses a mismatch with 503.
-    embedding_provider: Literal["local", "hf_api", "gemini"] = "local"
+    embedding_provider: Literal["e5_small_onnx", "local", "hf_api", "gemini"] = "e5_small_onnx"
+    # onnxruntime intra-op threads for e5_small_onnx query embedding (1 on the 512 MB Render box).
+    e5_onnx_threads: int = Field(default=1, ge=1, le=64)
     hf_api_token: SecretStr | None = None
     hf_api_timeout_seconds: float = Field(default=30, gt=0)
     gemini_embedding_model: str = Field(default="gemini-embedding-001", min_length=1)
     gemini_embedding_timeout_seconds: float = Field(default=30, gt=0)
+
+    # Legal search and analysis rewrite each new query once with the LLM (LLM_PROVIDER) into
+    # Bangla + English + keywords and fuse the results (app.rag.search.query_rewrite). With
+    # the mock LLM, or if the call fails, the query is searched as typed.
+    search_query_rewrite: bool = True
+    search_rewrite_timeout_seconds: float = Field(default=8, gt=0, le=60)
 
     # Analysis abstains when no retrieved provision reaches this cosine similarity (mock
     # reranker). Unset = the calibrated default for the embedding model, because

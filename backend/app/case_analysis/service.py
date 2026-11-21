@@ -34,7 +34,8 @@ from app.database import user_transaction
 from app.facts import repository as facts_repo
 from app.facts.service import fact_set_hash
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search
+from app.rag.search.query_rewrite import QueryRewriter, get_query_rewriter
+from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search, rewritten_search
 from app.rag.quote_locator import segment_hint
 from app.rag.text import BANGLA_STOPWORDS, normalize_for_match
 from app.rag.verifier import (
@@ -95,14 +96,25 @@ def fact_queries(fact: FactInput) -> list[str]:
 
 
 async def _retrieve(session, facts, embedder, reranker, incident_date, language,
-                    keyword_fallback: bool = True) -> tuple[list[dict], list[str]]:
+                    keyword_fallback: bool = True, rewriter: QueryRewriter | None = None,
+                    llm_calls: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """Searches per fact; the statement itself is also LLM-rewritten (at most one call per fact,
+    cached) when a rewriter is given. `llm_calls`, if given, counts the rewrite calls."""
     by_chunk: dict[UUID, dict[str, Any]] = {}
     warnings: set[str] = set()
     for fact in facts:
-        for query in fact_queries(fact):
-            result = await hybrid_search(session, query=query, embedder=embedder, reranker=reranker,
-                                         language=language, incident_date=incident_date, k=HITS_PER_QUERY,
-                                         keyword_fallback=keyword_fallback)
+        for index, query in enumerate(fact_queries(fact)):
+            if index == 0 and rewriter is not None:
+                result, rewrite = await rewritten_search(
+                    session, query=query, rewriter=rewriter, embedder=embedder, reranker=reranker,
+                    language=language, incident_date=incident_date, k=HITS_PER_QUERY,
+                    keyword_fallback=keyword_fallback)
+                if llm_calls is not None:
+                    llm_calls[0] += rewrite.llm_called
+            else:
+                result = await hybrid_search(session, query=query, embedder=embedder, reranker=reranker,
+                                             language=language, incident_date=incident_date, k=HITS_PER_QUERY,
+                                             keyword_fallback=keyword_fallback)
             warnings.update(result.warnings)
             for hit in result.hits:
                 score = hit.rerank_score if hit.rerank_score is not None else (hit.dense_similarity or 0.0)
@@ -182,6 +194,7 @@ async def run_analysis(
     thresholds: Thresholds,
     trigger: str = "manual",
     trigger_ref_id: UUID | None = None,
+    rewriter: QueryRewriter | None = None,
 ) -> UUID:
     async with user_transaction(session_factory, user_id) as session:
         organization_id = await session.scalar(text("SELECT organization_id FROM public.cases WHERE id = :c"),
@@ -196,7 +209,10 @@ async def run_analysis(
     fact_hash = fact_set_hash(rows)
 
     async with user_transaction(session_factory, user_id) as session:
-        ranked, retrieval_warnings = await _retrieve(session, facts, embedder, reranker, incident_date, language)
+        rewrite_calls = [0]
+        ranked, retrieval_warnings = await _retrieve(session, facts, embedder, reranker, incident_date, language,
+                                                     rewriter=rewriter or get_query_rewriter(),
+                                                     llm_calls=rewrite_calls)
         precedents = await judgments_available(session)
     using_reranker = reranker.name != "mock"
     threshold = thresholds.min_rerank_score if using_reranker else thresholds.min_similarity
@@ -288,7 +304,8 @@ async def run_analysis(
             session, action="analysis.created", actor_user_id=user_id, actor_role="lawyer",
             object_type="case_analysis", object_id=analysis_id, case_id=case_id, ip_address=None, user_agent=None,
             request_id=None, details={"status": status, "findings": len(findings), "origin": origin,
-                                      "version": (previous[1] + 1) if previous else 1},
+                                      "version": (previous[1] + 1) if previous else 1,
+                                      "query_rewrite_llm_calls": rewrite_calls[0]},
         )
     return analysis_id
 

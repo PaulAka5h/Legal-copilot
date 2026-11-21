@@ -25,17 +25,21 @@ dependencies = [
     "google-genai>=3.5.0",
     "pyarrow>=18",
     "minio>=7.2",
+    "onnxruntime>=1.32",
+    "tokenizers>=0.23",
 ]
 
 [dependency-groups]
 dev = [
     "httpx>=0.28,<1",
+    "psycopg2-binary>=2.9",
     "pytest>=9.2.0,<10",
     "testcontainers[postgres]>=4.15.0",
 ]
 # Local embedding/reranking models (torch). Only needed with EMBEDDING_PROVIDER=local,
 # for the embed worker, and for ingestion (tokenizer). Not installed in Dockerfile.render.
 ml = [
+    "onnx>=1.19",
     "sentence-transformers>=6.3.0",
 ]
 
