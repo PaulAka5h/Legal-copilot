@@ -52,7 +52,8 @@ async def generate_structured(
                 raw = await asyncio.to_thread(llm.complete_json, system, user, model_cls.__name__, schema)
                 return Generated(model_cls.model_validate_json(raw), "ai", llm.provider, llm.model, attempts, warnings)
             except httpx.HTTPError as error:
-                warnings.append(f"provider_error:{type(error).__name__}")
+                status = getattr(getattr(error, "response", None), "status_code", None)  # e.g. 429, 503
+                warnings.append(f"provider_error:{type(error).__name__}" + (f":{status}" if status else ""))
                 break
             except (ValidationError, ValueError):
                 warnings.append("invalid_model_output")

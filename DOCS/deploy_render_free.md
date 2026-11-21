@@ -255,12 +255,35 @@ Peak = cgroup `memory.peak` (includes the Tesseract subprocess and page cache; t
 | Scanned A4 PDF, RGB rendering (before this branch) | 300 | **471 MiB (over budget)** |
 | Same, greyscale rendering (this branch) | 300 / 250 / 200 | 182-293 MiB |
 | 24 MP phone photo + 5-page scan, then 2 scans uploaded concurrently | 300 / 250 / 200 | 372 / 344 / 324 MiB |
-| Search + analysis + OCR upload (smoke test) | 250 | _see below_ |
+| Smoke test with real Gemini search + analysis + OCR upload to MinIO, 19-Act Gemini dump (2026-11-21) | 250 | **208 MiB** (idle 117 MiB); 231 MiB after 2 more analyses |
+| Same, first run (Gemini key mis-quoted, so labelled keyword-only fallback) | 250 | 376 MiB |
 
 Greyscale OCR (Tesseract binarizes anyway) plus a pixel budget for photos removed
 most of the memory; `OCR_DPI=250` is set for headroom. Bangla OCR accuracy on the
 test page: 0.966 at 300 DPI, 0.974 at 250, 0.994 at 200.
 
-### hf_api vs local embeddings
+### Smoke test against the Render image (local, 2026-11-21)
 
-_see below_
+`docker run --memory=512m` of `backend/Dockerfile.render`, Postgres 17 with the 19-Act
+Gemini dump restored like Neon (non-superuser owner, RLS forced 37/37), local MinIO,
+real Gemini key:
+
+```
+[PASS] legal search: HTTP 200, 5 hits in 0.8s, mode hybrid, embeddings gemini-embedding-001,
+       top: The Negotiable Instruments Act, 1881 s.138 (cosine 0.7337)
+[PASS] case analysis: HTTP 201 in 3.8s, status succeeded, origin ai_mock (mock), 3 finding(s)
+[PASS] OCR upload to B2: HTTP 201, ready, 1.6s
+ALL PASSED
+```
+
+Analysis retrieval used Gemini (NI Act ss. 138, 84, 31, 136 at cosine 0.64-0.72, above
+the 0.624 threshold; 3 verified findings), but the Gemini **LLM**
+(`gemini-3.5-flash-lite`) answered `503 "This model is currently experiencing high
+demand"` on all three runs, so the findings came from the labelled mock
+(`origin ai_mock`, warning `provider_error:HTTPStatusError:503`). The smoke test only
+requires `status succeeded`; it fails if search is not `mode hybrid`.
+
+### Gemini vs e5 retrieval
+
+See `DOCS/eval_results.md` (19-Act subset): Gemini Recall@10 1.0 on both query sets
+(e5 0.923 / 0.95); abstain threshold 0.624.

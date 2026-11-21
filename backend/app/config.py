@@ -6,7 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Calibrated analysis thresholds per embedding provider (DOCS/eval_results.md).
 # e5 (2026-11-20, 20-Act set): relevant queries' best cosine >= 0.80, unrelated <= 0.78.
-DEFAULT_MIN_SIMILARITY = {"local": 0.79, "hf_api": 0.79, "gemini": 0.79}
+# gemini-embedding-001 v1 (2026-11-21, 19-Act demo set, eval/retrieval.py): 33 relevant
+# queries' best cosine >= 0.658, 12 off-topic <= 0.589; midpoint of the gap = 0.624.
+DEFAULT_MIN_SIMILARITY = {"local": 0.79, "hf_api": 0.79, "gemini": 0.624}
 
 
 class Settings(BaseSettings):

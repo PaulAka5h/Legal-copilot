@@ -96,16 +96,17 @@ def main() -> int:
     r = client.post(f"{case}/research/search", json={"query": SEARCH_QUERY, "k": 5})
     found = r.json() if r.status_code == 200 else {}
     hits = found.get("results", [])
-    ok &= step("legal search", bool(hits),
+    mode = found.get("retrieval_mode")
+    ok &= step("legal search", bool(hits) and mode == "hybrid",
                f"HTTP {r.status_code}, {len(hits)} hits in {time.monotonic() - t:.1f}s, "
-               f"embeddings {found.get('embedding_model')}"
+               f"mode {mode}, embeddings {found.get('embedding_model')}"
                + (f", top: {hits[0].get('act_title')} s.{hits[0].get('section_number')} "
                   f"(cosine {hits[0].get('dense_similarity')})" if hits else "")
                + ("" if r.status_code == 200 else f", {r.text[:200]}"))
 
     if not args.skip_analysis:
         confirmed = client.get(f"{case}/facts/confirmed")
-        if confirmed.status_code == 200 and not confirmed.json():
+        if confirmed.status_code == 200 and not confirmed.json().get("facts"):
             r = client.post(f"{case}/facts", json={"category": "act_or_omission", "statement": FACT})
             step("enter one synthetic fact", r.status_code == 201, f"HTTP {r.status_code}")
         t = time.monotonic()

@@ -118,7 +118,16 @@ async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None
 
     settings = Settings()
     target = embedding_target(settings)
-    embedder, reranker = CountingEmbedder(get_query_embedder()), get_reranker("mock")
+    if target.provider == "gemini":
+        # Paced like bulk embedding: free tier allows 100 texts/min, rejected tries count too.
+        from app.rag.search.gemini_embeddings import GeminiQueryEmbedder
+        from app.rag.search.providers import gemini_client
+
+        inner = GeminiQueryEmbedder(gemini_client(settings, attempts=6, backoff=2.0, max_wait=65.0,
+                                                  texts_per_minute=80))
+    else:
+        inner = get_query_embedder()
+    embedder, reranker = CountingEmbedder(inner), get_reranker("mock")
     engine = create_ingest_engine(os.environ["LEGAL_INGEST_DATABASE_URL"])
     out: dict = {"provider": target.provider, "model": target.model, "embedding_version": target.version,
                  "threshold_in_use": settings.analysis_similarity_threshold, "sets": {}}
