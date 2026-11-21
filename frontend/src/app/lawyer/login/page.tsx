@@ -60,6 +60,7 @@ export default async function LawyerLoginPage() {
         <PasswordField
           label={copy.password}
           ariaLabel={copy.password}
+          defaultValue=""
           showLabel={copy.showPassword}
           hideLabel={copy.hidePassword}
         />
