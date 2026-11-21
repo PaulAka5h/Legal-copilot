@@ -9,7 +9,6 @@ import { MockLoginForm } from "@/components/MockLoginForm";
 import { PasswordField } from "@/components/PasswordField";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { SAMPLE_LAWYER_LOGIN } from "@/lib/sample";
 import { getSession, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -54,7 +53,6 @@ export default async function LawyerLoginPage() {
           <input
             type="email"
             name="email"
-            defaultValue={SAMPLE_LAWYER_LOGIN.email}
             aria-label={copy.email}
             autoComplete="email"
           />
@@ -62,7 +60,6 @@ export default async function LawyerLoginPage() {
         <PasswordField
           label={copy.password}
           ariaLabel={copy.password}
-          defaultValue={SAMPLE_LAWYER_LOGIN.password}
           showLabel={copy.showPassword}
           hideLabel={copy.hidePassword}
         />

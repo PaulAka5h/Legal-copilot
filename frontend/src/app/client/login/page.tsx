@@ -8,7 +8,6 @@ import { Icon } from "@/components/Icon";
 import { MockLoginForm } from "@/components/MockLoginForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { SAMPLE_CLIENT_LOGIN } from "@/lib/sample";
 import { getSession, isMockAuthEnabled } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -44,7 +43,6 @@ export default async function ClientLoginPage() {
         <Field label={copy.email} icon="user">
           <input
             name="email"
-            defaultValue={SAMPLE_CLIENT_LOGIN.email}
             aria-label={copy.email}
             autoComplete="username"
           />
@@ -53,7 +51,6 @@ export default async function ClientLoginPage() {
           <input
             type="password"
             name="password"
-            defaultValue={SAMPLE_CLIENT_LOGIN.password}
             aria-label={copy.password}
             autoComplete="current-password"
           />
