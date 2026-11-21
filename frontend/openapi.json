@@ -632,6 +632,264 @@
     }
    }
   },
+  "/api/v1/auth/password/change": {
+   "post": {
+    "tags": [
+     "authentication"
+    ],
+    "summary": "Change the signed-in user's password",
+    "description": "Verifies the current password and sets a new one (at least 12 characters, different from the current one). Clears the PASSWORD_CHANGE_REQUIRED state of a lawyer-set temporary password and revokes the user's other sessions. Allowed while a password change is required.",
+    "operationId": "change_password_api_v1_auth_password_change_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordChangeRequest",
+        "description": "Current password and the new password"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad Request",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/auth/password/forgot": {
    "post": {
     "tags": [
@@ -2366,8 +2624,8 @@
     "tags": [
      "clients"
     ],
-    "summary": "Create a client profile",
-    "description": "Creates a lawyer-managed client profile in the active organization.",
+    "summary": "Create a client profile and portal login",
+    "description": "Creates a lawyer-managed client profile in the active organization. When an email is given, it also creates the client's portal login: the lawyer's `password` (12+ characters) or, if empty, a generated 16-character one. The plain password is returned once in `temporary_password` and is never stored or logged; the client must change it at first sign-in (PASSWORD_CHANGE_REQUIRED). With `case_id`, the client is linked to that case at once (lead lawyer of an open case only), so no invitation is needed.",
     "operationId": "create_client_endpoint_api_v1_clients_post",
     "requestBody": {
      "content": {
@@ -2386,7 +2644,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ClientResponse"
+         "$ref": "#/components/schemas/ClientCreatedResponse"
         }
        }
       }
@@ -2657,6 +2915,357 @@
           "request_id"
          ],
          "title": "Problem"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/clients/{client_id}/password-reset": {
+   "post": {
+    "tags": [
+     "clients"
+    ],
+    "summary": "Reset a client's portal password",
+    "description": "Generates a new 16-character temporary password, signs the client out of every session, and requires a password change at next sign-in. Creates the login first if the client has an email but no login yet. The plain password is returned once and is never stored or logged.",
+    "operationId": "reset_client_password_endpoint_api_v1_clients__client_id__password_reset_post",
+    "parameters": [
+     {
+      "name": "client_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Client profile ID",
+       "title": "Client Id"
+      },
+      "description": "Client profile ID"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClientPasswordResetResponse"
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Bad Request",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -18641,7 +19250,8 @@
         "type": "null"
        }
       ],
-      "title": "Email"
+      "title": "Email",
+      "description": "Sign-in email. When given, a client login is created."
      },
      "phone": {
       "anyOf": [
@@ -18666,6 +19276,33 @@
        }
       ],
       "title": "Address"
+     },
+     "password": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 256,
+        "minLength": 12
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Password",
+      "description": "Optional temporary password (12+ characters). Empty means the server generates one. The client must change it at first sign-in."
+     },
+     "case_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Case Id",
+      "description": "Optional case to link the client to (lead lawyer only)."
      }
     },
     "additionalProperties": false,
@@ -18674,6 +19311,107 @@
      "display_name"
     ],
     "title": "ClientCreate"
+   },
+   "ClientCreatedResponse": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "organization_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Organization Id"
+     },
+     "display_name": {
+      "type": "string",
+      "title": "Display Name"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "email"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "address": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Address"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "has_account": {
+      "type": "boolean",
+      "title": "Has Account",
+      "description": "True when the client has a portal login."
+     },
+     "temporary_password": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Temporary Password",
+      "description": "Shown once. Present when a login was created; never stored or retrievable again."
+     },
+     "linked_case_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Linked Case Id",
+      "description": "The case the client was linked to, if one was chosen."
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "organization_id",
+     "display_name",
+     "email",
+     "phone",
+     "address",
+     "created_at",
+     "has_account",
+     "temporary_password",
+     "linked_case_id"
+    ],
+    "title": "ClientCreatedResponse"
    },
    "ClientDocumentResponse": {
     "properties": {
@@ -18805,6 +19543,44 @@
     ],
     "title": "ClientNotificationResponse"
    },
+   "ClientPasswordResetResponse": {
+    "properties": {
+     "client_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Client Id"
+     },
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "temporary_password": {
+      "type": "string",
+      "title": "Temporary Password",
+      "description": "Shown once; never stored."
+     },
+     "created_account": {
+      "type": "boolean",
+      "title": "Created Account",
+      "description": "True when this call created the client's first login."
+     },
+     "sessions_revoked": {
+      "type": "integer",
+      "title": "Sessions Revoked",
+      "description": "Client sessions that were signed out."
+     }
+    },
+    "type": "object",
+    "required": [
+     "client_id",
+     "email",
+     "temporary_password",
+     "created_account",
+     "sessions_revoked"
+    ],
+    "title": "ClientPasswordResetResponse"
+   },
    "ClientPatch": {
     "properties": {
      "display_name": {
@@ -18915,6 +19691,11 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "has_account": {
+      "type": "boolean",
+      "title": "Has Account",
+      "description": "True when the client has a portal login."
      }
     },
     "type": "object",
@@ -18925,7 +19706,8 @@
      "email",
      "phone",
      "address",
-     "created_at"
+     "created_at",
+     "has_account"
     ],
     "title": "ClientResponse"
    },
@@ -21001,6 +21783,29 @@
     ],
     "title": "PageVersion"
    },
+   "PasswordChangeRequest": {
+    "properties": {
+     "current_password": {
+      "type": "string",
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Current Password"
+     },
+     "new_password": {
+      "type": "string",
+      "maxLength": 256,
+      "minLength": 12,
+      "title": "New Password"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "current_password",
+     "new_password"
+    ],
+    "title": "PasswordChangeRequest"
+   },
    "PasswordForgotRequest": {
     "properties": {
      "email": {
@@ -22040,6 +22845,12 @@
        "bn"
       ],
       "title": "Preferred Language"
+     },
+     "must_change_password": {
+      "type": "boolean",
+      "title": "Must Change Password",
+      "description": "True until the user replaces a password a lawyer set for them.",
+      "default": false
      }
     },
     "type": "object",

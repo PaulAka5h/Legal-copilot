@@ -9,6 +9,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.dependencies import (
+    AuthenticatedSessionDep,
+    AuthenticatedUserDep,
     CurrentUserDep,
     SESSION_COOKIE_NAME,
     SessionFactoryDep,
@@ -44,6 +46,7 @@ from app.auth.schemas import (
     MfaVerifyRequest,
     MfaVerifyResponse,
     InvitationAcceptRequest,
+    PasswordChangeRequest,
     PasswordForgotRequest,
     PasswordResetRequest,
 )
@@ -215,7 +218,8 @@ async def login(
             await session.execute(
                 text(
                     """
-                    SELECT email::text, full_name, preferred_language
+                    SELECT email::text, full_name, preferred_language,
+                           must_change_password
                     FROM public.users
                     WHERE id = :user_id
                     """
@@ -265,6 +269,80 @@ async def login(
         role=login_user["user_role"],
         full_name=profile["full_name"],
         preferred_language=profile["preferred_language"],
+        must_change_password=profile["must_change_password"],
+    )
+
+
+@auth_router.post(
+    "/password/change",
+    summary="Change the signed-in user's password",
+    description=(
+        "Verifies the current password and sets a new one (at least 12 characters, "
+        "different from the current one). Clears the PASSWORD_CHANGE_REQUIRED state "
+        "of a lawyer-set temporary password and revokes the user's other sessions. "
+        "Allowed while a password change is required."
+    ),
+    response_model=UserResponse,
+    responses=problem_responses(400, 401, 403, 422, 429, 503),
+)
+async def change_password(
+    request: Request,
+    response: Response,
+    session_factory: SessionFactoryDep,
+    user: AuthenticatedUserDep,
+    session: AuthenticatedSessionDep,
+    payload: Annotated[
+        PasswordChangeRequest,
+        Body(description="Current password and the new password"),
+    ],
+) -> UserResponse:
+    if not await consume_login_attempt(session_factory, request_ip(request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Try again later.",
+        )
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The new password must differ from the current password.",
+        )
+    stored_hash = await session.scalar(
+        text("SELECT password_hash FROM public.users WHERE id = :user_id"),
+        {"user_id": user.id},
+    )
+    if not await asyncio.to_thread(verify_password, stored_hash, payload.current_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The current password is incorrect.",
+        )
+    password_hash = await asyncio.to_thread(hash_password, payload.new_password)
+    revoked = await session.scalar(
+        text("SELECT app.complete_password_change(:password_hash, :session_id)"),
+        {"password_hash": password_hash, "session_id": user.session_id},
+    )
+    await write_audit_event(
+        session,
+        action="auth.password_changed",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="user",
+        object_id=user.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        details={
+            "was_temporary": user.must_change_password,
+            "other_sessions_revoked": revoked or 0,
+        },
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        full_name=user.full_name,
+        preferred_language=user.preferred_language,
+        must_change_password=False,
     )
 
 
@@ -613,8 +691,8 @@ async def accept_invitation(
 async def logout(
     request: Request,
     response: Response,
-    user: CurrentUserDep,
-    session: UserSessionDep,
+    user: AuthenticatedUserDep,
+    session: AuthenticatedSessionDep,
 ) -> MessageResponse:
     await session.execute(
         text("SELECT app.revoke_sessions(:session_id)"),
@@ -646,8 +724,8 @@ async def logout(
 async def logout_all(
     request: Request,
     response: Response,
-    user: CurrentUserDep,
-    session: UserSessionDep,
+    user: AuthenticatedUserDep,
+    session: AuthenticatedSessionDep,
 ) -> MessageResponse:
     await session.execute(
         text("SELECT app.revoke_sessions(NULL)"),

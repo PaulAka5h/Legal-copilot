@@ -79,10 +79,11 @@ def request_ip(request: Request) -> IpAddress:
         return ip_address("127.0.0.1")
 
 
-async def get_current_user(
+async def get_authenticated_user(
     request: Request,
     session_factory: SessionFactoryDep,
 ) -> CurrentUser:
+    """The session's user, even when a password change is still required."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         raise _unauthenticated()
@@ -110,6 +111,7 @@ async def get_current_user(
         full_name=record["full_name"],
         preferred_language=record["preferred_language"],
         session_id=record["session_id"],
+        must_change_password=record["must_change_password"],
     )
     async with user_transaction(session_factory, user.id) as session:
         result = await session.execute(
@@ -142,6 +144,24 @@ def _unauthenticated() -> HTTPException:
     )
 
 
+AuthenticatedUserDep = Annotated[CurrentUser, Depends(get_authenticated_user)]
+
+PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED"
+
+
+def get_current_user(user: AuthenticatedUserDep) -> CurrentUser:
+    """The session's user; refused until a lawyer-set password is changed.
+
+    Only password change and logout use AuthenticatedUserDep instead.
+    """
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{PASSWORD_CHANGE_REQUIRED}: Set a new password to continue.",
+        )
+    return user
+
+
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 
 
@@ -154,6 +174,17 @@ async def get_user_session(
 
 
 UserSessionDep = Annotated[AsyncSession, Depends(get_user_session)]
+
+
+async def get_authenticated_session(
+    session_factory: SessionFactoryDep,
+    user: AuthenticatedUserDep,
+) -> AsyncIterator[AsyncSession]:
+    async with user_transaction(session_factory, user.id) as session:
+        yield session
+
+
+AuthenticatedSessionDep = Annotated[AsyncSession, Depends(get_authenticated_session)]
 
 
 def require_lawyer(user: CurrentUserDep) -> CurrentUser:

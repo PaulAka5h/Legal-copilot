@@ -27,6 +27,10 @@ class UserResponse(BaseModel):
     role: Literal["lawyer", "client", "admin"]
     full_name: str
     preferred_language: Literal["en", "bn"]
+    must_change_password: bool = Field(
+        default=False,
+        description="True until the user replaces a password a lawyer set for them.",
+    )
 
 
 class MessageResponse(BaseModel):
@@ -40,6 +44,7 @@ class CurrentUser(BaseModel):
     full_name: str
     preferred_language: Literal["en", "bn"]
     session_id: UUID
+    must_change_password: bool = False
 
 
 class PasswordForgotRequest(BaseModel):
@@ -50,6 +55,12 @@ class PasswordForgotRequest(BaseModel):
 class PasswordResetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     token: str = Field(min_length=32, max_length=256)
+    new_password: str = Field(min_length=12, max_length=256)
+
+
+class PasswordChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=12, max_length=256)
 
 

@@ -11,7 +11,16 @@ import {
 } from "@/lib/api/backendClient";
 
 export type Role = "lawyer" | "client";
-export type Session = { role: Role; user: Api["UserResponse"] | null };
+/**
+ * passwordChangeRequired: the backend refuses everything but password change
+ * and logout until the user replaces a lawyer-set temporary password. Only
+ * lawyer-created client logins carry it, so such a session is a client one.
+ */
+export type Session = {
+  role: Role;
+  user: Api["UserResponse"] | null;
+  passwordChangeRequired?: boolean;
+};
 export type LoginState =
   | { status: "NOT_CONFIGURED" }
   | { status: "INVALID" }
@@ -55,6 +64,9 @@ export const getSession = cache(async (): Promise<Session | null> => {
 
   try {
     const response = await backendRequest("/api/v1/me", { token: value });
+    if (response.status === 403 && (await isPasswordChangeRequired(response))) {
+      return { role: "client", user: null, passwordChangeRequired: true };
+    }
     if (!response.ok) return null;
     const user = (await response.json()) as Api["UserResponse"];
     return { role: roleFor(user), user };
@@ -63,6 +75,17 @@ export const getSession = cache(async (): Promise<Session | null> => {
     throw error;
   }
 });
+
+export const PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
+
+async function isPasswordChangeRequired(response: Response): Promise<boolean> {
+  try {
+    const problem = (await response.json()) as { detail?: unknown };
+    return typeof problem.detail === "string" && problem.detail.startsWith(PASSWORD_CHANGE_REQUIRED);
+  } catch {
+    return false;
+  }
+}
 
 export async function setMockSession(role: Role): Promise<boolean> {
   if (!isMockAuthEnabled()) return false;
@@ -87,7 +110,7 @@ function tokenFrom(response: Response): string | null {
 export async function signInWithBackend(
   email: string,
   password: string,
-): Promise<{ role: Role } | LoginState> {
+): Promise<{ role: Role; mustChangePassword: boolean } | LoginState> {
   let response: Response;
   try {
     response = await backendRequest("/api/v1/auth/login", {
@@ -105,7 +128,7 @@ export async function signInWithBackend(
   const user = (await response.json()) as Api["UserResponse"];
 
   (await cookies()).set(SESSION_COOKIE, token, cookieOptions());
-  return { role: roleFor(user) };
+  return { role: roleFor(user), mustChangePassword: Boolean(user.must_change_password) };
 }
 
 export async function clearSession() {

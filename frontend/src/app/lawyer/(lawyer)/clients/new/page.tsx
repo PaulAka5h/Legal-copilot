@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/lawyer/PageHeading";
 import { NewClientForm } from "@/components/lawyer/NewClientForm";
-import { dictionaries, titleFor } from "@/lib/i18n";
+import { listMatters } from "@/lib/api/lawyer";
+import { dictionaries, pick, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { isMockAuthEnabled } from "@/lib/session";
 
@@ -13,6 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function NewClientPage() {
   const language = await getLanguage();
   const copy = dictionaries[language];
+  const cases = (await listMatters())
+    .filter((matter) => matter.status !== "closed")
+    .map((matter) => ({ id: matter.id, title: pick(matter.title, language) }));
 
   return (
     <>
@@ -22,7 +26,7 @@ export default async function NewClientPage() {
         subtitle={copy.newClient.subtitle}
       />
       {isMockAuthEnabled() ? <p className="mock-note">{copy.common.mockData}</p> : null}
-      <NewClientForm language={language} />
+      <NewClientForm language={language} cases={cases} />
     </>
   );
 }
