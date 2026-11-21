@@ -33,12 +33,17 @@ class MinioStore:
         if not all((settings.minio_endpoint, settings.minio_access_key, settings.minio_secret_key,
                     settings.minio_bucket)):
             raise StorageNotConfigured("MinIO endpoint, credentials, and bucket are required")
+        endpoint = settings.minio_endpoint
+        if "://" in endpoint or "/" in endpoint:
+            # The minio client rejects paths; B2 wants e.g. s3.us-west-004.backblazeb2.com
+            raise StorageNotConfigured("MINIO_ENDPOINT must be host[:port] only (no https://, no path)")
         self.bucket = settings.minio_bucket
         self.client = Minio(
-            settings.minio_endpoint,
+            endpoint,
             access_key=settings.minio_access_key,
             secret_key=settings.minio_secret_key.get_secret_value(),
             secure=settings.minio_secure,
+            region=settings.minio_region or None,
         )
         self._create_bucket = settings.app_env != "production"
         self._bucket_ready = False

@@ -1,7 +1,7 @@
 {
  "openapi": "3.1.0",
  "info": {
-  "title": "Legal Copilot API",
+  "title": "PokkhoAI API",
   "version": "0.1.0"
  },
  "paths": {
@@ -19280,8 +19280,16 @@
       "title": "Element"
      },
      "element_quote": {
-      "type": "string",
-      "title": "Element Quote"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Element Quote",
+      "description": "Exact span of the cited provision text (located and copied from the database), or null when the model's quote could not be found in the provision and was dropped"
      },
      "matched_fact_id": {
       "anyOf": [
@@ -21404,6 +21412,16 @@
       "type": "integer",
       "title": "Searched Versions",
       "description": "Approved, current source versions searched"
+     },
+     "retrieval_mode": {
+      "type": "string",
+      "enum": [
+       "hybrid",
+       "keyword_only"
+      ],
+      "title": "Retrieval Mode",
+      "description": "keyword_only: the embedding service was unavailable (quota or outage), so results are full-text matches only; show this label to the user",
+      "default": "hybrid"
      },
      "source_scope": {
       "type": "string",

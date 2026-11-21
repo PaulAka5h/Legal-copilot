@@ -64,6 +64,11 @@ class ResearchSearchResponse(BaseModel):
     reranker: str
     embedding_model: str
     searched_versions: int = Field(description="Approved, current source versions searched")
+    retrieval_mode: Literal["hybrid", "keyword_only"] = Field(
+        default="hybrid",
+        description="keyword_only: the embedding service was unavailable (quota or outage), so results are "
+        "full-text matches only; show this label to the user",
+    )
     source_scope: Literal["approved_statutes_only"] = Field(
         default="approved_statutes_only",
         description="Only approved statute versions are searched; no judgments are in the knowledge base",

@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from app.ai.structured import generate_structured
-from app.case_analysis.schemas import AnalysisDraft, ElementDraft, FindingDraft
+from app.case_analysis.schemas import AnalysisDraft, ElementDraft, FindingDraft, QuoteRef
 from app.case_analysis.service import _verify
 from app.rag.verifier import NO_PRECEDENT_NOTE
 from tests.step_c_helpers import ORIGIN, lawyer_with_case, new_client, sql_as
@@ -96,16 +96,18 @@ def test_verifier_strips_and_labels():
     chunks = {chunk_id: {"text": text, "title": "SAMPLE Act", "section_number": "9", "language": "en",
                          "source_url": "https://example.invalid", "section_status": "unknown", "source_status": "unknown",
                          "effective_from": None, "effective_to": None, "review_status": "approved", "is_current": True}}
+    ref = QuoteRef(chunk_id=chunk_id, sentences=[1])
     element = ElementDraft(element="officer neglects duty", element_quote="neglects his duty",
-                           matched_fact_id=uuid4(), status="met")  # fact id not in the confirmed set
+                           matched_fact_id=uuid4(), status="met", element_quote_sentences=[1])  # fact not confirmed
     good = FindingDraft(offence_or_claim="Neglect (see 12 DLR 34)", chunk_id=chunk_id, quote="neglects his duty",
-                        elements=[element], strength="strong", reasons=["About 90% likely to succeed"])
+                        quote_ref=ref, elements=[element], strength="strong", reasons=["About 90% likely to succeed"])
     bad_quote = FindingDraft(offence_or_claim="x", chunk_id=chunk_id, quote="words not in the provision at all",
+                             quote_ref=ref,
                              elements=[ElementDraft(element="y", element_quote="not in text either",
-                                                    matched_fact_id=fact_id, status="met")],
+                                                    matched_fact_id=fact_id, status="met", element_quote_sentences=[])],
                              strength="strong", reasons=["r"])
-    not_retrieved = FindingDraft(offence_or_claim="z", chunk_id=other_chunk, quote="q", elements=[element],
-                                 strength="weak", reasons=["r"])
+    not_retrieved = FindingDraft(offence_or_claim="z", chunk_id=other_chunk, quote="q", quote_ref=ref,
+                                 elements=[element], strength="weak", reasons=["r"])
     findings, summary = _verify(AnalysisDraft(findings=[good, bad_quote, not_retrieved], missing_information=[]),
                                 chunks, {fact_id}, None, {chunk_id}, precedents=False)
     assert summary["stripped_not_retrieved"] == 1 and len(findings) == 2
@@ -116,6 +118,7 @@ def test_verifier_strips_and_labels():
     assert {"probability_language_removed", "precedent_reference_removed"} <= set(summary["scrub_flags"])
     assert second["verification"] == "unverified" and second["strength"] == "insufficient"
     assert "quote_not_in_source" in second["section_citation"]["failures"]
+    assert second["section_citation"]["quote"] is None and second["elements"][0]["element_quote"] is None  # dropped
 
 
 class FakeLLM:
@@ -137,8 +140,8 @@ def test_structured_generation_retries_then_falls_back_to_labelled_mock():
     ok = asyncio.run(generate_structured(FakeLLM(["not json", valid]), AnalysisDraft, "s", "u", mock, True))
     assert (ok.origin, ok.attempts, ok.value.missing_information) == ("ai", 2, ["SAMPLE"])
     request = httpx.Request("POST", "http://x")
-    down = asyncio.run(generate_structured(
-        FakeLLM([httpx.HTTPStatusError("503", request=request, response=httpx.Response(503, request=request))]),
+    down = asyncio.run(generate_structured(  # a transport error is not retried (429/503 are: test_structured_retries)
+        FakeLLM([httpx.ConnectError("down", request=request)]),
         AnalysisDraft, "s", "u", mock, True))
     assert down.origin == "ai_mock" and "fallback_to_mock" in down.warnings
     with pytest.raises(Exception):
@@ -164,3 +167,48 @@ def test_analysis_isolation(api_client, ready_case):
         assert client.get(f"/api/v1/lawyer/cases/{case_id}/analysis").status_code == 403
     assert sql_as(database_url, client_id, "SELECT count(*) FROM public.case_analyses WHERE id = :i",
                   i=analysis["id"])[0][0] == 0
+
+
+class _QuotaExhausted:
+    """An e5-labelled embedder whose API answers 429 (like the Gemini free tier when the quota is used up)."""
+
+    from app.rag.ingest.chunking import EMBEDDING_MODEL as model_name, EMBEDDING_VERSION as embedding_version
+
+    def embed_query(self, query):
+        from app.rag.search.errors import EmbeddingUnavailable
+
+        raise EmbeddingUnavailable("Gemini answered HTTP 429")
+
+
+def test_analysis_falls_back_to_keyword_search_and_is_labelled(api_client, monkeypatch):
+    from app.case_analysis import router as analysis_router
+    from app.rag.search.retrieval import KEYWORD_ONLY_WARNING
+
+    monkeypatch.setattr(analysis_router, "get_query_embedder", lambda: _QuotaExhausted())
+    _, case_id = lawyer_with_case(api_client, "analysis-keyword-only")
+    add_fact(api_client, case_id, NEGLECT)
+    analysis = analyse(api_client, case_id)
+    assert KEYWORD_ONLY_WARNING in analysis["warnings"]
+    assert analysis["retrieved_sources"], "keyword matches must still reach the analysis"
+    assert any("Police" in s["act_title"] for s in analysis["retrieved_sources"])
+
+
+def test_cake_still_abstains_in_keyword_only_mode(api_client, monkeypatch):
+    from app.case_analysis import router as analysis_router
+
+    monkeypatch.setattr(analysis_router, "get_query_embedder", lambda: _QuotaExhausted())
+    _, case_id = lawyer_with_case(api_client, "analysis-keyword-abstain")
+    add_fact(api_client, case_id, "SAMPLE_DATA_NOT_REAL_LAW: the cake recipe needs vanilla frosting and chocolate.",
+             category="other")
+    assert analyse(api_client, case_id)["status"] == "insufficient_information"
+
+
+def test_keyword_support_counts_distinct_content_words():
+    from app.case_analysis.service import keyword_support
+
+    statute = "Every police officer who shall neglect or refuse to record a complaint at a police station ..."
+    assert keyword_support(NEGLECT, statute) >= 3  # police, officer, record, complaint, station
+    cake = "SAMPLE_DATA_NOT_REAL_LAW: the cake recipe needs vanilla frosting and chocolate."
+    assert keyword_support(cake, "This Act is the law of the land; section 2 applies to every sample.") == 0
+    bn = "পুলিশ কর্মকর্তা থানায় অভিযোগ লিপিবদ্ধ করতে অস্বীকার করেছেন।"
+    assert keyword_support(bn, "যে পুলিশ কর্মকর্তা থানায় অভিযোগ লিপিবদ্ধ করিতে অস্বীকার করেন") >= 3

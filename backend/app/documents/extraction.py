@@ -1,6 +1,9 @@
 """Page text extraction: PDF text layer first, Tesseract OCR (ben+eng) for scanned pages.
 
 All page text is NFC. OCR confidence is the mean word confidence (0-1) per page.
+Pages are OCR'd in greyscale (Tesseract binarizes anyway; a third of the memory of
+RGB) at OCR_DPI at most; photos are scaled to the same pixel budget as an A4 page at
+that DPI, which bounds memory (Render free: 512 MB, OCR_DPI=200).
 If Tesseract or the requested languages are missing, scanned pages are stored
 with empty text, ocr_engine 'not_configured', and quality 'needs_review', and an
 `ocr_not_configured` warning is returned. Page text is never logged.
@@ -13,7 +16,8 @@ from functools import lru_cache
 from app.rag.text import nfc
 
 MIN_TEXT_LAYER_CHARS = 25
-OCR_DPI = 300
+OCR_DPI = 300  # default; Settings.ocr_dpi (env OCR_DPI) overrides
+A4_AREA_IN2 = 8.27 * 11.69
 OCR_NOT_CONFIGURED = "not_configured"
 OCR_TIMEOUT_SECONDS = 60  # per call; a timeout fails processing instead of hanging
 
@@ -55,12 +59,19 @@ def detect_language(text: str) -> str:
     return "mixed"  # both scripts carry more than 10% of the letters
 
 
-def render_dpi(width_pt: float, height_pt: float) -> int:
-    """OCR_DPI, lowered so the rendered page never exceeds MAX_IMAGE_PIXELS (memory bound)."""
+def render_dpi(width_pt: float, height_pt: float, max_dpi: int = OCR_DPI) -> int:
+    """max_dpi, lowered so the rendered page never exceeds MAX_IMAGE_PIXELS (memory bound)."""
     from app.documents.validation import MAX_IMAGE_PIXELS
 
     area_in2 = max(width_pt / 72 * height_pt / 72, 1e-6)
-    return max(36, min(OCR_DPI, int((MAX_IMAGE_PIXELS / area_in2) ** 0.5)))
+    return max(36, min(max_dpi, int((MAX_IMAGE_PIXELS / area_in2) ** 0.5)))
+
+
+def ocr_size(width: int, height: int, dpi: int = OCR_DPI) -> tuple[int, int]:
+    """(width, height) scaled down to at most an A4 page's pixels at `dpi`."""
+    budget = A4_AREA_IN2 * dpi * dpi
+    scale = min(1.0, (budget / max(width * height, 1)) ** 0.5)
+    return max(1, int(width * scale)), max(1, int(height * scale))
 
 
 def _quality(confidence: float | None, text: str) -> str:
@@ -90,7 +101,17 @@ def _ocr_page(page_no: int, image, languages: str, engine: str | None) -> PageTe
     return PageText(page_no, text, "ocr", used, confidence, _quality(confidence, text), detect_language(text))
 
 
-def extract_pages(data: bytes, mime_type: str, languages: str) -> tuple[list[PageText], list[str]]:
+def _ocr_image(frame, dpi: int):
+    """Greyscale frame within the OCR pixel budget."""
+    from PIL import Image
+
+    size = ocr_size(frame.width, frame.height, dpi)
+    frame = frame.convert("L")
+    return frame if size == frame.size else frame.resize(size, Image.Resampling.LANCZOS)
+
+
+def extract_pages(data: bytes, mime_type: str, languages: str,
+                  dpi: int = OCR_DPI) -> tuple[list[PageText], list[str]]:
     engine = ocr_engine_for(languages)
     pages: list[PageText] = []
     if mime_type == "application/pdf":
@@ -103,15 +124,19 @@ def extract_pages(data: bytes, mime_type: str, languages: str) -> tuple[list[Pag
                 if len("".join(text.split())) >= MIN_TEXT_LAYER_CHARS:
                     pages.append(PageText(index, text, "text_layer", None, None, "ok", detect_language(text)))
                     continue
-                pixmap = page.get_pixmap(dpi=render_dpi(page.rect.width, page.rect.height))
-                image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+                pixmap = page.get_pixmap(dpi=render_dpi(page.rect.width, page.rect.height, dpi),
+                                         colorspace=pymupdf.csGRAY, alpha=False)
+                image = Image.frombytes("L", (pixmap.width, pixmap.height), pixmap.samples)
+                del pixmap
                 pages.append(_ocr_page(index, image, languages, engine))
     else:
         from PIL import Image, ImageSequence
 
         with Image.open(io.BytesIO(data)) as image:
+            if image.format == "JPEG":  # decode straight to reduced-size greyscale
+                image.draft("L", ocr_size(image.width, image.height, dpi))
             for index, frame in enumerate(ImageSequence.Iterator(image), start=1):
-                pages.append(_ocr_page(index, frame.convert("RGB"), languages, engine))
+                pages.append(_ocr_page(index, _ocr_image(frame, dpi), languages, engine))
 
     warnings = []
     if any(p.ocr_engine == OCR_NOT_CONFIGURED for p in pages):

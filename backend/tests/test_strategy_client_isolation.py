@@ -58,6 +58,8 @@ def _policies(database_url: str, user_id: UUID) -> list[tuple[str, str, str]]:
                                coalesce(qual, '') || ' ' || coalesce(with_check, '')
                         FROM pg_policies
                         WHERE schemaname = 'public' AND tablename = ANY(:tables)
+                          -- Owner-only policies (0019, Neon) cannot admit app_user.
+                          AND roles <> ARRAY['app_owner']::name[]
                         """
                     ),
                     {"tables": list(LAWYER_ONLY_TABLES)},

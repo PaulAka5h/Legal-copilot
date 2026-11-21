@@ -95,6 +95,7 @@ class GeminiLLM:
     timeout: float
     transport: httpx.BaseTransport | None = None
     provider: str = "gemini"
+    fallback_model: str | None = None  # GEMINI_FALLBACK_MODEL: tried when `model` gives up (app.ai.structured)
 
     def complete_json(self, system: str, user: str, schema_name: str, schema: dict[str, Any]) -> str:
         body = {
@@ -133,7 +134,7 @@ def _configured_llm(settings: Settings, transport: httpx.BaseTransport | None) -
         if not settings.gemini_api_key or not settings.gemini_model:
             raise LLMNotConfigured("GEMINI_API_KEY and GEMINI_MODEL are required for gemini")
         return GeminiLLM(settings.gemini_api_key.get_secret_value(), settings.gemini_model,
-                         settings.llm_timeout_seconds, transport)
+                         settings.llm_timeout_seconds, transport, fallback_model=settings.gemini_fallback_model)
     if not settings.llm_base_url or not settings.llm_model:
         raise LLMNotConfigured("LLM_BASE_URL and LLM_MODEL are required for ollama")
     if urlparse(settings.llm_base_url).hostname not in LOCAL_HOSTS:

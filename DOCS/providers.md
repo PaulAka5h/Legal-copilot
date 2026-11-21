@@ -2,7 +2,7 @@
 
 This file is the single list of external services that may receive project data. The LLM gateway reads the approved list from configuration (`LLM_APPROVED_PROVIDERS`) and refuses to send case content to anything not on it.
 
-Last updated: 2026-11-16
+Last updated: 2026-11-21
 
 ## Current state
 
@@ -10,12 +10,17 @@ Last updated: 2026-11-16
 |---|---|---|---|
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
 | Ollama (local, OpenAI-compatible API at `LLM_BASE_URL=http://localhost:11434/v1`) | LLM for fact extraction | Client case data, **development only**; runs on this machine, no data leaves it | Approved by Arafath 2026-11-20 for development; see review record. Production use needs a full review |
-| Google Gemini API (free tier), model from `GEMINI_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Fallback chain: gemini -> mock (unusable provider or transport error); mock output is labelled `ai_mock` |
+| Google Gemini API (free tier), model from `GEMINI_MODEL`, then `GEMINI_FALLBACK_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Fallback chain: `GEMINI_MODEL` (429/503 retried at 2 s, 5 s, 10 s) -> `GEMINI_FALLBACK_MODEL` -> mock, within a 100 s per-request budget; mock output is labelled `ai_mock`; the answering model is logged (`llm.answered`) and stored with the analysis |
 | (none yet) | External LLM for client data | None | No external provider has been reviewed or approved for client case data |
 | self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
 | self-hosted `BAAI/bge-reranker-v2-m3` (optional) | Reranking legal search results | Runs on our own hardware; no external data transfer | Optional via `RERANKER_PROVIDER`; default is the mock reranker |
 | Kaggle Notebooks (GPU compute) | Running the same e5-large model for the legal knowledge base | Public statute text from `legal_chunks` only (exported by `app.rag.embed export`); never case documents, client data, or prompts | Directed by Arafath 2026-11-20 for legal KB embeddings only; review checklist below not completed |
 | (none yet) | OCR | None | Local Tesseract is the default; no cloud OCR approved |
+| Hugging Face Inference API (`hf-inference` provider), same `intfloat/multilingual-e5-large` model | Query embeddings when `EMBEDDING_PROVIDER=hf_api` (Render free demo, no torch) | **SYNTHETIC SAMPLE DATA ONLY**: the text of legal searches and of case facts used as analysis queries leaves the server. Refused when `APP_ENV=production` by code | Directed by the project owner 2026-11-21 for the free Render demo; review checklist not completed. **Replaced by Gemini embeddings the same day** (token invalidated by the owner); the code path remains, refused in production |
+| Google Gemini API (free tier), embedding model from `GEMINI_EMBEDDING_MODEL` (`gemini-embedding-001`, 1024 dims) | Embeddings when `EMBEDDING_PROVIDER=gemini` (Render free demo): legal search queries and case facts used as analysis queries (`RETRIEVAL_QUERY`), and the public statute text of the legal knowledge base (`RETRIEVAL_DOCUMENT`, `python -m app.rag.embed reembed`) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`) plus public statute text. Never client documents. Refused when `APP_ENV=production` by code, same rule as `hf_api` | Directed by the project owner 2026-11-21 for the free Render demo (branch `deploy/render`); review checklist not completed. Same free-tier terms as the Gemini LLM row (Google may use submitted data). Search refuses to compare vectors from different models (503 `EMBEDDING_MODEL_MISMATCH`) |
+| Neon (managed Postgres, free plan) | Database for the Render demo | Synthetic only (demo lawyer, `SAMPLE_DATA_NOT_REAL_LAW` case, public statute text) | Directed by the project owner 2026-11-21 for the demo; review checklist not completed. RLS stays forced (see `deploy/neon_setup.md`) |
+| Backblaze B2 (S3-compatible, free tier) | Original uploaded documents for the Render demo | Synthetic only | Directed by the project owner 2026-11-21 for the demo; review checklist not completed |
+| Render (free web service) | Hosts the demo API container | Synthetic only (processes all demo requests in memory) | Directed by the project owner 2026-11-21 for the demo; review checklist not completed |
 
 Until a provider passes the review below, the platform runs with the mock provider or with synthetic data only. Real client documents must not be uploaded to any environment that can reach an unapproved provider.
 

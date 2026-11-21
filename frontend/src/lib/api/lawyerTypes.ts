@@ -241,6 +241,7 @@ export type CaseAnalysis = {
   version: number;
   status: "succeeded" | "insufficient_information" | "failed";
   aiMock: boolean;
+  keywordOnly: boolean;
   createdAt: string;
   findings: Finding[];
   missingInformation: string[];

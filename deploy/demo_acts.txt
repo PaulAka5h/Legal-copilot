@@ -1,0 +1,20 @@
+# Acts in the Render demo knowledge base (bdlaws act id | language | title | chunks). Gemini-embedded.
+46 | en | The Negotiable Instruments Act, 1881 | 182
+901 | bn | অর্থ ঋণ আদালত আইন, ২০০৩ | 85
+36 | en | The Specific Relief Act, 1877 | 76
+20 | en | The Divorce Act, 1869 | 72
+12 | en | The Police Act, 1861 | 65
+835 | bn | নারী ও শিশু নির্যাতন দমন আইন, ২০০০ | 53
+88 | en | The Limitation Act, 1908 | 31
+13 | en | The Stage-Carriages Act, 1861 | 26
+10 | en | The Societies Registration Act, 1860 | 24
+4 | en | The Public Servants (Inquiries) Act, 1850 | 24
+18 | en | The Sarais Act, 1867 | 21
+23 | en | The Pensions Act, 1871 | 16
+15 | en | The Carriers Act, 1865 | 13
+9 | en | The Hindu Widow's Re-marriage Act, 1856 | 10
+19 | en | The Alluvion (Amendment) Act, 1868 | 8
+7 | en | The Fatal Accidents Act, 1855 | 4
+8 | en | The Bills of Lading Act, 1856 | 3
+6 | en | The Legal Representative Suits Act, 1855 | 2
+17 | en | The Acting Judges Act, 1867 | 2

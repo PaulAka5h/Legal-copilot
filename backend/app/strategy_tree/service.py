@@ -60,7 +60,8 @@ def mock_strategy(findings: list[dict]) -> StrategyDraft:
         met = sum(e["status"] == "met" for e in finding["elements"])
         responses = []
         for element in open_elements:
-            element_basis = [LegalBasisDraft(chunk_id=citation["chunk_id"], quote=element["element_quote"])]
+            element_basis = [LegalBasisDraft(chunk_id=citation["chunk_id"],
+                                             quote=element["element_quote"] or citation["quote"])]
             responses.append(Ply2Draft(
                 actor="opponent",
                 move=f"Argue this element is not proved: {element['element'][:250]}",

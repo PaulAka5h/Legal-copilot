@@ -5,8 +5,10 @@ retrieval with the incident-date filter -> abstain check -> element-by-element
 findings (model or mock) -> deterministic verification -> new immutable version.
 """
 
+import asyncio
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
@@ -32,9 +34,17 @@ from app.database import user_transaction
 from app.facts import repository as facts_repo
 from app.facts.service import fact_set_hash
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.search.retrieval import hybrid_search
-from app.rag.text import normalize_for_match, quote_in_text
-from app.rag.verifier import NO_PRECEDENT_NOTE, judgments_available, load_chunks, scrub, verify_citation
+from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search
+from app.rag.quote_locator import segment_hint
+from app.rag.text import BANGLA_STOPWORDS, normalize_for_match
+from app.rag.verifier import (
+    NO_PRECEDENT_NOTE,
+    judgments_available,
+    load_chunks,
+    locate_in_chunk,
+    scrub,
+    verify_citation,
+)
 
 QUERIES_PER_FACT = 2
 HITS_PER_QUERY = 5
@@ -52,6 +62,28 @@ class Thresholds:
     min_rerank_score: float  # cross-encoder score when a real reranker runs
 
 
+# Keyword-only fallback gate (heuristic, not calibrated): a full-text hit counts only if
+# it shares this many distinct content words with the fact. Generic overlap ("law",
+# "section", the SAMPLE label) must not turn an unrelated fact into a legal finding.
+KEYWORD_MIN_SHARED_WORDS = 3
+_TOKEN = re.compile(r"[^\s.,;:!?()\[\]{}\"'“”‘’।/-]+")
+_EN_STOP = frozenset(
+    "the and that this with from have been were which their there would shall under into upon such "
+    "other about after before being when where what also only than then them they will your said "
+    "sample_data_not_real_law sample data real section act law".split()
+)
+
+
+def _content_words(text_value: str) -> set[str]:
+    words = {w.lower() for w in _TOKEN.findall(normalize_for_match(text_value))}
+    return {w for w in words if len(w) >= 4 and w not in _EN_STOP and w not in BANGLA_STOPWORDS}
+
+
+def keyword_support(statement: str, chunk_text: str) -> int:
+    """Distinct content words of the fact that also occur in the provision text."""
+    return len(_content_words(statement) & _content_words(chunk_text))
+
+
 def fact_queries(fact: FactInput) -> list[str]:
     """Multi-query per fact: the statement, plus its content words (names and filler removed)."""
     statement = normalize_for_match(fact.statement)
@@ -62,13 +94,15 @@ def fact_queries(fact: FactInput) -> list[str]:
     return queries[:QUERIES_PER_FACT]
 
 
-async def _retrieve(session, facts, embedder, reranker, incident_date, language) -> tuple[list[dict], list[str]]:
+async def _retrieve(session, facts, embedder, reranker, incident_date, language,
+                    keyword_fallback: bool = True) -> tuple[list[dict], list[str]]:
     by_chunk: dict[UUID, dict[str, Any]] = {}
     warnings: set[str] = set()
     for fact in facts:
         for query in fact_queries(fact):
             result = await hybrid_search(session, query=query, embedder=embedder, reranker=reranker,
-                                         language=language, incident_date=incident_date, k=HITS_PER_QUERY)
+                                         language=language, incident_date=incident_date, k=HITS_PER_QUERY,
+                                         keyword_fallback=keyword_fallback)
             warnings.update(result.warnings)
             for hit in result.hits:
                 score = hit.rerank_score if hit.rerank_score is not None else (hit.dense_similarity or 0.0)
@@ -83,14 +117,20 @@ def _verify(draft: AnalysisDraft, chunks: dict, fact_ids: set[UUID], incident_da
             retrieved_ids: set[UUID], precedents: bool) -> tuple[list[dict], dict]:
     findings, summary = [], {"findings_in": len(draft.findings), "stripped_not_retrieved": 0,
                              "citations_verified": 0, "citations_failed": 0, "elements_unverified": 0,
-                             "fact_links_removed": 0, "scrub_flags": []}
+                             "fact_links_removed": 0, "quotes_repaired": 0, "quotes_dropped": 0,
+                             "scrub_flags": []}
     for finding in draft.findings:
         if finding.chunk_id not in retrieved_ids:
             summary["stripped_not_retrieved"] += 1  # only retrieved text may be cited
             continue
-        citation = verify_citation(finding.chunk_id, finding.quote, chunks, incident_date)
-        summary["citations_verified" if citation.verified else "citations_failed"] += 1
         chunk_text = chunks.get(finding.chunk_id, {}).get("text", "")
+        ref = finding.quote_ref if finding.quote_ref.chunk_id == finding.chunk_id else None
+        citation = verify_citation(finding.chunk_id, finding.quote, chunks, incident_date,
+                                   segment_hint(chunk_text, ref.sentences) if ref and chunk_text else None)
+        summary["citations_verified" if citation.verified else "citations_failed"] += 1
+        summary["quotes_repaired"] += any(w.startswith("quote_repaired") for w in citation.warnings)
+        summary["quotes_dropped"] += citation.quote is None
+        dropped_elements = 0
         elements = []
         for element in finding.elements:
             fact_id, status = element.matched_fact_id, element.status
@@ -99,15 +139,24 @@ def _verify(draft: AnalysisDraft, chunks: dict, fact_ids: set[UUID], incident_da
                 summary["fact_links_removed"] += 1
             if status == "met" and fact_id is None:
                 status = "missing"
-            element_ok = bool(chunk_text) and quote_in_text(element.element_quote, chunk_text)
+            # Only the exact span from the stored provision is kept; an unlocatable quote is dropped.
+            located = locate_in_chunk(element.element_quote, chunk_text,
+                                      segment_hint(chunk_text, element.element_quote_sentences)) if chunk_text else None
+            element_ok = located is not None
             summary["elements_unverified"] += not element_ok
+            summary["quotes_repaired"] += bool(located and located.method != "exact")
+            summary["quotes_dropped"] += not element_ok
+            dropped_elements += not element_ok
             elements.append({"element": scrub(element.element, summary["scrub_flags"], precedents),
-                             "element_quote": element.element_quote, "matched_fact_id": fact_id,
+                             "element_quote": located.text if located else None, "matched_fact_id": fact_id,
                              "status": status, "verified": element_ok})
         reasons = [scrub(r, summary["scrub_flags"], precedents) for r in finding.reasons]
         verified = citation.verified and all(e["verified"] for e in elements)
         if not citation.verified:
             reasons.append("Citation failed verification: " + ", ".join(citation.failures))
+        if dropped_elements:
+            reasons.append(f"{dropped_elements} element quote(s) not found in the provision text were removed; "
+                           "this finding stays unverified.")
         findings.append({
             "offence_or_claim": scrub(finding.offence_or_claim, summary["scrub_flags"], precedents),
             "section_citation": asdict(citation), "elements": elements,
@@ -151,7 +200,18 @@ async def run_analysis(
         precedents = await judgments_available(session)
     using_reranker = reranker.name != "mock"
     threshold = thresholds.min_rerank_score if using_reranker else thresholds.min_similarity
-    relevant = [e for e in ranked if e["score"] >= threshold]
+    # Keyword-only fallback (embedder unavailable): those hits have no cosine score, so a
+    # full-text match counts as retrieved; the warning travels with the analysis and the
+    # UI labels it.
+    keyword_only = KEYWORD_ONLY_WARNING in retrieval_warnings
+    statements = {f.id: f.statement for f in facts}
+
+    def keyword_relevant(entry: dict) -> bool:
+        hit = entry["hit"]
+        return (keyword_only and hit.dense_similarity is None and hit.sparse_rank is not None
+                and max(keyword_support(statements[f], hit.text) for f in entry["facts"]) >= KEYWORD_MIN_SHARED_WORDS)
+
+    relevant = [e for e in ranked if e["score"] >= threshold or keyword_relevant(e)]
     provisions = [ProvisionInput(e["hit"].chunk_id, e["hit"].act_title, e["hit"].section_number, e["hit"].text)
                   for e in relevant[:MAX_PROVISIONS]]
     retrieved_sources = [{
@@ -182,11 +242,15 @@ async def run_analysis(
         warnings.extend(generated.warnings)
         async with user_transaction(session_factory, user_id) as session:
             chunks = await load_chunks(session, [p.chunk_id for p in provisions])
-        findings, summary = _verify(generated.value, chunks, {f.id for f in facts}, incident_date,
-                                    {p.chunk_id for p in provisions}, precedents)
+        # CPU-bound (quote location); off the event loop so other requests keep moving.
+        findings, summary = await asyncio.to_thread(
+            _verify, generated.value, chunks, {f.id for f in facts}, incident_date,
+            {p.chunk_id for p in provisions}, precedents)
         missing = [scrub(m, summary["scrub_flags"], precedents) for m in generated.value.missing_information]
-        if not any(f["verification"] == "verified" for f in findings):
-            abstain_reason = "insufficient_information: no finding passed citation verification."
+        # Abstain only when no finding has a verified citation. Findings whose element
+        # quotes failed are kept, labelled unverified and capped at insufficient.
+        if not any(f["section_citation"]["verified"] for f in findings):
+            abstain_reason = "insufficient_information: no finding has a verified citation."
 
     status = "insufficient_information" if abstain_reason else "succeeded"
     result = {

@@ -115,7 +115,7 @@ async def submit_hearing_update(
         reassessment_id = await service.submit_update(
             session_factory, case_id=access.case_id, hearing_id=hearing_id, user_id=user.id, payload=payload,
             embedder=embedder, reranker=reranker, llm=llm, allow_mock=mock_allowed(settings),
-            thresholds=Thresholds(settings.analysis_min_similarity, settings.analysis_min_rerank_score))
+            thresholds=Thresholds(settings.analysis_similarity_threshold, settings.analysis_min_rerank_score))
     except LookupError as error:
         raise HTTPException(status_code=404, detail="Hearing was not found.") from error
     except Exception as error:  # analysis needs confirmed facts etc.

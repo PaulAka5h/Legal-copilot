@@ -12,6 +12,10 @@ The AI supports the lawyer. It does not decide cases, guarantee outcomes, or cla
 
 Documentation is written. Code has not been started. See `docs/status.md` for what is done and what is next.
 
+Demo deployment (`DOCS/deploy_render_free.md`): demo knowledge base = 19 Acts (717 chunks, Gemini
+embeddings, free-tier limit); the full corpus pipeline exists (e5: 29 Acts / 2,652 chunks ingested
+and embedded locally; full-dataset dry run 1,176 Acts / 39,637 chunks).
+
 ## Tech stack
 
 | Layer | Choice |

@@ -1,12 +1,19 @@
 """CLI for legal chunk embeddings (as app_admin_ingest, LEGAL_INGEST_DATABASE_URL).
 
-  python -m app.rag.embed run    [--device auto|cpu|cuda] [--batch-size N] [--limit N] [--dry-run]
-  python -m app.rag.embed export --out chunks.jsonl [--limit N]
-  python -m app.rag.embed import --parquet embeddings.parquet [--reject-report PATH]
+  python -m app.rag.embed run     [--provider local|gemini] [--device auto|cpu|cuda] [--batch-size N]
+                                  [--limit N] [--dry-run]
+  python -m app.rag.embed reembed --provider local|gemini --yes [--batch-size N]
+  python -m app.rag.embed export  --out chunks.jsonl [--limit N]
+  python -m app.rag.embed import  --parquet embeddings.parquet [--reject-report PATH]
 
-run embeds locally. export/import offload the model to an external GPU
-(scripts/kaggle_embed.py); only public legal KB text is exported.
-Chunk text is never printed.
+run embeds pending chunks with e5 on this machine (local) or with the Gemini API
+(gemini, GEMINI_API_KEY + GEMINI_EMBEDDING_MODEL; synthetic/public text only).
+--provider defaults to EMBEDDING_PROVIDER (hf_api means local: same e5 model).
+reembed switches the whole knowledge base to that provider's model: it clears every
+vector made by another model (back them up first: deploy/embeddings_backup.sh) and
+embeds again; it is resumable (run it again after an interruption).
+export/import offload e5 to an external GPU (scripts/kaggle_embed.py); only public
+legal KB text is exported. Chunk text is never printed.
 """
 
 import argparse
@@ -19,10 +26,21 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from app.rag.embed.offload import export_pending, import_parquet
-from app.rag.embed.worker import E5Embedder, EmbedStats, count_pending, embed_pending, is_out_of_memory, pick_device
+from app.config import Settings
+from app.rag.embed.worker import (
+    E5Embedder,
+    EmbedStats,
+    count_pending,
+    embed_pending,
+    is_out_of_memory,
+    pick_device,
+    relabel_for,
+)
 from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION
 from app.rag.ingest.records import REPO_ROOT
 from app.rag.ingest.repository import create_ingest_engine
+from app.rag.search.gemini_embeddings import GeminiDocumentEmbedder
+from app.rag.search.providers import embedding_target, gemini_client
 
 DEFAULT_IMPORT_REPORT = REPO_ROOT / "data-scrapper" / "data" / "reports" / "embed_import_rejects.json"
 
@@ -32,11 +50,18 @@ def parse_args() -> argparse.Namespace:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
 
-    run = commands.add_parser("run", help="Embed pending chunks on this machine")
-    run.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    run.add_argument("--batch-size", type=int, default=16, help="Chunks per transaction and model batch")
-    run.add_argument("--limit", type=int, help="Maximum chunks to process in this run")
+    run = commands.add_parser("run", help="Embed pending chunks")
+    reembed = commands.add_parser("reembed", help="Re-embed the whole knowledge base with another model")
+    for sub in (run, reembed):
+        sub.add_argument("--provider", choices=("local", "gemini"), help="Default: EMBEDDING_PROVIDER")
+        sub.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto", help="local only")
+        sub.add_argument("--batch-size", type=int, help="Chunks per transaction (default 16 local, 30 gemini)")
+        sub.add_argument("--limit", type=int, help="Maximum chunks to process in this run")
+        sub.add_argument("--per-minute", type=int, default=90,
+                         help="gemini: texts sent per minute (free tier allows 100; default 90)")
     run.add_argument("--dry-run", action="store_true", help="Only report how many chunks are pending")
+    reembed.add_argument("--yes", action="store_true", required=True,
+                         help="Confirm: vectors from other models are cleared (back them up first)")
 
     export = commands.add_parser("export", help="Write pending chunks to JSONL for an external GPU")
     export.add_argument("--out", type=Path, required=True)
@@ -47,18 +72,40 @@ def parse_args() -> argparse.Namespace:
     imp.add_argument("--reject-report", type=Path, default=DEFAULT_IMPORT_REPORT)
 
     args = parser.parse_args()
-    for name in ("batch_size", "limit"):
+    for name in ("batch_size", "limit", "per_minute"):
         value = getattr(args, name, None)
         if value is not None and value < 1:
             parser.error(f"--{name.replace('_', '-')} must be at least 1")
     return args
 
 
+def resolve_provider(args: argparse.Namespace) -> str:
+    provider = args.provider or Settings().embedding_provider
+    return "gemini" if provider == "gemini" else "local"
+
+
+async def run_gemini(engine, args) -> dict:
+    settings = Settings(embedding_provider="gemini")
+    target = embedding_target(settings)
+    pending_before = await count_pending(engine, target.model, target.version)
+    result = {"model": target.model, "embedding_version": target.version, "pending_before": pending_before}
+    if getattr(args, "dry_run", False) or pending_before == 0:
+        return {**result, "dry_run": getattr(args, "dry_run", False)}
+    # Bulk: patient retries (free-tier per-minute quotas reset within a minute).
+    embedder = GeminiDocumentEmbedder(gemini_client(settings, attempts=10, backoff=2.0, max_wait=65.0,
+                                                    texts_per_minute=args.per_minute))
+    batch = args.batch_size or 30
+    stats = await embed_pending(engine, embedder, batch, args.limit, EmbedStats())
+    return {**result, "batch_size": batch, **asdict(stats),
+            "pending_after": await count_pending(engine, target.model, target.version)}
+
+
 async def run_local(engine, args) -> dict:
     pending_before = await count_pending(engine)
     result = {"model": EMBEDDING_MODEL, "embedding_version": EMBEDDING_VERSION, "pending_before": pending_before}
-    if args.dry_run or pending_before == 0:
-        return {**result, "dry_run": args.dry_run}
+    if getattr(args, "dry_run", False) or pending_before == 0:
+        return {**result, "dry_run": getattr(args, "dry_run", False)}
+    args.batch_size = args.batch_size or 16
 
     device = pick_device(args.device)
     stats = EmbedStats()
@@ -91,8 +138,14 @@ async def run(args: argparse.Namespace) -> dict:
         raise SystemExit("LEGAL_INGEST_DATABASE_URL is required")
     engine = create_ingest_engine(url)
     try:
-        if args.command == "run":
-            return await run_local(engine, args)
+        if args.command in ("run", "reembed"):
+            provider = resolve_provider(args)
+            relabelled = None
+            if args.command == "reembed":
+                target = embedding_target(Settings(embedding_provider=provider))
+                relabelled = await relabel_for(engine, target.model, target.version)
+            result = await (run_gemini if provider == "gemini" else run_local)(engine, args)
+            return result if relabelled is None else {"relabelled": relabelled, **result}
         if args.command == "export":
             rows = await export_pending(engine, args.out, args.limit)
             return {"exported": rows, "out": str(args.out), "model": EMBEDDING_MODEL,

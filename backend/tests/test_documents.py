@@ -187,3 +187,13 @@ def test_oversized_bodies_are_refused_before_authentication(api_client):
         assert json_route.status_code == 413  # 2 MB default for other routes
         assert anonymous.post(url, headers=ORIGIN, files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}
                               ).status_code == 401  # small bodies still reach auth
+
+
+def test_ocr_resolution_is_capped_by_ocr_dpi():
+    from app.documents.extraction import A4_AREA_IN2, ocr_size, render_dpi
+
+    assert render_dpi(595, 842, 200) == 200
+    assert ocr_size(1000, 1000, 200) == (1000, 1000)  # small photos untouched
+    width, height = ocr_size(4000, 6000, 200)  # 24 MP phone photo
+    assert width * height <= A4_AREA_IN2 * 200 * 200
+    assert abs(width / height - 4000 / 6000) < 0.01

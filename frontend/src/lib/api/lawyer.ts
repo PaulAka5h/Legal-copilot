@@ -394,6 +394,8 @@ function toAnalysis(row: Api["AnalysisOut"]): CaseAnalysis {
     version: row.version,
     status: row.status,
     aiMock: row.origin === "ai_mock",
+    // Backend KEYWORD_ONLY_WARNING: semantic search was unavailable for this run.
+    keywordOnly: row.warnings.some((warning) => warning.startsWith("keyword_only_fallback")),
     createdAt: row.created_at,
     findings: row.findings.map((finding) => ({
       claim: finding.offence_or_claim,

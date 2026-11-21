@@ -5,7 +5,8 @@ from typing import Any
 
 
 class StructuredJSONFormatter(logging.Formatter):
-    _safe_fields = ("request_id", "method", "path", "status_code", "exception_type")
+    # Model names and counts are configuration, never case data.
+    _safe_fields = ("request_id", "method", "path", "status_code", "exception_type", "provider", "model", "attempts")
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {

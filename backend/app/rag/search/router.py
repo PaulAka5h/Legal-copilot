@@ -82,4 +82,5 @@ async def search_case_research(
         reranker=result.reranker,
         embedding_model=result.embedding_model,
         searched_versions=result.eligible_versions,
+        retrieval_mode=result.retrieval_mode,
     )

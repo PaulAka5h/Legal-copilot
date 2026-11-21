@@ -14,9 +14,19 @@
 6. bn/en and sub-chunks of one section are merged by canonical_section_id; the
    other language versions are returned as alternates (cite both).
 7. Reranker (mock by default) orders the merged candidates; top k returned.
+Before embedding the query, the (embedding_model, embedding_version) of the
+eligible embedded chunks must equal the query embedder's: a knowledge base embedded
+with another model (or half re-embedded) raises EmbeddingModelMismatch (503) instead
+of returning meaningless neighbours. The dense side also filters on that pair.
+If the embedder is temporarily unavailable (EmbeddingUnavailable: quota 429, outage)
+search falls back to the full-text side only, flagged with KEYWORD_ONLY_WARNING and
+retrieval_mode "keyword_only" so the UI can label it. A model mismatch never falls
+back: it is a configuration error and stays a 503.
 Query text is never logged.
 """
 
+import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -26,6 +36,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.rag.embed.worker import vector_literal
+from app.rag.search.errors import EmbeddingModelMismatch, EmbeddingUnavailable
 from app.rag.search.providers import QueryEmbedder, Reranker
 from app.rag.text import BANGLA_STOPWORDS, nfc
 
@@ -37,6 +48,11 @@ RERANK_POOL = 30
 EF_SEARCH = 100
 
 BN_STOPWORDS = sorted(BANGLA_STOPWORDS)
+KEYWORD_ONLY_WARNING = (
+    "keyword_only_fallback: semantic search is unavailable (embedding quota or outage); "
+    "results matched by keywords only"
+)
+logger = logging.getLogger(__name__)
 INCLUDED_STATUSES = {"in_force", "unknown", "amended", "partly_repealed"}
 
 _ELIGIBLE_VERSIONS = text(
@@ -56,6 +72,16 @@ _ELIGIBLE_VERSIONS = text(
     """
 )
 
+_STORED_MODELS = text(
+    """
+    SELECT DISTINCT embedding_model, embedding_version
+    FROM public.legal_chunks
+    WHERE is_active AND embedding IS NOT NULL
+      AND legal_source_version_id = ANY(CAST(:versions AS uuid[]))
+    ORDER BY 1, 2
+    """
+)
+
 # Full-text query: 'simple' lexemes OR-ed, minus English stopwords (english_stem
 # returns an empty array for them) and the curated Bangla stopwords.
 TSQUERY_SQL = """
@@ -65,12 +91,7 @@ TSQUERY_SQL = """
       AND NOT (l = ANY(CAST(:bn_stopwords AS text[])))
 """
 
-_HYBRID = text(
-    f"""
-    WITH q AS (
-      SELECT ({TSQUERY_SQL}) AS ts
-    ),
-    dense AS (
+_DENSE = f"""
       SELECT d.id, d.dist, row_number() OVER (ORDER BY d.dist) AS r
       FROM (
         -- The query vector must be a bound parameter, not a joined column:
@@ -78,12 +99,15 @@ _HYBRID = text(
         SELECT c.id, c.embedding <=> CAST(:qvec AS vector) AS dist
         FROM public.legal_chunks c
         WHERE c.is_active AND c.embedding IS NOT NULL
+          AND c.embedding_model = :model AND c.embedding_version = :model_version
           AND c.legal_source_version_id = ANY(CAST(:versions AS uuid[]))
         ORDER BY c.embedding <=> CAST(:qvec AS vector)
         LIMIT {DENSE_K}
       ) d
-    ),
-    sparse AS (
+"""
+_NO_DENSE = "SELECT NULL::uuid AS id, NULL::float8 AS dist, NULL::bigint AS r WHERE false"
+
+_FUSED = f"""sparse AS (
       SELECT s.id, row_number() OVER (ORDER BY s.rank DESC, s.id) AS r
       FROM (
         SELECT c.id, ts_rank_cd(c.tsv, q.ts, 1) AS rank  -- 1: divide by 1 + log(length)
@@ -120,8 +144,15 @@ _HYBRID = text(
     JOIN public.legal_source_versions v ON v.id = c.legal_source_version_id
     JOIN public.legal_sources s ON s.id = v.legal_source_id
     ORDER BY f.score DESC, f.id
-    """
-)
+"""
+
+
+def _hybrid_sql(dense: bool):
+    return text(f"WITH q AS (SELECT ({TSQUERY_SQL}) AS ts), dense AS ({_DENSE if dense else _NO_DENSE}), {_FUSED}")
+
+
+_HYBRID = _hybrid_sql(dense=True)
+_KEYWORD_ONLY = _hybrid_sql(dense=False)
 
 
 @dataclass
@@ -163,6 +194,7 @@ class SearchResult:
     reranker: str
     embedding_model: str
     eligible_versions: int
+    retrieval_mode: str = "hybrid"  # or "keyword_only" (embedder unavailable, labelled)
 
 
 def in_force(
@@ -194,6 +226,13 @@ def in_force(
     return True, status, warnings
 
 
+async def check_embedding_model(session: AsyncSession, embedder: QueryEmbedder, versions: list) -> None:
+    """Raise EmbeddingModelMismatch unless every eligible embedded chunk matches the embedder."""
+    stored = [(r[0], r[1]) for r in await session.execute(_STORED_MODELS, {"versions": versions})]
+    if any(pair != (embedder.model_name, embedder.embedding_version) for pair in stored):
+        raise EmbeddingModelMismatch(embedder.model_name, embedder.embedding_version, stored)
+
+
 async def hybrid_search(
     session: AsyncSession,
     *,
@@ -203,6 +242,7 @@ async def hybrid_search(
     language: str | None = None,
     incident_date: date | None = None,
     k: int = 10,
+    keyword_fallback: bool = True,
 ) -> SearchResult:
     query = nfc(query).strip()
     response_warnings = [] if incident_date else ["no_incident_date: in-force status not checked against a date"]
@@ -215,13 +255,22 @@ async def hybrid_search(
         return SearchResult([], [*response_warnings, "no_approved_sources"], reranker.name,
                             embedder.model_name, 0)
 
-    qvec = vector_literal(embedder.embed_query(query))
-    rows = (
-        await session.execute(
-            _HYBRID,
-            {"qvec": qvec, "qtext": query, "versions": versions, "bn_stopwords": BN_STOPWORDS},
-        )
-    ).mappings().all()
+    await check_embedding_model(session, embedder, versions)
+    params = {"qtext": query, "versions": versions, "bn_stopwords": BN_STOPWORDS}
+    mode = "hybrid"
+    try:
+        # Off the event loop: local inference is CPU-bound, remote providers block on HTTP.
+        qvec = vector_literal(await asyncio.to_thread(embedder.embed_query, query))
+    except EmbeddingUnavailable as error:
+        if not keyword_fallback:
+            raise
+        logger.warning("search.keyword_only_fallback",
+                       extra={"event": "search.keyword_only_fallback", "exception_type": type(error).__name__})
+        mode = "keyword_only"
+        response_warnings.append(KEYWORD_ONLY_WARNING)
+    if mode == "hybrid":
+        params.update(qvec=qvec, model=embedder.model_name, model_version=embedder.embedding_version)
+    rows = (await session.execute(_HYBRID if mode == "hybrid" else _KEYWORD_ONLY, params)).mappings().all()
 
     merged: dict[UUID, SearchHit] = {}
     for row in rows:
@@ -244,7 +293,7 @@ async def hybrid_search(
     for hit, score in zip(pool, scores):
         hit.rerank_score = None if reranker.name == "mock" else score
     ranked = [h for _, h in sorted(zip(scores, pool), key=lambda pair: -pair[0])]
-    return SearchResult(ranked[:k], response_warnings, reranker.name, embedder.model_name, len(versions))
+    return SearchResult(ranked[:k], response_warnings, reranker.name, embedder.model_name, len(versions), mode)
 
 
 def _hit(row: Any, status: str, warnings: list[str]) -> SearchHit:

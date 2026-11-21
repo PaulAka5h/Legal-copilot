@@ -153,6 +153,11 @@ export function AnalysisPanel({
         {analysis ? (
           <>
             <DraftNotice copy={copy} aiMock={analysis.aiMock} />
+            {analysis.keywordOnly ? (
+              <p role="status" className="mt-3 text-[10px] font-semibold text-[#806b43]">
+                {copy.keywordOnly}
+              </p>
+            ) : null}
             {analysis.status !== "succeeded" ? (
               <p className="mt-3 text-[10px] font-semibold text-[#806b43]">
                 {copy.insufficient}

@@ -2,8 +2,12 @@
 
 For each cited chunk: it must exist and be readable (RLS), belong to an approved
 and current source version, be in force on the incident date (unknown status
-is allowed but flagged), and any quote must be an NFC, whitespace-normalized
-substring of the stored chunk text. Also scrubs probability language and case
+is allowed but flagged), and any quote must be found in the stored chunk text
+(app.rag.quote_locator: exact, then normalized, then a strict fuzzy match). The stored
+quote is then REPLACED by the exact span of the chunk, so a verified quote is always
+an exact substring of the source; the repair is recorded as a warning
+(quote_repaired:normalized|fuzzy). A quote that cannot be found is dropped (quote None)
+and the citation fails with quote_not_in_source. Also scrubs probability language and case
 citations when no judgment is in the knowledge base (Rules 1 and 4).
 """
 
@@ -15,8 +19,8 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.rag.quote_locator import Located, locate_quote
 from app.rag.search.retrieval import in_force
-from app.rag.text import quote_in_text
 
 NO_PRECEDENT_NOTE = "No precedent in knowledge base: no judgments are ingested, so no case law is cited."
 
@@ -33,6 +37,16 @@ _CHUNKS = text(
     WHERE c.id = ANY(CAST(:ids AS uuid[])) AND c.is_active
     """
 )
+_SENTENCE_LABEL = re.compile(r"\[S\d{1,3}\]\s*")  # prompt labels (case_analysis.analyzer), not source text
+
+
+def locate_in_chunk(quote: str | None, chunk_text: str, hint: tuple[int, int] | None = None) -> Located | None:
+    """Exact source span for a model quote, with the prompt's [S#] labels ignored."""
+    if not quote:
+        return None
+    return locate_quote(_SENTENCE_LABEL.sub("", quote), chunk_text, hint)
+
+
 _PROBABILITY = re.compile(r"\d{1,3}(?:\.\d+)?\s*%|\bper\s?cent\b|\bprobabilit\w*|\bodds\b|শতাংশ|সম্ভাবনা\s*\d", re.I)
 _CASE_CITATION = re.compile(r"\b\d{1,3}\s+(?:DLR|BLD|BLC|MLR|SCOB|BLT|ALR)\b|\b(?:DLR|BLD|BLC|SCOB)\s*\(|\bAIR\s+\d{4}\b"
                             r"|\b[A-Z][a-zA-Z.]+\s+(?:vs?\.?|versus)\s+[A-Z][a-zA-Z.]+")
@@ -59,7 +73,8 @@ async def load_chunks(session: AsyncSession, chunk_ids: list[UUID]) -> dict[UUID
     return {r["id"]: dict(r) for r in rows.mappings()}
 
 
-def verify_citation(chunk_id: UUID, quote: str | None, chunks: dict[UUID, dict], incident_date: date | None) -> Citation:
+def verify_citation(chunk_id: UUID, quote: str | None, chunks: dict[UUID, dict], incident_date: date | None,
+                    hint: tuple[int, int] | None = None) -> Citation:
     chunk = chunks.get(UUID(str(chunk_id)))
     citation = Citation(chunk_id=UUID(str(chunk_id)), quote=quote)
     if chunk is None:
@@ -77,8 +92,15 @@ def verify_citation(chunk_id: UUID, quote: str | None, chunks: dict[UUID, dict],
     citation.warnings.extend(warnings)
     if not include:
         citation.failures.append("not_in_force_on_incident_date")
-    if quote is not None and not quote_in_text(quote, chunk["text"]):
-        citation.failures.append("quote_not_in_source")
+    if quote is not None:
+        located = locate_in_chunk(quote, chunk["text"], hint)
+        if located is None:
+            citation.quote = None  # never keep text that is not in the source
+            citation.failures.append("quote_not_in_source")
+        else:
+            citation.quote = located.text  # exact span from the database, not the model's wording
+            if located.method != "exact":
+                citation.warnings.append(f"quote_repaired:{located.method}")
     citation.verified = not citation.failures
     return citation
 

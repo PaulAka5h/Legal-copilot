@@ -1934,8 +1934,11 @@ export interface components {
         ElementOut: {
             /** Element */
             element: string;
-            /** Element Quote */
-            element_quote: string;
+            /**
+             * Element Quote
+             * @description Exact span of the cited provision text (located and copied from the database), or null when the model's quote could not be found in the provision and was dropped
+             */
+            element_quote: string | null;
             /** Matched Fact Id */
             matched_fact_id: string | null;
             /**
@@ -2769,6 +2772,13 @@ export interface components {
              * @description Approved, current source versions searched
              */
             searched_versions: number;
+            /**
+             * Retrieval Mode
+             * @description keyword_only: the embedding service was unavailable (quota or outage), so results are full-text matches only; show this label to the user
+             * @default hybrid
+             * @enum {string}
+             */
+            retrieval_mode: "hybrid" | "keyword_only";
             /**
              * Source Scope
              * @description Only approved statute versions are searched; no judgments are in the knowledge base

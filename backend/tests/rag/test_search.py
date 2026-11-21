@@ -271,3 +271,71 @@ def test_recall_at_10_on_bangla_eval(lawyer_case):
     misses = [row["query"][:60] for row, r in zip(rows, ranks) if r is None]
     print(f"\nBangla Recall@10 = {recall:.3f} ({len(hits)}/{len(rows)}), MRR@10 = {mrr:.3f}, misses = {misses}")
     assert recall >= BN_RECALL_FLOOR, misses
+
+
+def test_query_model_mismatch_is_refused_with_503(lawyer_case, monkeypatch):
+    """legal_copilot_test holds e5 vectors: a gemini query embedder must not be compared with them."""
+    from app.rag.search import router as search_router
+
+    class OtherModel:
+        model_name, embedding_version = "gemini-embedding-001", 1
+        calls = 0
+
+        def embed_query(self, query):
+            OtherModel.calls += 1
+            raise AssertionError("must refuse before spending an embedding call")
+
+    monkeypatch.setattr(search_router, "get_query_embedder", OtherModel)
+    client, case_id, _, _ = lawyer_case
+    response = client.post(f"/api/v1/lawyer/cases/{case_id}/research/search", headers=ORIGIN,
+                           json={"query": "cheque dishonour"})
+    assert response.status_code == 503, response.text
+    detail = response.json()["detail"]
+    assert detail.startswith("EMBEDDING_MODEL_MISMATCH") and "intfloat/multilingual-e5-large v1" in detail
+    assert OtherModel.calls == 0
+
+
+def test_embedding_outage_falls_back_to_keyword_only_and_says_so(lawyer_case, monkeypatch):
+    from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION
+    from app.rag.search import router as search_router
+    from app.rag.search.errors import EmbeddingUnavailable
+    from app.rag.search.retrieval import KEYWORD_ONLY_WARNING
+
+    class QuotaExhausted:
+        model_name, embedding_version = EMBEDDING_MODEL, EMBEDDING_VERSION
+
+        def embed_query(self, query):
+            raise EmbeddingUnavailable("Gemini answered HTTP 429")
+
+    monkeypatch.setattr(search_router, "get_query_embedder", QuotaExhausted)
+    client, case_id, _, _ = lawyer_case
+    body = _search(client, case_id, query="police officer neglect of duty", k=5)
+    assert body["retrieval_mode"] == "keyword_only" and KEYWORD_ONLY_WARNING in body["warnings"]
+    assert body["results"] and all(h["dense_rank"] is None and h["sparse_rank"] for h in body["results"])
+
+
+def test_keyword_fallback_can_be_disabled(lawyer_case):
+    from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION
+    from app.rag.search.errors import EmbeddingUnavailable
+    from app.rag.search.providers import get_reranker
+    from app.rag.search.retrieval import hybrid_search
+
+    class QuotaExhausted:
+        model_name, embedding_version = EMBEDDING_MODEL, EMBEDDING_VERSION
+
+        def embed_query(self, query):
+            raise EmbeddingUnavailable("Gemini answered HTTP 429")
+
+    _, _, user_id, settings = lawyer_case
+
+    async def run():
+        engine = create_database_engine(settings.database_url)
+        try:
+            async with user_transaction(async_sessionmaker(engine), user_id) as session:
+                await hybrid_search(session, query="police", embedder=QuotaExhausted(), reranker=get_reranker("mock"),
+                                    keyword_fallback=False)
+        finally:
+            await engine.dispose()
+
+    with pytest.raises(EmbeddingUnavailable):
+        asyncio.run(run())
