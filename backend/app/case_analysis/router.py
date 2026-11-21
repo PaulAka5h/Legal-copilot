@@ -64,7 +64,7 @@ async def create_analysis(
         analysis_id = await service.run_analysis(
             session_factory, case_id=access.case_id, user_id=user.id, incident_date=payload.incident_date,
             language=payload.language, embedder=embedder, reranker=reranker, llm=llm, allow_mock=allow_mock,
-            thresholds=service.Thresholds(settings.analysis_min_similarity, settings.analysis_min_rerank_score),
+            thresholds=service.Thresholds(settings.analysis_similarity_threshold, settings.analysis_min_rerank_score),
         )
     except service.AnalysisError as error:
         raise HTTPException(status_code=error.status_code, detail=error.detail) from error

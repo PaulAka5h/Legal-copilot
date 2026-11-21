@@ -4,17 +4,18 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+
+from app.database import asyncpg_url
 
 INGEST_ROLE = "app_admin_ingest"
 
 
 def create_ingest_engine(database_url: str) -> AsyncEngine:
-    url = make_url(database_url)
+    url = asyncpg_url(database_url)
     if url.drivername != "postgresql+asyncpg" or url.username != INGEST_ROLE:
         raise ValueError(f"Ingest database URL must use postgresql+asyncpg as {INGEST_ROLE}")
-    return create_async_engine(database_url, pool_pre_ping=True)
+    return create_async_engine(url, pool_pre_ping=True)
 
 
 async def upsert_source(conn: AsyncConnection, source: dict[str, Any]) -> UUID:

@@ -2770,6 +2770,13 @@ export interface components {
              */
             searched_versions: number;
             /**
+             * Retrieval Mode
+             * @description keyword_only: the embedding service was unavailable (quota or outage), so results are full-text matches only; show this label to the user
+             * @default hybrid
+             * @enum {string}
+             */
+            retrieval_mode: "hybrid" | "keyword_only";
+            /**
              * Source Scope
              * @description Only approved statute versions are searched; no judgments are in the knowledge base
              * @default approved_statutes_only

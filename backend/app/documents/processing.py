@@ -74,7 +74,7 @@ async def process_document(
     try:
         data = await asyncio.to_thread(store.get, document["storage_key"])
         pages, warnings = await asyncio.to_thread(
-            extract_pages, data, document["mime_type"], settings.ocr_languages
+            extract_pages, data, document["mime_type"], settings.ocr_languages, settings.ocr_dpi
         )
     except Exception as error:
         logger.warning("document.processing_failed", extra={"event": "document.processing_failed",

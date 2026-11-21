@@ -16,13 +16,10 @@ dependencies = [
     "pydantic-settings>=2.7,<3",
     "pymupdf>=2.1",
     "pypdf>=7.1.0",
-    "pytest>=9.2.0",
     "python-dotenv>=1,<2",
     "python-docx>=1.2.0",
-    "sentence-transformers>=6.3.0",
     "sqlalchemy[asyncio]>=2,<3",
     "tabulate>=0.10.0",
-    "testcontainers[postgres]>=4.15.0",
     "pytesseract>=0.3.13",
     "uvicorn>=0.54.0",
     "google-genai>=3.5.0",
@@ -33,11 +30,18 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28,<1",
-    "pytest>=8.3,<10",
+    "pytest>=9.2.0,<10",
+    "testcontainers[postgres]>=4.15.0",
+]
+# Local embedding/reranking models (torch). Only needed with EMBEDDING_PROVIDER=local,
+# for the embed worker, and for ingestion (tokenizer). Not installed in Dockerfile.render.
+ml = [
+    "sentence-transformers>=6.3.0",
 ]
 
 [tool.uv]
 package = false
+default-groups = ["dev", "ml"]
 
 [tool.fastapi]
 entrypoint = "app.main:app"

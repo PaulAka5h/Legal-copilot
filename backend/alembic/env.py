@@ -9,6 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.database import asyncpg_url
 
 config = context.config
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -55,6 +56,7 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     url = get_database_url(offline=False)
     bootstrap = context.get_x_argument(as_dictionary=True).get("bootstrap") == "true"
+    url = asyncpg_url(url).render_as_string(hide_password=False)  # Neon's ?sslmode=require
     config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),

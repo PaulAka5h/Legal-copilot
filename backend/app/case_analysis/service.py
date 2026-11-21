@@ -7,6 +7,7 @@ findings (model or mock) -> deterministic verification -> new immutable version.
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
@@ -32,8 +33,8 @@ from app.database import user_transaction
 from app.facts import repository as facts_repo
 from app.facts.service import fact_set_hash
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.search.retrieval import hybrid_search
-from app.rag.text import normalize_for_match, quote_in_text
+from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search
+from app.rag.text import BANGLA_STOPWORDS, normalize_for_match, quote_in_text
 from app.rag.verifier import NO_PRECEDENT_NOTE, judgments_available, load_chunks, scrub, verify_citation
 
 QUERIES_PER_FACT = 2
@@ -52,6 +53,28 @@ class Thresholds:
     min_rerank_score: float  # cross-encoder score when a real reranker runs
 
 
+# Keyword-only fallback gate (heuristic, not calibrated): a full-text hit counts only if
+# it shares this many distinct content words with the fact. Generic overlap ("law",
+# "section", the SAMPLE label) must not turn an unrelated fact into a legal finding.
+KEYWORD_MIN_SHARED_WORDS = 3
+_TOKEN = re.compile(r"[^\s.,;:!?()\[\]{}\"'“”‘’।/-]+")
+_EN_STOP = frozenset(
+    "the and that this with from have been were which their there would shall under into upon such "
+    "other about after before being when where what also only than then them they will your said "
+    "sample_data_not_real_law sample data real section act law".split()
+)
+
+
+def _content_words(text_value: str) -> set[str]:
+    words = {w.lower() for w in _TOKEN.findall(normalize_for_match(text_value))}
+    return {w for w in words if len(w) >= 4 and w not in _EN_STOP and w not in BANGLA_STOPWORDS}
+
+
+def keyword_support(statement: str, chunk_text: str) -> int:
+    """Distinct content words of the fact that also occur in the provision text."""
+    return len(_content_words(statement) & _content_words(chunk_text))
+
+
 def fact_queries(fact: FactInput) -> list[str]:
     """Multi-query per fact: the statement, plus its content words (names and filler removed)."""
     statement = normalize_for_match(fact.statement)
@@ -62,13 +85,15 @@ def fact_queries(fact: FactInput) -> list[str]:
     return queries[:QUERIES_PER_FACT]
 
 
-async def _retrieve(session, facts, embedder, reranker, incident_date, language) -> tuple[list[dict], list[str]]:
+async def _retrieve(session, facts, embedder, reranker, incident_date, language,
+                    keyword_fallback: bool = True) -> tuple[list[dict], list[str]]:
     by_chunk: dict[UUID, dict[str, Any]] = {}
     warnings: set[str] = set()
     for fact in facts:
         for query in fact_queries(fact):
             result = await hybrid_search(session, query=query, embedder=embedder, reranker=reranker,
-                                         language=language, incident_date=incident_date, k=HITS_PER_QUERY)
+                                         language=language, incident_date=incident_date, k=HITS_PER_QUERY,
+                                         keyword_fallback=keyword_fallback)
             warnings.update(result.warnings)
             for hit in result.hits:
                 score = hit.rerank_score if hit.rerank_score is not None else (hit.dense_similarity or 0.0)
@@ -151,7 +176,18 @@ async def run_analysis(
         precedents = await judgments_available(session)
     using_reranker = reranker.name != "mock"
     threshold = thresholds.min_rerank_score if using_reranker else thresholds.min_similarity
-    relevant = [e for e in ranked if e["score"] >= threshold]
+    # Keyword-only fallback (embedder unavailable): those hits have no cosine score, so a
+    # full-text match counts as retrieved; the warning travels with the analysis and the
+    # UI labels it.
+    keyword_only = KEYWORD_ONLY_WARNING in retrieval_warnings
+    statements = {f.id: f.statement for f in facts}
+
+    def keyword_relevant(entry: dict) -> bool:
+        hit = entry["hit"]
+        return (keyword_only and hit.dense_similarity is None and hit.sparse_rank is not None
+                and max(keyword_support(statements[f], hit.text) for f in entry["facts"]) >= KEYWORD_MIN_SHARED_WORDS)
+
+    relevant = [e for e in ranked if e["score"] >= threshold or keyword_relevant(e)]
     provisions = [ProvisionInput(e["hit"].chunk_id, e["hit"].act_title, e["hit"].section_number, e["hit"].text)
                   for e in relevant[:MAX_PROVISIONS]]
     retrieved_sources = [{

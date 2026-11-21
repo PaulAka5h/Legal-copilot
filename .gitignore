@@ -54,3 +54,10 @@ build/
 *.egg-info/
 .coverage
 htmlcov/
+
+# Demo dump: holds the demo lawyer password hash (deploy/make_demo_dump.sh)
+deploy/demo_data.dump
+deploy/demo_data.dump.tmp
+
+# Local embedding backups (deploy/embeddings_backup.sh)
+backups/

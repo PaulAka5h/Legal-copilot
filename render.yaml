@@ -1,0 +1,76 @@
+# Render Blueprint: PokkhoAI API on the FREE plan (512 MB RAM, Docker).
+# Database: Neon. Documents: Backblaze B2. Embeddings + analysis: Gemini API (one key).
+# Step-by-step guide: DOCS/deploy_render_free.md
+#
+# Values marked `sync: false` are secrets or per-account values: Render asks for
+# them when you create the Blueprint and never reads them from this file.
+# SYNTHETIC DEMO DATA ONLY (SAMPLE_DATA_NOT_REAL_LAW): see DOCS/providers.md.
+services:
+  - type: web
+    name: pokkhoai-api
+    runtime: docker
+    plan: free
+    region: singapore            # match your Neon region (AWS ap-southeast-1)
+    branch: deploy/render
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile.render
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # --- App ---
+      - key: APP_ENV
+        value: development        # demo: Gemini (LLM and embeddings) is refused in production by design
+      - key: LOG_LEVEL
+        value: INFO
+      - key: APP_ORIGIN
+        sync: false               # your Vercel URL, e.g. https://pokkhoai.vercel.app (no trailing slash)
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true       # random 256-bit key (Fernet) for MFA secrets
+
+      # --- Database (Neon, runtime role app_user, DIRECT host, not -pooler) ---
+      - key: DATABASE_URL
+        sync: false               # postgresql+asyncpg://app_user:<pw>@<ep-...>.neon.tech/neondb?sslmode=require
+
+      # --- Object storage (Backblaze B2 through the minio client) ---
+      - key: MINIO_ENDPOINT
+        sync: false               # s3.<region>.backblazeb2.com  (host only, no https://, no path)
+      - key: MINIO_REGION
+        sync: false               # e.g. us-west-004 (the <region> part of the endpoint)
+      - key: MINIO_BUCKET
+        sync: false
+      - key: MINIO_ACCESS_KEY
+        sync: false               # B2 keyID
+      - key: MINIO_SECRET_KEY
+        sync: false               # B2 applicationKey
+      - key: MINIO_SECURE
+        value: "true"
+
+      # --- AI providers ---
+      # Query embeddings must use the model the demo knowledge base was embedded with
+      # (deploy/demo_data.dump: gemini-embedding-001, 1024 dims, embedding_version 1);
+      # otherwise search answers 503 EMBEDDING_MODEL_MISMATCH. The analysis threshold
+      # follows the provider (app/config.py DEFAULT_MIN_SIMILARITY).
+      - key: EMBEDDING_PROVIDER
+        value: gemini
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001
+      - key: RERANKER_PROVIDER
+        value: mock
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_APPROVED_PROVIDERS
+        value: gemini,mock
+      - key: GEMINI_API_KEY
+        sync: false               # REQUIRED: legal search embeds queries with it
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+
+      # --- Documents ---
+      - key: MALWARE_SCANNER
+        value: none
+      - key: OCR_LANGUAGES
+        value: ben+eng
+      - key: OCR_DPI
+        value: "250"              # measured peak 344 MiB with 3 concurrent OCR uploads

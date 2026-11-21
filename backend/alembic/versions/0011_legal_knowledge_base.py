@@ -30,9 +30,10 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     op.execute("GRANT USAGE ON SCHEMA public TO app_admin_ingest")
-    op.execute("GRANT USAGE ON SCHEMA app TO app_admin_ingest")
 
     op.execute("SET ROLE app_owner")
+    # As the schema owner, so a non-superuser bootstrap (Neon) may run it too.
+    op.execute("GRANT USAGE ON SCHEMA app TO app_admin_ingest")
     _create_tables()
     _create_indexes()
     _create_functions()

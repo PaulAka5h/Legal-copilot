@@ -107,7 +107,18 @@ def section_row(record: dict[str, Any], position: int) -> dict[str, Any]:
     }
 
 
-def plan_chunks(record: dict[str, Any], counter: TokenCounter) -> list[dict[str, Any]]:
+def configured_embedding_label() -> tuple[str, int]:
+    """(model, version) new chunks are queued for: the EMBEDDING_PROVIDER's model."""
+    from app.config import Settings
+    from app.rag.search.providers import embedding_target
+
+    target = embedding_target(Settings())
+    return target.model, target.version
+
+
+def plan_chunks(
+    record: dict[str, Any], counter: TokenCounter, label: tuple[str, int] = (EMBEDDING_MODEL, EMBEDDING_VERSION)
+) -> list[dict[str, Any]]:
     header = section_header(
         record["act_name"], record.get("act_year"), record.get("section_number"), record.get("section_title")
     )
@@ -119,21 +130,21 @@ def plan_chunks(record: dict[str, Any], counter: TokenCounter) -> list[dict[str,
             "text": chunk.text,
             "token_count": chunk.token_count,
             "content_hash": hashlib.sha256(chunk.text.encode("utf-8")).hexdigest(),
-            "embedding_model": EMBEDDING_MODEL,
-            "embedding_version": EMBEDDING_VERSION,
+            "embedding_model": label[0],
+            "embedding_version": label[1],
         }
         for chunk in chunk_section(header, nfc(record["section_content"]), counter)
     ]
 
 
 def _plan_batch(
-    batch: ActBatch, counter: TokenCounter, summary: IngestSummary
+    batch: ActBatch, counter: TokenCounter, summary: IngestSummary, label: tuple[str, int]
 ) -> list[tuple[dict, list[dict]]] | None:
     """Plan every section of the Act, or return None so no partial version is written."""
     planned = []
     for position, record in enumerate(batch.records):
         try:
-            chunks = plan_chunks(record, counter)
+            chunks = plan_chunks(record, counter, label)
         except ValueError as error:
             summary.chunk_errors.append({"document_id": record["document_id"], "issue": str(error)})
             return None
@@ -164,11 +175,12 @@ async def ingest_batches(
     version starts pending and needs approval like any other.
     """
     summary = IngestSummary()
+    label = configured_embedding_label()
     for batch in batches:
         if limit is not None and summary.acts_seen >= limit:
             break
         summary.acts_seen += 1
-        planned = _plan_batch(batch, counter, summary)
+        planned = _plan_batch(batch, counter, summary, label)
         if planned is None:
             summary.acts_skipped_chunk_error += 1
             continue

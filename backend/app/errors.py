@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.rag.search.errors import EmbeddingModelMismatch, ProviderNotConfigured
+
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 
 
@@ -97,6 +99,40 @@ def register_exception_handlers(app: FastAPI) -> None:
             422,
             "Unprocessable Entity",
             "Request validation failed.",
+        )
+
+    @app.exception_handler(EmbeddingModelMismatch)
+    async def handle_embedding_mismatch(request: Request, exc: EmbeddingModelMismatch) -> JSONResponse:
+        # Model names are configuration, not case data; the query text is never logged.
+        logger.error(
+            "search.embedding_model_mismatch",
+            extra={
+                "event": "search.embedding_model_mismatch",
+                "request_id": getattr(request.state, "request_id", "unknown"),
+                "query_model": f"{exc.query_model} v{exc.query_version}",
+                "stored_models": [f"{m} v{v}" for m, v in exc.stored],
+            },
+        )
+        return problem_response(request, 503, "Service Unavailable", f"EMBEDDING_MODEL_MISMATCH: {exc}")
+
+    @app.exception_handler(ProviderNotConfigured)
+    async def handle_provider_unavailable(
+        request: Request, exc: ProviderNotConfigured
+    ) -> JSONResponse:
+        # Raised mid-request when the embedding model or API fails (e.g. hf_api down).
+        logger.warning(
+            "provider.unavailable",
+            extra={
+                "event": "provider.unavailable",
+                "request_id": getattr(request.state, "request_id", "unknown"),
+                "exception_type": type(exc).__name__,
+            },
+        )
+        return problem_response(
+            request,
+            503,
+            "Service Unavailable",
+            "NOT_CONFIGURED: legal search models are not available on this server.",
         )
 
     @app.exception_handler(Exception)

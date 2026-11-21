@@ -259,6 +259,8 @@ const en = {
       noAnalysis: "No analysis yet. Confirm facts, then run it.",
       version: "Version {number}",
       insufficient: "Insufficient information",
+      keywordOnly:
+        "Keyword-only search: the semantic search service was unavailable (usage limit or outage), so provisions were matched by keywords only. Results may be incomplete. Run the analysis again later.",
       elements: "Elements",
       reasons: "Reasons",
       missingInfo: "Missing information",
@@ -822,6 +824,8 @@ const bn: Dictionary = {
       noAnalysis: "এখনও বিশ্লেষণ হয়নি। তথ্য নিশ্চিত করে চালান।",
       version: "সংস্করণ {number}",
       insufficient: "অপর্যাপ্ত তথ্য",
+      keywordOnly:
+        "শুধু শব্দভিত্তিক অনুসন্ধান: অর্থভিত্তিক অনুসন্ধান সেবা পাওয়া যায়নি (ব্যবহারসীমা বা বিভ্রাট), তাই ধারাগুলো কেবল শব্দ মিলিয়ে খোঁজা হয়েছে। ফলাফল অসম্পূর্ণ হতে পারে। পরে আবার বিশ্লেষণ চালান।",
       elements: "উপাদান",
       reasons: "কারণ",
       missingInfo: "অনুপস্থিত তথ্য",

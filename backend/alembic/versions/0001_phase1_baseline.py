@@ -22,6 +22,64 @@ TABLES = (
 )
 
 
+# Role attributes, applied one at a time and only where they differ. Managed
+# Postgres (Neon) runs the bootstrap as a non-superuser with CREATEROLE, which may
+# not even *mention* SUPERUSER, REPLICATION or BYPASSRLS in ALTER ROLE. Final state
+# on a superuser bootstrap is unchanged. Safety rules:
+# - app_user and app_admin_ingest must end NOSUPERUSER, NOBYPASSRLS, NOREPLICATION;
+#   if that cannot be achieved the migration fails (never weaker isolation).
+# - app_owner gets BYPASSRLS when the bootstrap role may grant it. Otherwise it stays
+#   NOBYPASSRLS (stricter: FORCE RLS then applies to the owner too) with a WARNING.
+# - A non-superuser bootstrap role is given SET (not INHERIT) on app_owner so the
+#   SET ROLE / OWNER TO below work; with CREATEROLE it already administers the role.
+_ROLE_ATTRIBUTES = """
+DO $$
+DECLARE
+  r record;
+  wanted_bypass boolean;
+BEGIN
+  FOR r IN
+    SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolcanlogin,
+           rolreplication, rolbypassrls
+    FROM pg_roles WHERE rolname IN ('app_owner', 'app_user', 'app_admin_ingest')
+  LOOP
+    IF NOT r.rolcanlogin THEN EXECUTE format('ALTER ROLE %I LOGIN', r.rolname); END IF;
+    IF r.rolcreatedb THEN EXECUTE format('ALTER ROLE %I NOCREATEDB', r.rolname); END IF;
+    IF r.rolcreaterole THEN EXECUTE format('ALTER ROLE %I NOCREATEROLE', r.rolname); END IF;
+    IF r.rolinherit THEN EXECUTE format('ALTER ROLE %I NOINHERIT', r.rolname); END IF;
+    IF r.rolsuper THEN EXECUTE format('ALTER ROLE %I NOSUPERUSER', r.rolname); END IF;
+    IF r.rolreplication THEN EXECUTE format('ALTER ROLE %I NOREPLICATION', r.rolname); END IF;
+    wanted_bypass := r.rolname = 'app_owner';
+    IF r.rolbypassrls AND NOT wanted_bypass THEN
+      EXECUTE format('ALTER ROLE %I NOBYPASSRLS', r.rolname);
+    ELSIF wanted_bypass AND NOT r.rolbypassrls THEN
+      BEGIN
+        ALTER ROLE app_owner BYPASSRLS;
+      EXCEPTION WHEN insufficient_privilege THEN
+        RAISE WARNING 'app_owner left NOBYPASSRLS: bootstrap role may not grant BYPASSRLS '
+          '(managed Postgres). Row level security stays forced for the owner as well.';
+      END;
+    END IF;
+  END LOOP;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_roles
+    WHERE rolname IN ('app_owner', 'app_user', 'app_admin_ingest')
+      AND (rolsuper OR rolreplication OR (rolbypassrls AND rolname <> 'app_owner'))
+  ) THEN
+    RAISE EXCEPTION 'runtime roles must be NOSUPERUSER NOREPLICATION and app_user/'
+      'app_admin_ingest NOBYPASSRLS';
+  END IF;
+
+  IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
+     AND NOT pg_has_role(current_user, 'app_owner', 'SET') THEN
+    EXECUTE format('GRANT app_owner TO %I WITH INHERIT FALSE, SET TRUE', current_user);
+  END IF;
+END
+$$
+"""
+
+
 def upgrade() -> None:
     op.execute(
         """
@@ -40,27 +98,17 @@ def upgrade() -> None:
         $$
         """
     )
-    op.execute(
-        "ALTER ROLE app_owner WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-        "NOINHERIT NOREPLICATION BYPASSRLS"
-    )
-    op.execute(
-        "ALTER ROLE app_user WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-        "NOINHERIT NOREPLICATION NOBYPASSRLS"
-    )
-    op.execute(
-        "ALTER ROLE app_admin_ingest WITH LOGIN NOSUPERUSER NOCREATEDB "
-        "NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
-    )
+    op.execute(_ROLE_ATTRIBUTES)
     for extension in ("vector", "pg_trgm", "citext"):
         op.execute(f"CREATE EXTENSION IF NOT EXISTS {extension}")
     op.execute("CREATE SCHEMA IF NOT EXISTS app AUTHORIZATION app_owner")
     op.execute("ALTER SCHEMA app OWNER TO app_owner")
     op.execute("GRANT USAGE, CREATE ON SCHEMA public TO app_owner")
     op.execute("GRANT USAGE ON SCHEMA public TO app_user")
+    op.execute("SET ROLE app_owner")
+    # As the schema owner, so a non-superuser bootstrap (Neon) may run them too.
     op.execute("GRANT USAGE ON SCHEMA app TO app_user")
     op.execute("REVOKE ALL ON SCHEMA app FROM PUBLIC")
-    op.execute("SET ROLE app_owner")
     op.execute(
         "ALTER DEFAULT PRIVILEGES IN SCHEMA app "
         "REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC"
@@ -78,6 +126,15 @@ def upgrade() -> None:
         BEGIN
           IF to_regclass('public.alembic_version') IS NOT NULL THEN
             ALTER TABLE public.alembic_version OWNER TO app_owner;
+            -- A non-superuser bootstrap role (Neon) still has to record the
+            -- remaining bootstrap revisions; grant it only this table.
+            IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+              EXECUTE format(
+                'SET LOCAL ROLE app_owner; '
+                'GRANT SELECT, INSERT, UPDATE, DELETE ON public.alembic_version TO %I',
+                current_user);
+              RESET ROLE;
+            END IF;
           END IF;
         END
         $$

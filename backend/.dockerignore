@@ -1,0 +1,14 @@
+# Keep secrets, virtualenvs and test data out of every image built from backend/.
+.env
+.env.*
+!.env.example
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+tests
+eval
+scripts
+src
+deploy
+*.dump

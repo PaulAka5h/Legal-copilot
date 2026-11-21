@@ -1,6 +1,9 @@
-"""Embed pending legal chunks with multilingual-e5-large (self-hosted).
+"""Embed pending legal chunks.
 
-- Text sent to the model is "passage: " + NFC(chunk text), normalized vectors.
+- Default embedder: multilingual-e5-large (self-hosted), "passage: " + NFC(chunk
+  text), normalized vectors. Gemini (app.rag.search.gemini_embeddings) is the other.
+- A chunk is pending for an embedder when embedding IS NULL and its
+  (embedding_model, embedding_version) label equals the embedder's.
 - Resumable: each batch is its own transaction; pending = embedding IS NULL.
 - Safe with several workers: rows are claimed with FOR UPDATE SKIP LOCKED.
 - Idempotent via content_hash: a chunk whose hash already has an embedding for
@@ -56,12 +59,17 @@ _PENDING = text(
 
 class Embedder(Protocol):
     device: str
+    model_name: str
+    embedding_version: int
 
     def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
 class E5Embedder:
     """sentence-transformers wrapper; fp16 on CUDA to fit small GPUs."""
+
+    model_name = EMBEDDING_MODEL
+    embedding_version = EMBEDDING_VERSION
 
     def __init__(self, device: str, batch_size: int):
         from sentence_transformers import SentenceTransformer
@@ -125,9 +133,34 @@ class EmbedStats:
     total_seconds: float = 0.0
 
 
-async def count_pending(engine: AsyncEngine) -> int:
+def _label(embedder: object) -> dict[str, object]:
+    return {"model": getattr(embedder, "model_name", EMBEDDING_MODEL),
+            "version": getattr(embedder, "embedding_version", EMBEDDING_VERSION)}
+
+
+async def count_pending(engine: AsyncEngine, model: str = EMBEDDING_MODEL, version: int = EMBEDDING_VERSION) -> int:
     async with engine.connect() as conn:
-        return await conn.scalar(_PENDING, {"model": EMBEDDING_MODEL, "version": EMBEDDING_VERSION})
+        return await conn.scalar(_PENDING, {"model": model, "version": version})
+
+
+_RELABEL = text(
+    """
+    UPDATE public.legal_chunks
+    SET embedding = NULL, embedded_at = NULL, embedding_model = :model, embedding_version = :version
+    WHERE is_active AND (embedding_model, embedding_version) IS DISTINCT FROM (:model, :version)
+    """
+)
+
+
+async def relabel_for(engine: AsyncEngine, model: str, version: int) -> int:
+    """Queue every active chunk not already labelled (model, version) for re-embedding.
+
+    Clears the old vectors in one transaction (back them up first). Until the new
+    vectors are written, search with the new model sees only re-embedded chunks and
+    search with the old model refuses (EmbeddingModelMismatch).
+    """
+    async with engine.begin() as conn:
+        return (await conn.execute(_RELABEL, {"model": model, "version": version})).rowcount
 
 
 async def embed_pending(
@@ -140,7 +173,7 @@ async def embed_pending(
     """Embed pending chunks; pass `stats` to keep counting across a retry."""
     stats = stats or EmbedStats()
     started = time.perf_counter()
-    params = {"model": EMBEDDING_MODEL, "version": EMBEDDING_VERSION}
+    params = _label(embedder)
     while limit is None or stats.embedded + stats.reused_by_content_hash < limit:
         remaining = None if limit is None else limit - stats.embedded - stats.reused_by_content_hash
         size = batch_size if remaining is None else min(batch_size, remaining)

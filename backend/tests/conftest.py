@@ -19,6 +19,67 @@ for _secret in ("GEMINI_API_KEY",):
     os.environ.pop(_secret, None)
 os.environ["LLM_PROVIDER"] = "mock"
 os.environ["LLM_APPROVED_PROVIDERS"] = "mock"
+# EMBEDDING_PROVIDER=hf_api runs the suite through the hf_api code path. The HTTP
+# call never leaves the machine: _mock_hf_api answers it (see below).
+os.environ.setdefault("EMBEDDING_PROVIDER", "local")
+if os.environ["EMBEDDING_PROVIDER"] == "hf_api":
+    os.environ["HF_API_TOKEN"] = "hf_mock_token_for_tests"
+
+
+def _hf_api_mock_transport():
+    """Answers feature-extraction like the HF API: token-level e5-large vectors.
+
+    Uses the local model when the `ml` group is installed, so recall tests keep
+    real vectors; otherwise a deterministic hash vector (enough for unit paths).
+    """
+    import hashlib
+    import json
+
+    import httpx
+
+    from app.rag.ingest.chunking import EMBEDDING_MODEL, MAX_TOKENS
+
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        model = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+        model.max_seq_length = MAX_TOKENS
+    except ImportError:
+        model = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "router.huggingface.co"
+        text = json.loads(request.content)["inputs"]
+        if model is not None:
+            tokens = model.encode([text], output_value="token_embeddings", convert_to_numpy=False,
+                                  show_progress_bar=False)[0]
+            return httpx.Response(200, json=[tokens.float().tolist()])
+        digest = hashlib.sha256(text.encode()).digest()
+        return httpx.Response(200, json=[[(digest[i % 32] - 127.5) / 128 for i in range(1024)]])
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _mock_hf_api():
+    if os.environ.get("EMBEDDING_PROVIDER") != "hf_api":
+        yield
+        return
+    from app.rag.search import providers
+
+    mock = _hf_api_mock_transport()
+    original = providers.HFApiQueryEmbedder.__init__
+
+    def patched(self, token, timeout=30.0, transport=None, retry_wait=2.0):
+        original(self, token, timeout, transport or mock, retry_wait)
+
+    providers.HFApiQueryEmbedder.__init__ = patched
+    providers.get_query_embedder.cache_clear()
+    try:
+        yield
+    finally:
+        providers.HFApiQueryEmbedder.__init__ = original
+        providers.get_query_embedder.cache_clear()
 
 
 @pytest.fixture

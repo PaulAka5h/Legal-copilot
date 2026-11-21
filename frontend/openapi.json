@@ -1,7 +1,7 @@
 {
  "openapi": "3.1.0",
  "info": {
-  "title": "Legal Copilot API",
+  "title": "PokkhoAI API",
   "version": "0.1.0"
  },
  "paths": {
@@ -21404,6 +21404,16 @@
       "type": "integer",
       "title": "Searched Versions",
       "description": "Approved, current source versions searched"
+     },
+     "retrieval_mode": {
+      "type": "string",
+      "enum": [
+       "hybrid",
+       "keyword_only"
+      ],
+      "title": "Retrieval Mode",
+      "description": "keyword_only: the embedding service was unavailable (quota or outage), so results are full-text matches only; show this label to the user",
+      "default": "hybrid"
      },
      "source_scope": {
       "type": "string",

@@ -62,11 +62,12 @@ async def evaluate(provider: str, limit: int | None) -> dict:
     try:
         for row in rows:
             async with AsyncSession(engine) as session, session.begin():
-                search = await hybrid_search(session, query=row["fact"], embedder=embedder, reranker=reranker, k=10)
+                search = await hybrid_search(session, query=row["fact"], embedder=embedder, reranker=reranker, k=10,
+                                             keyword_fallback=False)
                 rank = _rank(search.hits, row["expected"])
                 fact = FactInput(uuid4(), row["fact"], row["category"], "lawyer_entered", "undisputed")
-                ranked, _ = await _retrieve(session, [fact], embedder, reranker, None, None)
-                relevant = [e for e in ranked if e["score"] >= settings.analysis_min_similarity][:8]
+                ranked, _ = await _retrieve(session, [fact], embedder, reranker, None, None, keyword_fallback=False)
+                relevant = [e for e in ranked if e["score"] >= settings.analysis_similarity_threshold][:8]
                 provisions = [ProvisionInput(e["hit"].chunk_id, e["hit"].act_title, e["hit"].section_number,
                                              e["hit"].text) for e in relevant]
                 chunks = await load_chunks(session, [p.chunk_id for p in provisions])

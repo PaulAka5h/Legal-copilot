@@ -164,3 +164,48 @@ def test_analysis_isolation(api_client, ready_case):
         assert client.get(f"/api/v1/lawyer/cases/{case_id}/analysis").status_code == 403
     assert sql_as(database_url, client_id, "SELECT count(*) FROM public.case_analyses WHERE id = :i",
                   i=analysis["id"])[0][0] == 0
+
+
+class _QuotaExhausted:
+    """An e5-labelled embedder whose API answers 429 (like the Gemini free tier when the quota is used up)."""
+
+    from app.rag.ingest.chunking import EMBEDDING_MODEL as model_name, EMBEDDING_VERSION as embedding_version
+
+    def embed_query(self, query):
+        from app.rag.search.errors import EmbeddingUnavailable
+
+        raise EmbeddingUnavailable("Gemini answered HTTP 429")
+
+
+def test_analysis_falls_back_to_keyword_search_and_is_labelled(api_client, monkeypatch):
+    from app.case_analysis import router as analysis_router
+    from app.rag.search.retrieval import KEYWORD_ONLY_WARNING
+
+    monkeypatch.setattr(analysis_router, "get_query_embedder", lambda: _QuotaExhausted())
+    _, case_id = lawyer_with_case(api_client, "analysis-keyword-only")
+    add_fact(api_client, case_id, NEGLECT)
+    analysis = analyse(api_client, case_id)
+    assert KEYWORD_ONLY_WARNING in analysis["warnings"]
+    assert analysis["retrieved_sources"], "keyword matches must still reach the analysis"
+    assert any("Police" in s["act_title"] for s in analysis["retrieved_sources"])
+
+
+def test_cake_still_abstains_in_keyword_only_mode(api_client, monkeypatch):
+    from app.case_analysis import router as analysis_router
+
+    monkeypatch.setattr(analysis_router, "get_query_embedder", lambda: _QuotaExhausted())
+    _, case_id = lawyer_with_case(api_client, "analysis-keyword-abstain")
+    add_fact(api_client, case_id, "SAMPLE_DATA_NOT_REAL_LAW: the cake recipe needs vanilla frosting and chocolate.",
+             category="other")
+    assert analyse(api_client, case_id)["status"] == "insufficient_information"
+
+
+def test_keyword_support_counts_distinct_content_words():
+    from app.case_analysis.service import keyword_support
+
+    statute = "Every police officer who shall neglect or refuse to record a complaint at a police station ..."
+    assert keyword_support(NEGLECT, statute) >= 3  # police, officer, record, complaint, station
+    cake = "SAMPLE_DATA_NOT_REAL_LAW: the cake recipe needs vanilla frosting and chocolate."
+    assert keyword_support(cake, "This Act is the law of the land; section 2 applies to every sample.") == 0
+    bn = "পুলিশ কর্মকর্তা থানায় অভিযোগ লিপিবদ্ধ করতে অস্বীকার করেছেন।"
+    assert keyword_support(bn, "যে পুলিশ কর্মকর্তা থানায় অভিযোগ লিপিবদ্ধ করিতে অস্বীকার করেন") >= 3
