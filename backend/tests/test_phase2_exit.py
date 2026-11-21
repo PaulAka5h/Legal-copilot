@@ -85,17 +85,14 @@ def test_phase2_two_tenant_exit_scenario(api_client) -> None:
     lawyer_b = TestClient(
         create_app(lawyer_a.app.state.settings),
         base_url="https://testserver",
-        client=("127.0.3.1", 50000),
     )
     client_a = TestClient(
         create_app(lawyer_a.app.state.settings),
         base_url="https://testserver",
-        client=("127.0.3.2", 50000),
     )
     client_b = TestClient(
         create_app(lawyer_a.app.state.settings),
         base_url="https://testserver",
-        client=("127.0.3.3", 50000),
     )
 
     with lawyer_b:

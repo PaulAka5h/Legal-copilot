@@ -56,7 +56,6 @@ def test_lawyer_dashboard_isolated_by_organization(api_client) -> None:
     other = TestClient(
         create_app(api_client.app.state.settings),
         base_url="https://testserver",
-        client=("127.0.2.2", 50000),
     )
     with other:
         register_login(other, "SAMPLE_DATA_NOT_REAL_LAW Lawyer B")

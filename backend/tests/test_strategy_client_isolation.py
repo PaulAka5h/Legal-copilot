@@ -80,7 +80,6 @@ def test_client_member_cannot_read_strategy_tables(api_client) -> None:
     client = TestClient(
         create_app(lawyer.app.state.settings),
         base_url="https://testserver",
-        client=("127.0.4.2", 50000),
     )
     with client:
         create_invite_and_accept(lawyer, client, case_id, "strat-iso-client")

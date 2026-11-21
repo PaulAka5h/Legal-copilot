@@ -126,6 +126,6 @@ def test_startup_sweep_recovers_documents(api_client):
     stuck = stuck_document(settings, user_id, case_id)
     backdate(settings, user_id, stuck, settings.stuck_processing_minutes + 5)
 
-    with TestClient(create_app(settings), base_url="https://testserver", client=("127.0.8.1", 50000)):
+    with TestClient(create_app(settings), base_url="https://testserver"):
         pass  # lifespan runs the sweep
     assert state(settings, user_id, stuck)[:2] == ("failed", "processing_timeout")

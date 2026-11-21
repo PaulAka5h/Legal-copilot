@@ -77,7 +77,7 @@ def lawyer_case():
         pytest.skip("TEST_DATABASE_URL must point at legal_copilot_test")
     settings = Settings(app_env="test", database_url=database_url, app_origin="http://localhost:3000",
                         session_cookie_secure=True)
-    client = TestClient(create_app(settings), base_url="https://testserver", client=("127.0.5.1", 50000))
+    client = TestClient(create_app(settings), base_url="https://testserver")
     with client:
         user_id = UUID(register_login(client, "search-lawyer"))
         if not _fixture_ready(database_url, user_id):
@@ -153,16 +153,16 @@ def test_access_control_and_audit(lawyer_case):
     path = f"/api/v1/lawyer/cases/{case_id}/research/search"
     query = f"SAMPLE secret query {secrets.token_hex(4)}"
 
-    anonymous = TestClient(create_app(settings), base_url="https://testserver", client=("127.0.5.2", 50000))
+    anonymous = TestClient(create_app(settings), base_url="https://testserver")
     with anonymous:
         assert anonymous.post(path, headers=ORIGIN, json={"query": query}).status_code == 401
 
-    other = TestClient(create_app(settings), base_url="https://testserver", client=("127.0.5.3", 50000))
+    other = TestClient(create_app(settings), base_url="https://testserver")
     with other:
         register_login(other, "search-other-lawyer")
         assert other.post(path, headers=ORIGIN, json={"query": query}).status_code == 404  # not a member
 
-    member_client = TestClient(create_app(settings), base_url="https://testserver", client=("127.0.5.4", 50000))
+    member_client = TestClient(create_app(settings), base_url="https://testserver")
     with member_client:
         create_invite_and_accept(client, member_client, case_id, "search-client")
         assert member_client.post(path, headers=ORIGIN, json={"query": query}).status_code == 403

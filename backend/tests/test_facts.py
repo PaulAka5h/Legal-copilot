@@ -197,7 +197,7 @@ def test_production_refuses_unscanned_upload_and_mock_extraction(local_app_user_
         session_cookie_secure=True, mfa_encryption_key=Fernet.generate_key().decode(),
         minio_bucket=os.getenv("TEST_MINIO_BUCKET"),
     )
-    client = TestClient(create_app(settings), base_url="https://testserver", client=("127.0.7.1", 50000))
+    client = TestClient(create_app(settings), base_url="https://testserver")
     with client:
         _, case_id = lawyer_with_case(client, "prod-refusal")
         response = upload(client, case_id, sample_pdf([EN_DATE]))

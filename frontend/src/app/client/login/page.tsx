@@ -8,8 +8,7 @@ import { Icon } from "@/components/Icon";
 import { MockLoginForm } from "@/components/MockLoginForm";
 import { dictionaries, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
-import { SAMPLE_CLIENT_LOGIN } from "@/lib/sample";
-import { getSession, isMockAuthEnabled } from "@/lib/session";
+import { getSession } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
@@ -35,7 +34,6 @@ export default async function ClientLoginPage() {
       <span className="eyebrow">{copy.portal}</span>
       <h2>{copy.title}</h2>
       <p className="form-intro">{copy.intro}</p>
-      {isMockAuthEnabled() ? <p className="mock-note">{common.mockNotice}</p> : null}
       <MockLoginForm action={clientLogin} notices={{
           NOT_CONFIGURED: common.mockDisabled,
           INVALID: common.loginInvalid,
@@ -44,7 +42,6 @@ export default async function ClientLoginPage() {
         <Field label={copy.email} icon="user">
           <input
             name="email"
-            defaultValue={SAMPLE_CLIENT_LOGIN.email}
             aria-label={copy.email}
             autoComplete="username"
           />
@@ -53,7 +50,6 @@ export default async function ClientLoginPage() {
           <input
             type="password"
             name="password"
-            defaultValue={SAMPLE_CLIENT_LOGIN.password}
             aria-label={copy.password}
             autoComplete="current-password"
           />
@@ -63,17 +59,6 @@ export default async function ClientLoginPage() {
           <Icon name="arrow" size={19} />
         </button>
       </MockLoginForm>
-      <div className="help-note">
-        <Icon name="user" size={17} />
-        <span>{copy.noAccountNote}</span>
-      </div>
-      <div className="help-note">
-        <Icon name="lock" size={17} />
-        <span>
-          {copy.helpTitle}
-          <small>{copy.helpBody}</small>
-        </span>
-      </div>
     </AuthLayout>
   );
 }

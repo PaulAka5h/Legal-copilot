@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
+from psycopg2 import connect
 from sqlalchemy.engine import make_url
 
 from app.config import Settings
@@ -101,6 +102,21 @@ def local_app_user_database_url() -> str:
     return database_url
 
 
+@pytest.fixture(autouse=True, scope="function")
+def _clear_login_rate_limits():
+    """Clear the IP-based login rate limit table before each test so tests
+    running through Starlette TestClient (all from the same host) do not
+    exhaust the per-IP attempt counter."""
+    with connect(
+        host="localhost", port=5433, user="postgres",
+        password="local-development-placeholder", dbname="legal_copilot_test"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM public.auth_login_ip_limits")
+        conn.commit()
+    yield
+
+
 @pytest.fixture
 def api_client(local_app_user_database_url: str):
     app = create_app(
@@ -118,10 +134,6 @@ def api_client(local_app_user_database_url: str):
     client = TestClient(
         app,
         base_url="https://testserver",
-        client=(
-            f"127.0.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}",
-            50000,
-        ),
     )
     with client:
         yield client
