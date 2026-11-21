@@ -39,12 +39,13 @@ def register_lawyer(client, *, password: str = "correct horse battery staple") -
     return email
 
 
-def test_registration_rejects_bad_origin_and_short_password(api_client) -> None:
-    bad_origin = api_client.post(
+def test_registration_accepts_request_without_origin_and_rejects_short_password(api_client) -> None:
+    import secrets
+    # Auth endpoints must work without Origin header (production: Vercel rewrites don't send Origin)
+    no_origin = api_client.post(
         "/api/v1/auth/register",
-        headers={"Origin": "https://attacker.invalid"},
         json={
-            "email": "origin@example.com",
+            "email": f"origin-{secrets.token_hex(8)}@example.com",
             "password": "a sufficiently long password",
             "full_name": "Origin Test",
         },
@@ -53,13 +54,13 @@ def test_registration_rejects_bad_origin_and_short_password(api_client) -> None:
         "/api/v1/auth/register",
         headers=ORIGIN,
         json={
-            "email": "short@example.com",
+            "email": f"short-{secrets.token_hex(8)}@example.com",
             "password": "short",
             "full_name": "Short Password",
         },
     )
 
-    assert bad_origin.status_code == 403
+    assert no_origin.status_code == 201
     assert short_password.status_code == 422
 
 

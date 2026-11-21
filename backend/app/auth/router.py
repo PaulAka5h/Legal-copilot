@@ -53,7 +53,6 @@ from app.errors import problem_responses
 auth_router = APIRouter(
     prefix="/api/v1/auth",
     tags=["authentication"],
-    dependencies=[Depends(require_same_origin)],
 )
 identity_router = APIRouter(prefix="/api/v1", tags=["identity"])
 
