@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from app.ai.structured import generate_structured
-from app.case_analysis.schemas import AnalysisDraft, ElementDraft, FindingDraft
+from app.case_analysis.schemas import AnalysisDraft, ElementDraft, FindingDraft, QuoteRef
 from app.case_analysis.service import _verify
 from app.rag.verifier import NO_PRECEDENT_NOTE
 from tests.step_c_helpers import ORIGIN, lawyer_with_case, new_client, sql_as
@@ -96,16 +96,18 @@ def test_verifier_strips_and_labels():
     chunks = {chunk_id: {"text": text, "title": "SAMPLE Act", "section_number": "9", "language": "en",
                          "source_url": "https://example.invalid", "section_status": "unknown", "source_status": "unknown",
                          "effective_from": None, "effective_to": None, "review_status": "approved", "is_current": True}}
+    ref = QuoteRef(chunk_id=chunk_id, sentences=[1])
     element = ElementDraft(element="officer neglects duty", element_quote="neglects his duty",
-                           matched_fact_id=uuid4(), status="met")  # fact id not in the confirmed set
+                           matched_fact_id=uuid4(), status="met", element_quote_sentences=[1])  # fact not confirmed
     good = FindingDraft(offence_or_claim="Neglect (see 12 DLR 34)", chunk_id=chunk_id, quote="neglects his duty",
-                        elements=[element], strength="strong", reasons=["About 90% likely to succeed"])
+                        quote_ref=ref, elements=[element], strength="strong", reasons=["About 90% likely to succeed"])
     bad_quote = FindingDraft(offence_or_claim="x", chunk_id=chunk_id, quote="words not in the provision at all",
+                             quote_ref=ref,
                              elements=[ElementDraft(element="y", element_quote="not in text either",
-                                                    matched_fact_id=fact_id, status="met")],
+                                                    matched_fact_id=fact_id, status="met", element_quote_sentences=[])],
                              strength="strong", reasons=["r"])
-    not_retrieved = FindingDraft(offence_or_claim="z", chunk_id=other_chunk, quote="q", elements=[element],
-                                 strength="weak", reasons=["r"])
+    not_retrieved = FindingDraft(offence_or_claim="z", chunk_id=other_chunk, quote="q", quote_ref=ref,
+                                 elements=[element], strength="weak", reasons=["r"])
     findings, summary = _verify(AnalysisDraft(findings=[good, bad_quote, not_retrieved], missing_information=[]),
                                 chunks, {fact_id}, None, {chunk_id}, precedents=False)
     assert summary["stripped_not_retrieved"] == 1 and len(findings) == 2
@@ -116,6 +118,7 @@ def test_verifier_strips_and_labels():
     assert {"probability_language_removed", "precedent_reference_removed"} <= set(summary["scrub_flags"])
     assert second["verification"] == "unverified" and second["strength"] == "insufficient"
     assert "quote_not_in_source" in second["section_citation"]["failures"]
+    assert second["section_citation"]["quote"] is None and second["elements"][0]["element_quote"] is None  # dropped
 
 
 class FakeLLM:

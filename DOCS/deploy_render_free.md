@@ -287,6 +287,12 @@ demand"` on all three runs, so the findings came from the labelled mock
 (`origin ai_mock`, warning `provider_error:HTTPStatusError:503`). The smoke test only
 requires `status succeeded`; it fails if search is not `mode hybrid`.
 
+After the quote-repair change (same container, 2026-11-21, one live run): real Gemini
+analysis in 4.9 s, `origin ai`, `gemini-3.5-flash-lite` on the first attempt; finding
+NI Act s.138 **verified** with all 4 elements verified. Gemini had dropped the bdlaws
+footnote markers ("3", "4", "5" on their own lines) from its quotes; the verifier matched
+them (ratio 0.995-0.997) and stored the exact source spans. Peak 188 MiB.
+
 ### Gemini vs e5 retrieval
 
 See `DOCS/eval_results.md` (19-Act subset): Gemini Recall@10 1.0 on both query sets

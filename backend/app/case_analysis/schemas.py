@@ -9,11 +9,26 @@ ElementStatus = Literal["met", "missing", "disputed"]
 
 
 # ------------------------------------------------------------- model output (validated)
+SentenceNumbers = list[int]
+
+
+class QuoteRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_id: UUID = Field(description="chunk_id of the provision the quote is copied from")
+    sentences: SentenceNumbers = Field(max_length=12,
+                                       description="Numbers of the provision's [S#] sentences the quote is copied from")
+
+
 class ElementDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     element: str = Field(min_length=1, max_length=500, description="One legal ingredient, in plain words")
-    element_quote: str = Field(min_length=1, max_length=600, description="Exact text of the ingredient in the provision")
+    # Long limits on purpose: Gemini's schema mode drops maxLength, and a long quote is
+    # still checked and stored as the exact source span (app.rag.quote_locator).
+    element_quote: str = Field(min_length=1, max_length=1500, description="Exact text of the ingredient in the provision")
+    element_quote_sentences: SentenceNumbers = Field(
+        max_length=12, description="Numbers of the [S#] sentences of the finding's provision the element_quote is from")
     matched_fact_id: UUID | None = Field(description="Confirmed fact that satisfies the ingredient, or null")
     status: ElementStatus
 
@@ -23,7 +38,8 @@ class FindingDraft(BaseModel):
 
     offence_or_claim: str = Field(min_length=1, max_length=300)
     chunk_id: UUID = Field(description="The provision chunk the ingredients come from")
-    quote: str = Field(min_length=1, max_length=1200, description="Exact text from that chunk")
+    quote: str = Field(min_length=1, max_length=4000, description="Exact text from that chunk")
+    quote_ref: QuoteRef = Field(description="Where the quote is in the provision (a hint; the text is what is checked)")
     elements: list[ElementDraft] = Field(min_length=1, max_length=8)
     strength: Strength
     reasons: list[str] = Field(min_length=1, max_length=6)
@@ -52,7 +68,9 @@ class CitationOut(BaseModel):
 
 class ElementOut(BaseModel):
     element: str
-    element_quote: str
+    element_quote: str | None = Field(
+        description="Exact span of the cited provision text (located and copied from the database), or null when "
+        "the model's quote could not be found in the provision and was dropped")
     matched_fact_id: UUID | None
     status: ElementStatus
     verified: bool = Field(description="element_quote found in the cited provision text")

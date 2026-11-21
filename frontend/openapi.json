@@ -19280,8 +19280,16 @@
       "title": "Element"
      },
      "element_quote": {
-      "type": "string",
-      "title": "Element Quote"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Element Quote",
+      "description": "Exact span of the cited provision text (located and copied from the database), or null when the model's quote could not be found in the provision and was dropped"
      },
      "matched_fact_id": {
       "anyOf": [

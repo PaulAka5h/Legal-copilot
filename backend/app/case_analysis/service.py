@@ -5,6 +5,7 @@ retrieval with the incident-date filter -> abstain check -> element-by-element
 findings (model or mock) -> deterministic verification -> new immutable version.
 """
 
+import asyncio
 import hashlib
 import json
 import re
@@ -34,8 +35,16 @@ from app.facts import repository as facts_repo
 from app.facts.service import fact_set_hash
 from app.rag.search.providers import QueryEmbedder, Reranker
 from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search
-from app.rag.text import BANGLA_STOPWORDS, normalize_for_match, quote_in_text
-from app.rag.verifier import NO_PRECEDENT_NOTE, judgments_available, load_chunks, scrub, verify_citation
+from app.rag.quote_locator import segment_hint
+from app.rag.text import BANGLA_STOPWORDS, normalize_for_match
+from app.rag.verifier import (
+    NO_PRECEDENT_NOTE,
+    judgments_available,
+    load_chunks,
+    locate_in_chunk,
+    scrub,
+    verify_citation,
+)
 
 QUERIES_PER_FACT = 2
 HITS_PER_QUERY = 5
@@ -108,14 +117,20 @@ def _verify(draft: AnalysisDraft, chunks: dict, fact_ids: set[UUID], incident_da
             retrieved_ids: set[UUID], precedents: bool) -> tuple[list[dict], dict]:
     findings, summary = [], {"findings_in": len(draft.findings), "stripped_not_retrieved": 0,
                              "citations_verified": 0, "citations_failed": 0, "elements_unverified": 0,
-                             "fact_links_removed": 0, "scrub_flags": []}
+                             "fact_links_removed": 0, "quotes_repaired": 0, "quotes_dropped": 0,
+                             "scrub_flags": []}
     for finding in draft.findings:
         if finding.chunk_id not in retrieved_ids:
             summary["stripped_not_retrieved"] += 1  # only retrieved text may be cited
             continue
-        citation = verify_citation(finding.chunk_id, finding.quote, chunks, incident_date)
-        summary["citations_verified" if citation.verified else "citations_failed"] += 1
         chunk_text = chunks.get(finding.chunk_id, {}).get("text", "")
+        ref = finding.quote_ref if finding.quote_ref.chunk_id == finding.chunk_id else None
+        citation = verify_citation(finding.chunk_id, finding.quote, chunks, incident_date,
+                                   segment_hint(chunk_text, ref.sentences) if ref and chunk_text else None)
+        summary["citations_verified" if citation.verified else "citations_failed"] += 1
+        summary["quotes_repaired"] += any(w.startswith("quote_repaired") for w in citation.warnings)
+        summary["quotes_dropped"] += citation.quote is None
+        dropped_elements = 0
         elements = []
         for element in finding.elements:
             fact_id, status = element.matched_fact_id, element.status
@@ -124,15 +139,24 @@ def _verify(draft: AnalysisDraft, chunks: dict, fact_ids: set[UUID], incident_da
                 summary["fact_links_removed"] += 1
             if status == "met" and fact_id is None:
                 status = "missing"
-            element_ok = bool(chunk_text) and quote_in_text(element.element_quote, chunk_text)
+            # Only the exact span from the stored provision is kept; an unlocatable quote is dropped.
+            located = locate_in_chunk(element.element_quote, chunk_text,
+                                      segment_hint(chunk_text, element.element_quote_sentences)) if chunk_text else None
+            element_ok = located is not None
             summary["elements_unverified"] += not element_ok
+            summary["quotes_repaired"] += bool(located and located.method != "exact")
+            summary["quotes_dropped"] += not element_ok
+            dropped_elements += not element_ok
             elements.append({"element": scrub(element.element, summary["scrub_flags"], precedents),
-                             "element_quote": element.element_quote, "matched_fact_id": fact_id,
+                             "element_quote": located.text if located else None, "matched_fact_id": fact_id,
                              "status": status, "verified": element_ok})
         reasons = [scrub(r, summary["scrub_flags"], precedents) for r in finding.reasons]
         verified = citation.verified and all(e["verified"] for e in elements)
         if not citation.verified:
             reasons.append("Citation failed verification: " + ", ".join(citation.failures))
+        if dropped_elements:
+            reasons.append(f"{dropped_elements} element quote(s) not found in the provision text were removed; "
+                           "this finding stays unverified.")
         findings.append({
             "offence_or_claim": scrub(finding.offence_or_claim, summary["scrub_flags"], precedents),
             "section_citation": asdict(citation), "elements": elements,
@@ -218,11 +242,15 @@ async def run_analysis(
         warnings.extend(generated.warnings)
         async with user_transaction(session_factory, user_id) as session:
             chunks = await load_chunks(session, [p.chunk_id for p in provisions])
-        findings, summary = _verify(generated.value, chunks, {f.id for f in facts}, incident_date,
-                                    {p.chunk_id for p in provisions}, precedents)
+        # CPU-bound (quote location); off the event loop so other requests keep moving.
+        findings, summary = await asyncio.to_thread(
+            _verify, generated.value, chunks, {f.id for f in facts}, incident_date,
+            {p.chunk_id for p in provisions}, precedents)
         missing = [scrub(m, summary["scrub_flags"], precedents) for m in generated.value.missing_information]
-        if not any(f["verification"] == "verified" for f in findings):
-            abstain_reason = "insufficient_information: no finding passed citation verification."
+        # Abstain only when no finding has a verified citation. Findings whose element
+        # quotes failed are kept, labelled unverified and capped at insufficient.
+        if not any(f["section_citation"]["verified"] for f in findings):
+            abstain_reason = "insufficient_information: no finding has a verified citation."
 
     status = "insufficient_information" if abstain_reason else "succeeded"
     result = {
