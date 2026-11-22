@@ -54,6 +54,40 @@ class StrategyDraft(BaseModel):
     missing_information: list[str] = Field(max_length=10)
 
 
+# ------------------------------------------------------------- model output: a flat node list
+# The model returns a flat list (id + parent_id) instead of three nested levels: deep nesting
+# with enums makes structured-output decoders slow or refuse the schema. The tree is rebuilt
+# and checked in code (service.nest_nodes). Limits are generous; extras are trimmed in code.
+class FlatLegalBasis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_id: str = Field(description="chunk_id of one of the given provisions")
+    quote: str = Field(min_length=1, max_length=2000, description="Exact text copied from that provision")
+
+
+class FlatNode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=40, description="Short unique id, e.g. m1, m1r1, m1r1c1")
+    parent_id: str | None = Field(description="null for our first moves; otherwise the id of the parent node")
+    actor: Literal["us", "opponent", "court"]
+    move: str = Field(min_length=1, max_length=1200)
+    legal_basis: list[FlatLegalBasis] = Field(max_length=6)
+    requirements: list[str] = Field(max_length=10)
+    risk: Level
+    cost: Level
+    time: Level
+    strength: Strength
+    reasons: list[str] = Field(min_length=1, max_length=8)
+
+
+class StrategyFlatDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nodes: list[FlatNode] = Field(max_length=80)
+    missing_information: list[str] = Field(max_length=20)
+
+
 # ------------------------------------------------------------- API (master prompt StrategyNode)
 class StrategyNode(BaseModel):
     id: str

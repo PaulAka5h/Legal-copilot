@@ -89,11 +89,16 @@ export function TextList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-export function DraftNotice({ copy, aiMock }: { copy: AiCopy; aiMock: boolean }) {
+/** Draft notice plus where the output came from: "ai (groq)" or the labelled mock. */
+export function DraftNotice({ copy, aiMock, provider }: { copy: AiCopy; aiMock: boolean; provider?: string }) {
   return (
     <p className="mt-3 rounded-md border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[9px] leading-relaxed text-[color:var(--color-muted)]">
       {copy.draftNotice}
-      {aiMock ? <b className="ml-1 text-[#806b43]">{copy.mockOrigin}</b> : null}
+      {aiMock ? (
+        <b className="ml-1 text-[#806b43]">{copy.mockOrigin}</b>
+      ) : provider ? (
+        <b className="ml-1 text-[color:var(--color-deep)]">{copy.aiOrigin.replace("{provider}", provider)}</b>
+      ) : null}
     </p>
   );
 }

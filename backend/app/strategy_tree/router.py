@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 
-from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_provider
+from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_chain
 from app.auth.dependencies import LawyerDep, SessionFactoryDep, UserSessionDep, require_same_origin
 from app.cases.dependencies import CaseAccessDep, CaseAccessShortDep, require_case_permission
 from app.database import user_transaction
@@ -44,7 +44,7 @@ async def create_strategy(
         raise HTTPException(status_code=409, detail="Closed cases are read-only.")
     settings = request.app.state.settings
     try:
-        llm = resolve_provider(settings, getattr(request.app.state, "llm_transport", None))
+        llm = resolve_chain(settings, getattr(request.app.state, "llm_transport", None))
     except LLMNotConfigured as error:
         raise HTTPException(status_code=503, detail=f"NOT_CONFIGURED: {error}") from error
     try:

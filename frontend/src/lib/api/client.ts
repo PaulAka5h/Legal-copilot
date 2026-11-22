@@ -3,6 +3,8 @@ import "server-only";
 import {
   backend,
   backendOrNull,
+  backendRequest,
+  sessionToken,
   withDemoFallback,
   type Api,
 } from "@/lib/api/backendClient";
@@ -35,11 +37,12 @@ export type CaseStage = {
   state: StageState;
 };
 
+/** Only the fields the lawyer filled in and allows clients to see; the rest are null. */
 export type LawyerContact = {
   name: Localized;
-  firm: Localized;
-  phone: string;
-  email: string;
+  firm: Localized | null;
+  phone: string | null;
+  email: string | null;
 };
 
 export type NextHearing = {
@@ -52,6 +55,8 @@ export type NextHearing = {
 
 export type SharedDocument = {
   id: string;
+  /** Download path (proxied and authorized per case by the backend); null in demo mode. */
+  href: string | null;
   format: "PDF";
   name: Localized;
   size: Localized;
@@ -237,15 +242,16 @@ export async function getClientProfile(): Promise<ClientProfile> {
  * offered in the switcher, so an update shared on any case is reachable.
  */
 export async function getClientCase(caseId?: string): Promise<ClientCase | null> {
-  return withDemoFallback(
+  return withDemoFallback<ClientCase | null>(
     async () => {
       const rows = await myCases();
       const row = rows.find((item) => item.id === caseId) ?? rows[0];
       if (!row) return null;
-      const [hearing, documents, updates] = await Promise.all([
+      const [hearing, documents, updates, lawyer] = await Promise.all([
         backendOrNull<Api["ClientHearingResponse"] | null>(clientCaseUrl(row.id, "/hearing")),
         backend<Api["ClientDocumentResponse"][]>(clientCaseUrl(row.id, "/documents")),
         backend<Api["app__client_portal__schemas__ClientUpdateResponse"][]>(clientCaseUrl(row.id, "/updates")),
+        backendOrNull<Api["LawyerContact"]>(clientCaseUrl(row.id, "/lawyer")),
       ]);
       const closed = row.status === "closed";
       return {
@@ -257,15 +263,16 @@ export async function getClientCase(caseId?: string): Promise<ClientCase | null>
         hearingNumber: updates.length,
         stages: stagesFor(row.progress),
         nextHearing: toNextHearing(hearing, row.court ?? null),
-        // Lawyer contact details are not exposed to clients by the API yet.
+        // The lead lawyer's contact card: only fields the lawyer filled in and allows.
         lawyer: {
-          name: { en: "Your lawyer", bn: "আপনার আইনজীবী" },
-          firm: same(""),
-          phone: "",
-          email: "",
+          name: lawyer?.full_name ? same(lawyer.full_name) : { en: "Your lawyer", bn: "আপনার আইনজীবী" },
+          firm: lawyer?.firm ? same(lawyer.firm) : null,
+          phone: lawyer?.phone ?? null,
+          email: lawyer?.email ?? null,
         },
         documents: documents.map((document) => ({
           id: document.id,
+          href: `/client/documents/${encodeURIComponent(document.document_id)}/download`,
           format: "PDF" as const,
           name: same(document.display_name),
           size: same(""),
@@ -321,6 +328,24 @@ function demoSummary(summaryId: string): ClientSummaryDetail | null {
   };
 }
 
-export function downloadClientSummary(): { status: "NOT_CONFIGURED" } {
-  return { status: "NOT_CONFIGURED" };
+/**
+ * Stream a client file from the backend (approved summary PDF or shared
+ * document). The backend authorizes per case; 404 for anything not visible
+ * to this client. Returns null for no access, NOT_CONFIGURED in demo mode.
+ */
+export async function clientFile(path: string): Promise<Response | null | "NOT_CONFIGURED"> {
+  const token = await sessionToken();
+  if (!token) return "NOT_CONFIGURED";
+  const response = await backendRequest(path, { token });
+  if (response.status === 404 || response.status === 403) return null;
+  if (!response.ok) throw new Error(`Backend returned ${response.status}.`);
+  return response;
+}
+
+export function summaryPdfPath(summaryId: string, language: "en" | "bn") {
+  return `/api/v1/client/updates/${encodeURIComponent(summaryId)}/pdf?language=${language}`;
+}
+
+export function documentDownloadPath(documentId: string) {
+  return `/api/v1/client/documents/${encodeURIComponent(documentId)}/download`;
 }

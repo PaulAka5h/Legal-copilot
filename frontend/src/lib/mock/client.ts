@@ -76,6 +76,7 @@ export const clientCase: Omit<ClientCase, "summaries" | "cases"> = {
   documents: [
     {
       id: "doc-petition",
+      href: null,
       format: "PDF",
       name: { en: "Petition_Copy.pdf", bn: "আবেদনের কপি" },
       size: { en: "2.4 MB", bn: "২.৪ এমবি" },
@@ -83,6 +84,7 @@ export const clientCase: Omit<ClientCase, "summaries" | "cases"> = {
     },
     {
       id: "doc-order",
+      href: null,
       format: "PDF",
       name: { en: "Court_Order_02.pdf", bn: "আদালতের আদেশ ০২" },
       size: { en: "1.1 MB", bn: "১.১ এমবি" },
@@ -90,6 +92,7 @@ export const clientCase: Omit<ClientCase, "summaries" | "cases"> = {
     },
     {
       id: "doc-witness",
+      href: null,
       format: "PDF",
       name: { en: "Witness_Statement.pdf", bn: "সাক্ষীর বিবৃতি" },
       size: { en: "3.8 MB", bn: "৩.৮ এমবি" },

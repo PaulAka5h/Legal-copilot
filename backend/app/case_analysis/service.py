@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.llm import StructuredLLM
 from app.ai.structured import generate_structured
+
+# Analysis's own LLM deadline; a hearing update then leaves strategy time of its own.
+ANALYSIS_BUDGET_SECONDS = 60.0
 from app.auth.repository import write_audit_event
 from app.case_analysis.analyzer import (
     MAX_PROVISIONS,
@@ -256,7 +259,7 @@ async def run_analysis(
     else:
         generated = await generate_structured(
             llm, AnalysisDraft, SYSTEM_PROMPT, build_user_prompt(facts, provisions),
-            lambda: mock_analysis(facts, provisions), allow_mock,
+            lambda: mock_analysis(facts, provisions), allow_mock, budget_seconds=ANALYSIS_BUDGET_SECONDS,
         )
         origin, provider, model, attempts = generated.origin, generated.provider, generated.model, generated.attempts
         warnings.extend(generated.warnings)

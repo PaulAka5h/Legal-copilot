@@ -64,7 +64,3 @@ class ClientHearingResponse(BaseModel):
     scheduled_at: datetime
     purpose: str | None
     court_room: str | None
-
-
-class DownloadUrlResponse(BaseModel):
-    status: Literal["NOT_CONFIGURED"]

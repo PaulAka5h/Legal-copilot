@@ -39,7 +39,11 @@ def test_case_progress_is_derived_from_hearings_and_status() -> None:
         "opened": "complete", "scheduled": "current", "held": "upcoming", "closed": "upcoming"}
     assert states(case_progress(status="open", has_hearing=True, has_held_hearing=False)) == {
         "opened": "complete", "scheduled": "complete", "held": "current", "closed": "upcoming"}
-    assert states(case_progress(status="on_hold", has_hearing=True, has_held_hearing=True))["closed"] == "current"
+    assert states(case_progress(status="on_hold", has_hearing=True, has_held_hearing=True))["closed"] == "upcoming"
+    for has_hearing in (False, True):  # "Case closed" is never current unless the case is closed
+        for held in (False, True):
+            assert states(case_progress(status="open", has_hearing=has_hearing, has_held_hearing=held))[
+                "closed"] == "upcoming"
     assert set(states(case_progress(status="closed", has_hearing=False, has_held_hearing=False)).values()) == {
         "complete"}
 
@@ -97,7 +101,7 @@ def test_progress_moves_with_hearings_and_status(api_client) -> None:
     hearing = make_hearing(api_client, case_id)
     assert progress()["scheduled"] == "complete" and progress()["held"] == "current"
     update(api_client, case_id, hearing["id"])
-    assert progress()["held"] == "complete" and progress()["closed"] == "current"
+    assert progress()["held"] == "complete" and progress()["closed"] == "upcoming"
     assert api_client.post(f"/api/v1/cases/{case_id}/close", headers=ORIGIN, json={}).status_code == 200
     assert set(progress().values()) == {"complete"}
 

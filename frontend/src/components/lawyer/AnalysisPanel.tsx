@@ -152,7 +152,7 @@ export function AnalysisPanel({
 
         {analysis ? (
           <>
-            <DraftNotice copy={copy} aiMock={analysis.aiMock} />
+            <DraftNotice copy={copy} aiMock={analysis.aiMock} provider={analysis.provider} />
             {analysis.keywordOnly ? (
               <p role="status" className="mt-3 text-[10px] font-semibold text-[#806b43]">
                 {copy.keywordOnly}
@@ -196,7 +196,7 @@ export function AnalysisPanel({
 
         {strategy ? (
           <>
-            <DraftNotice copy={copy} aiMock={strategy.aiMock} />
+            <DraftNotice copy={copy} aiMock={strategy.aiMock} provider={strategy.provider} />
             {strategy.status !== "succeeded" ? (
               <p className="mt-3 text-[10px] font-semibold text-[#806b43]">{copy.insufficient}</p>
             ) : null}

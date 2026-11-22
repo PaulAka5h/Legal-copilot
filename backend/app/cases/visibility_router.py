@@ -12,7 +12,6 @@ from app.cases.schemas import (
     ClientTaskCreate,
     ClientUpdateCreate,
     ClientUpdateResponse,
-    SharedDocumentCreate,
     VisibilityPatch,
 )
 from app.errors import problem_responses
@@ -124,49 +123,6 @@ async def publish_client_update(
         case_id=row["case_id"],
     )
     return ClientUpdateResponse.model_validate(dict(row))
-
-
-@router.post(
-    "/cases/{case_id}/shared-documents",
-    summary="Share a document with a client",
-    description="Shares an existing document UUID with active client membership.",
-    response_model=dict,
-    responses=problem_responses(401, 403, 404, 422, 503),
-)
-async def share_document(
-    case_id: Annotated[UUID, Path(description="Case ID")],
-    user: LawyerDep,
-    session: UserSessionDep,
-    case_access: CaseAccessDep,
-    payload: Annotated[SharedDocumentCreate, Body(description="Shared document")],
-) -> dict:
-    row = (
-        await session.execute(
-            text(
-                """
-                INSERT INTO public.client_shared_documents
-                  (case_id, organization_id, document_id, display_name, shared_by)
-                SELECT c.id, c.organization_id, :document_id, :display_name, :user_id
-                FROM public.cases c
-                WHERE c.id = :case_id
-                ON CONFLICT (case_id, document_id) DO UPDATE
-                  SET display_name = EXCLUDED.display_name,
-                      revoked_at = NULL,
-                      shared_at = now()
-                RETURNING id
-                """
-            ),
-            {
-                "case_id": case_id,
-                "document_id": payload.document_id,
-                "display_name": payload.display_name,
-                "user_id": user.id,
-            },
-        )
-    ).mappings().one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Case was not found.")
-    return {"id": str(row["id"]), "document_id": str(payload.document_id)}
 
 
 @router.post(

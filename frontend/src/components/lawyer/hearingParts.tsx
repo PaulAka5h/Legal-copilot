@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toggleDocumentShareAction } from "@/app/lawyer/actions";
 import { Icon } from "@/components/Icon";
 import type {
   CaseDocument,
@@ -75,11 +76,14 @@ export function DocumentList({
   language,
   copy,
   onRetry,
+  share,
 }: {
   documents: CaseDocument[];
   language: Language;
   copy: Dictionary["caseDetail"];
   onRetry: (document: CaseDocument) => void;
+  /** Share-with-client toggle; omitted for closed cases and demo data. */
+  share?: { caseId: string; tab: "hearings" | "documents" };
 }) {
   if (documents.length === 0) {
     return (
@@ -115,6 +119,26 @@ export function DocumentList({
             >
               {copy.retry}
             </button>
+          ) : share && document.status === "ready" ? (
+            <form action={toggleDocumentShareAction} className="flex shrink-0 items-center gap-1.5">
+              <input type="hidden" name="caseId" value={share.caseId} />
+              <input type="hidden" name="documentId" value={document.id} />
+              <input type="hidden" name="tab" value={share.tab} />
+              <input type="hidden" name="share" value={document.sharedWithClient ? "0" : "1"} />
+              {document.sharedWithClient ? (
+                <span className="rounded-full bg-[#eaf6ef] px-2 py-0.5 text-[8px] font-bold text-[var(--color-deep)]">
+                  {copy.sharedWithClient}
+                </span>
+              ) : null}
+              <button
+                type="submit"
+                role="switch"
+                aria-checked={Boolean(document.sharedWithClient)}
+                className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
+              >
+                {document.sharedWithClient ? copy.stopSharing : copy.shareWithClient}
+              </button>
+            </form>
           ) : null}
         </li>
       ))}

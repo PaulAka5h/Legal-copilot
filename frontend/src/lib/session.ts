@@ -106,16 +106,21 @@ function tokenFrom(response: Response): string | null {
   return null;
 }
 
-/** Sign in against the backend and keep its session token in our httpOnly cookie. */
+/**
+ * Sign in against the backend for one portal and keep its session token in our
+ * httpOnly cookie. The backend refuses an account of another role with the same
+ * generic error as a wrong password and creates no session.
+ */
 export async function signInWithBackend(
   email: string,
   password: string,
+  expectedRole: Role,
 ): Promise<{ role: Role; mustChangePassword: boolean } | LoginState> {
   let response: Response;
   try {
     response = await backendRequest("/api/v1/auth/login", {
       method: "POST",
-      json: { email, password },
+      json: { email, password, expected_role: expectedRole } satisfies Api["LoginRequest"],
     });
   } catch (error) {
     if (error instanceof BackendUnavailable) return { status: "UNAVAILABLE" };
@@ -126,6 +131,8 @@ export async function signInWithBackend(
   const token = tokenFrom(response);
   if (!token) return { status: "INVALID" };
   const user = (await response.json()) as Api["UserResponse"];
+  // Defence in depth: never keep a session for the other portal's role.
+  if (roleFor(user) !== expectedRole) return { status: "INVALID" };
 
   (await cookies()).set(SESSION_COOKIE, token, cookieOptions());
   return { role: roleFor(user), mustChangePassword: Boolean(user.must_change_password) };

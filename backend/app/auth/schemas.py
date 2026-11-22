@@ -19,6 +19,13 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=256)
     mfa_code: str | None = Field(default=None, pattern=r"^\d{6}$")
     mfa_recovery_code: str | None = Field(default=None, min_length=8, max_length=256)
+    expected_role: Literal["lawyer", "client"] | None = Field(
+        default=None,
+        description=(
+            "The portal the user signs in from. An account of another role gets the same generic "
+            "invalid-credentials error as a wrong password, and no session is created."
+        ),
+    )
 
 
 class UserResponse(BaseModel):

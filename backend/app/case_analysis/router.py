@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 
-from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_provider
+from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_chain
 from app.auth.dependencies import LawyerDep, SessionFactoryDep, UserSessionDep, require_same_origin
 from app.case_analysis import service
 from app.case_analysis.schemas import AnalysisOut, AnalysisRequest, AnalysisVersionSummary
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/lawyer/cases/{case_id}/analysis", tags=["case
 def model_settings(request: Request):
     settings = request.app.state.settings
     try:
-        llm = resolve_provider(settings, getattr(request.app.state, "llm_transport", None))
+        llm = resolve_chain(settings, getattr(request.app.state, "llm_transport", None))
         return llm, mock_allowed(settings), get_query_embedder(), get_reranker()
     except (LLMNotConfigured, ProviderNotConfigured) as error:
         raise HTTPException(status_code=503, detail=f"NOT_CONFIGURED: {error}") from error

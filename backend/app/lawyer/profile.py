@@ -28,6 +28,8 @@ class LawyerProfileResponse(BaseModel):
     chamber_name: str | None
     organization_name: str
     can_edit_organization: bool = Field(description="True for organization owners")
+    show_contact_to_clients: bool = Field(
+        description="The lawyer allows firm, phone and email on their clients' dashboards (name is always shown)")
 
 
 class LawyerProfilePatch(BaseModel):
@@ -37,12 +39,13 @@ class LawyerProfilePatch(BaseModel):
     preferred_language: Literal["en", "bn"] | None = None
     chamber_name: str | None = Field(default=None, max_length=200)
     organization_name: str | None = Field(default=None, min_length=1, max_length=200)
+    show_contact_to_clients: bool | None = None
 
     @model_validator(mode="after")
     def validate_patch(self) -> "LawyerProfilePatch":
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided.")
-        for field in ("full_name", "preferred_language", "organization_name"):
+        for field in ("full_name", "preferred_language", "organization_name", "show_contact_to_clients"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null.")
         return self
@@ -55,6 +58,7 @@ async def _read_profile(session: AsyncSession, user_id: UUID) -> LawyerProfileRe
             """
             SELECT u.full_name, u.email::text AS email, u.phone, u.preferred_language,
                    lp.chamber_name, o.name AS organization_name,
+                   COALESCE(lp.show_contact_to_clients, true) AS show_contact_to_clients,
                    (om.org_role = 'owner') AS can_edit_organization
             FROM public.users u
             JOIN public.organization_members om
@@ -84,8 +88,9 @@ async def get_profile(user: LawyerDep, session: UserSessionDep) -> LawyerProfile
     "/profile",
     summary="Update the lawyer profile",
     description=(
-        "Updates name, phone, preferred language, chamber name and (owners only) the organization "
-        "name. Email cannot be changed here. Audit-logged with the changed field names."
+        "Updates name, phone, preferred language, chamber name, whether clients see the contact card "
+        "details, and (owners only) the organization name. Email cannot be changed here. Audit-logged "
+        "with the changed field names."
     ),
     response_model=LawyerProfileResponse,
     responses=problem_responses(401, 403, 404, 409, 422, 503),
@@ -110,15 +115,21 @@ async def patch_profile(
             text(f"UPDATE public.users SET {assignments}, updated_at = now() WHERE id = :user_id"),
             {**{name: values[name] for name in user_columns}, "user_id": user.id},
         )
-    if "chamber_name" in fields:
+    profile_columns = [name for name in ("chamber_name", "show_contact_to_clients") if name in fields]
+    if profile_columns:
+        params = {"user_id": user.id, "chamber_name": (values.get("chamber_name") or None),
+                  "show_contact_to_clients": values.get("show_contact_to_clients", True)}
+        insert_columns = ", ".join(profile_columns)
+        insert_values = ", ".join(f":{name}" for name in profile_columns)
+        updates = ", ".join(f"{name} = EXCLUDED.{name}" for name in profile_columns)
         await session.execute(
             text(
-                """
-                INSERT INTO public.lawyer_profiles (user_id, chamber_name) VALUES (:user_id, :chamber)
-                ON CONFLICT (user_id) DO UPDATE SET chamber_name = EXCLUDED.chamber_name
+                f"""
+                INSERT INTO public.lawyer_profiles (user_id, {insert_columns}) VALUES (:user_id, {insert_values})
+                ON CONFLICT (user_id) DO UPDATE SET {updates}
                 """
             ),
-            {"user_id": user.id, "chamber": values["chamber_name"] or None},
+            params,
         )
     organization_id = await resolve_actor_organization(session, user.id)
     if "organization_name" in fields:

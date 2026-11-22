@@ -44,10 +44,10 @@ async function signIn(
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { status: "INVALID" };
 
-  const result = await signInWithBackend(email, password);
+  // Role-specific: a lawyer account cannot sign in on the client page and vice versa.
+  const result = await signInWithBackend(email, password, role);
   if (result && "role" in result) {
     if (result.mustChangePassword) redirect("/client/set-password");
-    // The backend decides the role, whichever portal the form was on.
     redirect(result.role === "lawyer" ? "/lawyer/dashboard" : "/client/dashboard");
   }
   return result;
