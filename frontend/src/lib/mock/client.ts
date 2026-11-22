@@ -72,6 +72,8 @@ export const clientCase: Omit<ClientCase, "summaries" | "cases"> = {
     firm: { en: "Rahman & Associates", bn: "রহমান অ্যান্ড অ্যাসোসিয়েটস" },
     phone: "+880 1711-000000",
     email: "farhana@rahmanlaw.bd",
+    photoId: null,
+    details: {},
   },
   documents: [
     {

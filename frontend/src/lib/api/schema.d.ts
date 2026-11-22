@@ -663,9 +663,37 @@ export interface paths {
         head?: never;
         /**
          * Update the lawyer profile
-         * @description Updates name, phone, preferred language, chamber name, whether clients see the contact card details, and (owners only) the organization name. Email cannot be changed here. Audit-logged with the changed field names.
+         * @description Updates account fields (name, phone, preferred language), professional details (Bar Council enrollment, courts, practice areas, experience, office address, languages, bio, public contact phone and email), which fields clients see on the contact card, and (owners only) the organization name. All professional fields are optional; send null to clear one. Text is NFC-normalized; the public phone must be a Bangladesh mobile (+8801XXXXXXXXX). Email cannot be changed here. Audit-logged with the changed field names only.
          */
         patch: operations["patch_profile_api_v1_lawyer_profile_patch"];
+        trace?: never;
+    };
+    "/api/v1/lawyer/profile/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get my profile photo
+         * @description The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none.
+         */
+        get: operations["get_my_photo_api_v1_lawyer_profile_photo_get"];
+        /**
+         * Upload or replace the profile photo
+         * @description JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are ignored). Images over 25 megapixels are refused before decoding. The server strips all metadata (EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous photo is deleted. Audit-logged without image content.
+         */
+        put: operations["upload_photo_api_v1_lawyer_profile_photo_put"];
+        post?: never;
+        /**
+         * Remove the profile photo
+         * @description Removes the photo (clients then see initials). Deletes the stored files. Audit-logged.
+         */
+        delete: operations["delete_photo_api_v1_lawyer_profile_photo_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/client/cases": {
@@ -817,9 +845,29 @@ export interface paths {
         };
         /**
          * Get the lawyer contact card
-         * @description The lead lawyer's name and, when the lawyer allows it in their profile, firm, phone and email. Empty fields are null. Open cases with client membership only.
+         * @description The lead lawyer's name (always) and only the fields the lawyer chose to show clients: by default photo, firm and phone; optionally email, Bar Council enrollment, courts, practice areas, years of experience, office address, languages and bio. Hidden or empty fields are null. Open cases with client membership only.
          */
         get: operations["lawyer_contact_api_v1_client_cases__case_id__lawyer_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client/cases/{case_id}/lawyer/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the lawyer's photo
+         * @description The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to clients. Otherwise 404. Open cases with client membership only.
+         */
+        get: operations["lawyer_photo_api_v1_client_cases__case_id__lawyer_photo_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1702,6 +1750,14 @@ export interface components {
              * @description Display title; defaults to the filename
              */
             title?: string | null;
+        };
+        /** Body_upload_photo_api_v1_lawyer_profile_photo_put */
+        Body_upload_photo_api_v1_lawyer_profile_photo_put: {
+            /**
+             * File
+             * @description The photo (JPEG, PNG or WebP, at most 5 MB)
+             */
+            file: string;
         };
         /** CaseCloseRequest */
         CaseCloseRequest: {
@@ -2824,16 +2880,38 @@ export interface components {
              */
             occurred_at: string;
         };
-        /** LawyerContact */
+        /**
+         * LawyerContact
+         * @description A client's view of their lead lawyer: only the fields the lawyer allows; the rest are null.
+         */
         LawyerContact: {
             /** Full Name */
             full_name: string;
+            /**
+             * Photo Id
+             * @description Set when the photo is shown and exists; fetch it from .../lawyer/photo (version for caching)
+             */
+            photo_id: string | null;
             /** Firm */
             firm: string | null;
             /** Phone */
             phone: string | null;
             /** Email */
             email: string | null;
+            /** Bar Enrollment No */
+            bar_enrollment_no: string | null;
+            /** Courts */
+            courts: string[] | null;
+            /** Practice Areas */
+            practice_areas: ("criminal" | "civil" | "family" | "land" | "labour" | "commercial" | "cheque_ni_act" | "other")[] | null;
+            /** Years Experience */
+            years_experience: number | null;
+            /** Office Address */
+            office_address: string | null;
+            /** Languages */
+            languages: ("bn" | "en" | "other")[] | null;
+            /** Bio */
+            bio: string | null;
         };
         /** LawyerOverviewResponse */
         LawyerOverviewResponse: {
@@ -2858,16 +2936,46 @@ export interface components {
             chamber_name?: string | null;
             /** Organization Name */
             organization_name?: string | null;
-            /** Show Contact To Clients */
-            show_contact_to_clients?: boolean | null;
+            /** Bar Enrollment No */
+            bar_enrollment_no?: string | null;
+            /**
+             * Courts
+             * @description Courts of practice, at most 10, 150 characters each
+             */
+            courts?: string[] | null;
+            /** Practice Areas */
+            practice_areas?: ("criminal" | "civil" | "family" | "land" | "labour" | "commercial" | "cheque_ni_act" | "other")[] | null;
+            /** Years Experience */
+            years_experience?: number | null;
+            /** Office Address */
+            office_address?: string | null;
+            /** Languages */
+            languages?: ("bn" | "en" | "other")[] | null;
+            /** Bio */
+            bio?: string | null;
+            /**
+             * Public Phone
+             * @description Bangladesh mobile; stored as +8801XXXXXXXXX
+             */
+            public_phone?: string | null;
+            /** Public Email */
+            public_email?: string | null;
+            /** Client Visible Fields */
+            client_visible_fields?: ("photo" | "firm" | "phone" | "email" | "bar_enrollment_no" | "courts" | "practice_areas" | "years_experience" | "office_address" | "languages" | "bio")[] | null;
         };
         /** LawyerProfileResponse */
         LawyerProfileResponse: {
             /** Full Name */
             full_name: string;
-            /** Email */
+            /**
+             * Email
+             * @description Login email (not editable here, never shown to clients)
+             */
             email: string;
-            /** Phone */
+            /**
+             * Phone
+             * @description Account phone
+             */
             phone: string | null;
             /**
              * Preferred Language
@@ -2883,11 +2991,40 @@ export interface components {
              * @description True for organization owners
              */
             can_edit_organization: boolean;
+            /** Bar Enrollment No */
+            bar_enrollment_no: string | null;
+            /** Courts */
+            courts: string[];
+            /** Practice Areas */
+            practice_areas: ("criminal" | "civil" | "family" | "land" | "labour" | "commercial" | "cheque_ni_act" | "other")[];
+            /** Years Experience */
+            years_experience: number | null;
+            /** Office Address */
+            office_address: string | null;
+            /** Languages */
+            languages: ("bn" | "en" | "other")[];
+            /** Bio */
+            bio: string | null;
             /**
-             * Show Contact To Clients
-             * @description The lawyer allows firm, phone and email on their clients' dashboards (name is always shown)
+             * Public Phone
+             * @description Public contact phone, +8801XXXXXXXXX
              */
-            show_contact_to_clients: boolean;
+            public_phone: string | null;
+            /**
+             * Public Email
+             * @description Public contact email, separate from the login email
+             */
+            public_email: string | null;
+            /**
+             * Client Visible Fields
+             * @description Fields shown on clients' contact card (the name is always shown)
+             */
+            client_visible_fields: ("photo" | "firm" | "phone" | "email" | "bar_enrollment_no" | "courts" | "practice_areas" | "years_experience" | "office_address" | "languages" | "bio")[];
+            /**
+             * Photo Id
+             * @description Current photo version; null when there is no photo
+             */
+            photo_id: string | null;
         };
         /** LawyerTeamMemberResponse */
         LawyerTeamMemberResponse: {
@@ -3095,6 +3232,14 @@ export interface components {
             heading: string;
             /** Items */
             items: components["schemas"]["PdfItem"][];
+        };
+        /** PhotoResponse */
+        PhotoResponse: {
+            /**
+             * Photo Id
+             * @description The current photo version; null after removal
+             */
+            photo_id: string | null;
         };
         /** Problem */
         Problem: {
@@ -9182,6 +9327,423 @@ export interface operations {
             };
         };
     };
+    get_my_photo_api_v1_lawyer_profile_photo_get: {
+        parameters: {
+            query?: {
+                /** @description Square size in pixels: 512 or 96 */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo (WebP) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    upload_photo_api_v1_lawyer_profile_photo_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_photo_api_v1_lawyer_profile_photo_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    delete_photo_api_v1_lawyer_profile_photo_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
     list_client_cases_api_v1_client_cases_get: {
         parameters: {
             query?: never;
@@ -10214,6 +10776,157 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    lawyer_photo_api_v1_client_cases__case_id__lawyer_photo_get: {
+        parameters: {
+            query?: {
+                /** @description Square size in pixels: 512 or 96 */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo (WebP) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

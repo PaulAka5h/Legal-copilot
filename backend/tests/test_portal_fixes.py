@@ -124,11 +124,13 @@ def test_lawyer_contact_card_shows_only_approved_filled_fields(api_client) -> No
         card = client.get(url).json()
         assert card["full_name"].startswith("SAMPLE_DATA_NOT_REAL_LAW") and card["phone"] is None  # not filled in
         assert api_client.patch("/api/v1/lawyer/profile", headers=ORIGIN, json={
-            "phone": "+880 1700-000000", "chamber_name": "SAMPLE Chamber"}).status_code == 200
+            "phone": "+880 1700-000000", "chamber_name": "SAMPLE Chamber",
+            "public_email": "chamber@example.com"}).status_code == 200
         card = client.get(url).json()
-        assert (card["firm"], card["phone"]) == ("SAMPLE Chamber", "+880 1700-000000") and card["email"]
+        # Default visibility: firm and phone (account phone when no public phone); email stays hidden.
+        assert (card["firm"], card["phone"], card["email"]) == ("SAMPLE Chamber", "+880 1700-000000", None)
         assert api_client.patch("/api/v1/lawyer/profile", headers=ORIGIN,
-                                json={"show_contact_to_clients": False}).status_code == 200
+                                json={"client_visible_fields": []}).status_code == 200
         hidden = client.get(url).json()
         assert hidden["full_name"] and (hidden["firm"], hidden["phone"], hidden["email"]) == (None, None, None)
         other_case = create_case(api_client, f"SAMPLE-contact-{secrets.token_hex(3)}")

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/actions";
 import { Icon, type IconName } from "@/components/Icon";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { Avatar, lawyerPhotoUrl } from "@/components/Avatar";
 import { Logo } from "@/components/Logo";
 import type { LawyerProfile } from "@/lib/api/lawyer";
 import {
@@ -14,7 +15,6 @@ import {
   pick,
   type Language,
 } from "@/lib/i18n";
-import { initials } from "@/lib/initials";
 
 type NavKey = "dashboard" | "matters" | "clients" | "settings";
 
@@ -70,8 +70,12 @@ export function LawyerShell({
           })}
         </nav>
         <div className="sidebar-footer">
-          <span>{pick(profile.firm, language)}</span>
-          <small>{pick(profile.location, language)}</small>
+          <Avatar name={profile.name.en} src={lawyerPhotoUrl(profile.photoId)} size={32} />
+          <span>
+            <b>{pick(profile.name, language)}</b>
+            <span>{pick(profile.firm, language)}</span>
+            <small>{pick(profile.location, language)}</small>
+          </span>
         </div>
       </aside>
 
@@ -83,7 +87,7 @@ export function LawyerShell({
           <div className="topbar-right">
             <LanguageToggle language={language} compact />
             <div className="user-meta">
-              <span className="avatar">{initials(profile.name.en)}</span>
+              <Avatar name={profile.name.en} src={lawyerPhotoUrl(profile.photoId)} />
               <span>
                 <b>{pick(profile.name, language)}</b>
                 <small>{common.advocate}</small>

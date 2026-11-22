@@ -21,6 +21,8 @@ from app.auth.dependencies import ClientDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
 from app.documents.storage import StorageNotConfigured, get_store
 from app.errors import problem_responses
+from app.lawyer.photo import WEBP_RESPONSE, check_size, read_photo
+from app.lawyer.profile_schemas import LawyerContact
 from app.pdf.render import Document, attachment_headers, render_pdf
 
 router = APIRouter(prefix="/api/v1/client", tags=["client-portal"])
@@ -28,13 +30,6 @@ router = APIRouter(prefix="/api/v1/client", tags=["client-portal"])
 PDF_RESPONSE = {200: {"content": {"application/pdf": {}}, "description": "The PDF file (attachment)"}}
 FILE_RESPONSE = {200: {"content": {"application/octet-stream": {}}, "description": "The file (attachment)"}}
 EXTENSIONS = {"application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg", "image/tiff": ".tiff"}
-
-
-class LawyerContact(BaseModel):
-    full_name: str
-    firm: str | None
-    phone: str | None
-    email: str | None
 
 
 async def _audit(session, request: Request, user, action: str, object_type: str, object_id: UUID,
@@ -48,21 +43,50 @@ async def _audit(session, request: Request, user, action: str, object_type: str,
     )
 
 
+async def _lawyer_contact_row(session, case_id: UUID):
+    row = (await session.execute(text("SELECT * FROM app.client_case_lawyer_contact(:c)"),
+                                 {"c": case_id})).mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case was not found.")
+    return row
+
+
 @router.get(
     "/cases/{case_id}/lawyer",
     summary="Get the lawyer contact card",
-    description=("The lead lawyer's name and, when the lawyer allows it in their profile, firm, phone and email. "
-                 "Empty fields are null. Open cases with client membership only."),
+    description=("The lead lawyer's name (always) and only the fields the lawyer chose to show clients: by default "
+                 "photo, firm and phone; optionally email, Bar Council enrollment, courts, practice areas, years "
+                 "of experience, office address, languages and bio. Hidden or empty fields are null. Open cases "
+                 "with client membership only."),
     response_model=LawyerContact,
     responses=problem_responses(401, 403, 404, 422),
 )
 async def lawyer_contact(case_id: Annotated[UUID, Path(description="Case ID")], user: ClientDep,
                          session: UserSessionDep) -> LawyerContact:
-    row = (await session.execute(text("SELECT * FROM app.client_case_lawyer_contact(:c)"),
-                                 {"c": case_id})).mappings().one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Case was not found.")
-    return LawyerContact.model_validate(dict(row))
+    row = dict(await _lawyer_contact_row(session, case_id))
+    return LawyerContact.model_validate({**row, "photo_id": row["avatar_id"]})
+
+
+@router.get(
+    "/cases/{case_id}/lawyer/photo",
+    summary="Get the lawyer's photo",
+    description=("The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to "
+                 "clients. Otherwise 404. Open cases with client membership only."),
+    response_class=Response,
+    responses={**WEBP_RESPONSE, **problem_responses(401, 403, 404, 422, 503)},
+)
+async def lawyer_photo(request: Request, case_id: Annotated[UUID, Path(description="Case ID")], user: ClientDep,
+                       session: UserSessionDep,
+                       size: Annotated[int, Query(description="Square size in pixels: 512 or 96")] = 96) -> Response:
+    check_size(size)
+    row = await _lawyer_contact_row(session, case_id)
+    if row["avatar_id"] is None:
+        raise HTTPException(status_code=404, detail="Photo was not found.")
+    try:
+        store = get_store(request.app.state.settings)
+    except StorageNotConfigured as error:
+        raise HTTPException(status_code=503, detail=f"NOT_CONFIGURED: {error}") from error
+    return await read_photo(store, row["lawyer_user_id"], row["avatar_id"], size)
 
 
 @router.get(

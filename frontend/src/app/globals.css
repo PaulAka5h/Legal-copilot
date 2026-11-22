@@ -666,9 +666,20 @@
 .sidebar-footer {
   margin: 17px 7px 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   font-size: 10px;
   font-weight: 600;
+}
+
+.sidebar-footer > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-footer b {
+  font-size: 11px;
 }
 
 .sidebar-footer small {
@@ -725,6 +736,7 @@
 .avatar {
   width: 35px;
   height: 35px;
+  flex: none;
   display: grid;
   place-items: center;
   color: #fff;
@@ -732,6 +744,17 @@
   border-radius: 10px;
   font-size: 10px;
   font-weight: 700;
+}
+
+.avatar-photo {
+  object-fit: cover;
+  background: var(--color-surface);
+}
+
+.lawyer-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .user-meta > span:last-child {
@@ -1922,6 +1945,10 @@
   gap: 14px;
 }
 
+.profile-list:empty {
+  display: none;
+}
+
 .profile-list > div {
   display: flex;
   justify-content: space-between;
@@ -2703,6 +2730,79 @@
 .edit-case-grid input:focus,
 .edit-case-grid select:focus {
   border-color: var(--color-green);
+}
+
+.edit-case-grid textarea {
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+}
+
+.edit-case-grid textarea:focus {
+  border-color: var(--color-green);
+}
+
+.edit-case-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.profile-subhead {
+  margin: 24px 0 2px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-checks {
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.profile-checks > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.profile-checks label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.profile-checks input {
+  accent-color: var(--color-deep);
+}
+
+.photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.photo-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.photo-upload input[type="file"] {
+  max-width: 260px;
+  font-size: 11px;
 }
 
 .edit-case-grid input:disabled {

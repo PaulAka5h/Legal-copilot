@@ -50,6 +50,7 @@ import type {
   SummarySection,
   Verification,
 } from "@/lib/api/lawyerTypes";
+import { isValidProfileInput, nfc, normalizeBdPhone } from "@/lib/api/lawyerProfile";
 import { dictionaries, format, numberFor, pick, type Language } from "@/lib/i18n";
 import { getSession } from "@/lib/session";
 import { currentKeyNotes } from "@/lib/summaryNotes";
@@ -1139,7 +1140,17 @@ function toProfileDetail(row: Api["LawyerProfileResponse"]): LawyerProfileDetail
     chamberName: row.chamber_name ?? "",
     organizationName: row.organization_name,
     canEditOrganization: row.can_edit_organization,
-    showContactToClients: row.show_contact_to_clients,
+    visibleFields: row.client_visible_fields,
+    photoId: row.photo_id ?? null,
+    barEnrollmentNo: row.bar_enrollment_no ?? "",
+    courts: row.courts,
+    practiceAreas: row.practice_areas,
+    yearsExperience: row.years_experience ?? null,
+    officeAddress: row.office_address ?? "",
+    languages: row.languages,
+    bio: row.bio ?? "",
+    publicPhone: row.public_phone ?? "",
+    publicEmail: row.public_email ?? "",
   };
 }
 
@@ -1155,23 +1166,29 @@ export type ProfileResult = "ok" | "invalid" | "error" | "NOT_CONFIGURED";
 
 /** Update the profile (audit-logged by the backend). Email is never sent. */
 export async function updateLawyerProfile(input: ProfileInput, canEditOrganization: boolean): Promise<ProfileResult> {
-  const fullName = input.fullName.trim();
-  const phone = input.phone.trim();
-  const organizationName = input.organizationName.trim();
-  if (!fullName || fullName.length > 200 || phone.length > 30 || !/^[0-9+()\- ]*$/.test(phone)) return "invalid";
-  if (input.chamberName.trim().length > 200 || (canEditOrganization && !organizationName)) return "invalid";
+  if (!isValidProfileInput(input, canEditOrganization)) return "invalid";
+  const text = (value: string) => nfc(value) || null;
   return withDemoFallback<ProfileResult>(
     async () => {
       try {
         await backend<Api["LawyerProfileResponse"]>("/api/v1/lawyer/profile", {
           method: "PATCH",
           json: {
-            full_name: fullName,
-            phone: phone || null,
+            full_name: nfc(input.fullName),
+            phone: input.phone.trim() || null,
             preferred_language: input.preferredLanguage,
-            chamber_name: input.chamberName.trim() || null,
-            show_contact_to_clients: input.showContactToClients,
-            ...(canEditOrganization ? { organization_name: organizationName } : {}),
+            chamber_name: text(input.chamberName),
+            bar_enrollment_no: text(input.barEnrollmentNo),
+            courts: input.courts.map(nfc).filter(Boolean),
+            practice_areas: input.practiceAreas,
+            years_experience: input.yearsExperience,
+            office_address: text(input.officeAddress),
+            languages: input.languages,
+            bio: text(input.bio),
+            public_phone: input.publicPhone.trim() ? normalizeBdPhone(input.publicPhone) : null,
+            public_email: input.publicEmail.trim() || null,
+            client_visible_fields: input.visibleFields,
+            ...(canEditOrganization ? { organization_name: nfc(input.organizationName) } : {}),
           } satisfies Api["LawyerProfilePatch"],
         });
         return "ok";
@@ -1196,6 +1213,7 @@ export async function getLawyerProfile(): Promise<LawyerProfile> {
     email: user.email,
     firm: same(detail ? detail.chamberName || detail.organizationName : ""),
     location: same(""),
+    photoId: detail?.photoId ?? null,
   };
 }
 

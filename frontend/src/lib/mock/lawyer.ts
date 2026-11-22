@@ -14,6 +14,7 @@ export const lawyerProfile: LawyerProfile = {
   email: "farhana@rahmanlaw.bd",
   firm: { en: "Rahman & Associates", bn: "রহমান অ্যান্ড অ্যাসোসিয়েটস" },
   location: { en: "Dhaka, Bangladesh", bn: "ঢাকা, বাংলাদেশ" },
+  photoId: null,
 };
 
 /** Demo matters; progress, archived and isLead are derived in lawyerDemo.ts. */

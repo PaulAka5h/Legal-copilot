@@ -1,54 +1,28 @@
-"""Lawyer profile: name, phone, preferred language, chamber and organization name.
+"""Lawyer profile: account fields, professional details and client visibility.
 
 Email is not editable here. Only an organization owner may rename the
 organization. Every change is audit-logged with field names only (no values).
+The photo has its own endpoints (app.lawyer.photo).
 """
 
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import LawyerDep, UserSessionDep, request_ip, require_same_origin
 from app.auth.repository import write_audit_event
 from app.errors import problem_responses
+from app.lawyer.profile_schemas import DEFAULT_VISIBLE_FIELDS, LawyerProfilePatch, LawyerProfileResponse
 from app.tenancy import resolve_actor_organization
 
 router = APIRouter(prefix="/api/v1/lawyer", tags=["lawyer-profile"])
 
-
-class LawyerProfileResponse(BaseModel):
-    full_name: str
-    email: str
-    phone: str | None
-    preferred_language: Literal["en", "bn"]
-    chamber_name: str | None
-    organization_name: str
-    can_edit_organization: bool = Field(description="True for organization owners")
-    show_contact_to_clients: bool = Field(
-        description="The lawyer allows firm, phone and email on their clients' dashboards (name is always shown)")
-
-
-class LawyerProfilePatch(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    full_name: str | None = Field(default=None, min_length=1, max_length=200)
-    phone: str | None = Field(default=None, max_length=30, pattern=r"^[0-9+()\- ]*$")
-    preferred_language: Literal["en", "bn"] | None = None
-    chamber_name: str | None = Field(default=None, max_length=200)
-    organization_name: str | None = Field(default=None, min_length=1, max_length=200)
-    show_contact_to_clients: bool | None = None
-
-    @model_validator(mode="after")
-    def validate_patch(self) -> "LawyerProfilePatch":
-        if not self.model_fields_set:
-            raise ValueError("At least one field must be provided.")
-        for field in ("full_name", "preferred_language", "organization_name", "show_contact_to_clients"):
-            if field in self.model_fields_set and getattr(self, field) is None:
-                raise ValueError(f"{field} cannot be null.")
-        return self
+# Column names come from this fixed list only, never from the request.
+PROFILE_COLUMNS = ("chamber_name", "bar_enrollment_no", "courts", "practice_areas", "years_experience",
+                   "office_address", "languages", "bio", "public_phone", "public_email", "client_visible_fields")
 
 
 async def _read_profile(session: AsyncSession, user_id: UUID) -> LawyerProfileResponse:
@@ -58,8 +32,11 @@ async def _read_profile(session: AsyncSession, user_id: UUID) -> LawyerProfileRe
             """
             SELECT u.full_name, u.email::text AS email, u.phone, u.preferred_language,
                    lp.chamber_name, o.name AS organization_name,
-                   COALESCE(lp.show_contact_to_clients, true) AS show_contact_to_clients,
-                   (om.org_role = 'owner') AS can_edit_organization
+                   (om.org_role = 'owner') AS can_edit_organization,
+                   lp.bar_enrollment_no, COALESCE(lp.courts, '{}') AS courts,
+                   COALESCE(lp.practice_areas, '{}') AS practice_areas, lp.years_experience,
+                   lp.office_address, COALESCE(lp.languages, '{}') AS languages, lp.bio,
+                   lp.public_phone, lp.public_email, lp.client_visible_fields, lp.avatar_id AS photo_id
             FROM public.users u
             JOIN public.organization_members om
               ON om.user_id = u.id AND om.organization_id = :org AND om.status = 'active'
@@ -70,7 +47,10 @@ async def _read_profile(session: AsyncSession, user_id: UUID) -> LawyerProfileRe
         ),
         {"user_id": user_id, "org": organization_id},
     )).mappings().one()
-    return LawyerProfileResponse.model_validate(dict(row))
+    values = dict(row)
+    if values["client_visible_fields"] is None:
+        values["client_visible_fields"] = DEFAULT_VISIBLE_FIELDS
+    return LawyerProfileResponse.model_validate(values)
 
 
 @router.get(
@@ -88,9 +68,12 @@ async def get_profile(user: LawyerDep, session: UserSessionDep) -> LawyerProfile
     "/profile",
     summary="Update the lawyer profile",
     description=(
-        "Updates name, phone, preferred language, chamber name, whether clients see the contact card "
-        "details, and (owners only) the organization name. Email cannot be changed here. Audit-logged "
-        "with the changed field names."
+        "Updates account fields (name, phone, preferred language), professional details (Bar Council "
+        "enrollment, courts, practice areas, experience, office address, languages, bio, public contact "
+        "phone and email), which fields clients see on the contact card, and (owners only) the organization "
+        "name. All professional fields are optional; send null to clear one. Text is NFC-normalized; the "
+        "public phone must be a Bangladesh mobile (+8801XXXXXXXXX). Email cannot be changed here. "
+        "Audit-logged with the changed field names only."
     ),
     response_model=LawyerProfileResponse,
     responses=problem_responses(401, 403, 404, 409, 422, 503),
@@ -115,10 +98,9 @@ async def patch_profile(
             text(f"UPDATE public.users SET {assignments}, updated_at = now() WHERE id = :user_id"),
             {**{name: values[name] for name in user_columns}, "user_id": user.id},
         )
-    profile_columns = [name for name in ("chamber_name", "show_contact_to_clients") if name in fields]
+    profile_columns = [name for name in PROFILE_COLUMNS if name in fields]
     if profile_columns:
-        params = {"user_id": user.id, "chamber_name": (values.get("chamber_name") or None),
-                  "show_contact_to_clients": values.get("show_contact_to_clients", True)}
+        params = {"user_id": user.id, **{name: values[name] for name in profile_columns}}
         insert_columns = ", ".join(profile_columns)
         insert_values = ", ".join(f":{name}" for name in profile_columns)
         updates = ", ".join(f"{name} = EXCLUDED.{name}" for name in profile_columns)
