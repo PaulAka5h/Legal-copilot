@@ -566,3 +566,25 @@ No migration.
   `tests/test_strategy_llm.py` (flat/nest, Gemini path with repair and 3 plies, the root cause, skip logging,
   live cheque case opt-in: `LIVE_LLM_TEST=1` + `GEMINI_API_KEY`/`GEMINI_MODEL`),
   `tests/ai/test_structured_retries.py` rewritten for no-backoff + repair.
+
+## Lawyer profile: photo, professional details, client visibility (2026-11-23, branch feat/lawyer-profile)
+
+Migration `0026_lawyer_profile_details` (run on Neon before deploying). New nullable `lawyer_profiles` columns:
+`years_experience`, `office_address`, `languages`, `bio`, `public_phone`, `public_email`, `client_visible_fields`,
+`avatar_id`, `avatar_updated_at` (`bar_enrollment_no`, `courts`, `practice_areas` already existed).
+`app.client_case_lawyer_contact` is replaced to return each field only when the lawyer allows it.
+Rows with `show_contact_to_clients = false` become `client_visible_fields = {photo}`; that column is no longer read.
+
+- Photo: `PUT/DELETE/GET /api/v1/lawyer/profile/photo`; clients: `GET /api/v1/client/cases/{case_id}/lawyer/photo`
+  (404 unless the photo is shown). JPEG/PNG/WebP by magic bytes, max 5 MB (body limit 6 MB on that path),
+  max 16 MP checked from the header before decoding, one decode at a time, EXIF rotation applied then all
+  metadata dropped, 512 and 96 center-cropped WebP at `users/{user_id}/avatar/{avatar_id}-{size}.webp`.
+  No public bucket URLs; there is no route that takes another lawyer's ID. Audit: `lawyer.photo_updated`,
+  `lawyer.photo_removed`.
+- Details: Bar Council enrollment, courts, practice areas, experience, office address, languages, bio, public
+  phone (+8801XXXXXXXXX, normalized from 01… forms) and public email. Text is NFC before length checks.
+- Visibility: name always shown; default photo, firm, phone (public phone, falling back to the account phone).
+  The login email is never shown to clients.
+- Tests: `tests/test_lawyer_profile.py` (upload valid/too large/wrong type/fake extension, resize and EXIF strip,
+  pixel limit, client sees only allowed fields, another lawyer's photo not reachable).
+- Not done: the settings and client card UI were type-checked and built but not clicked through in a browser.

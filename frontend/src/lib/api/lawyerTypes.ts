@@ -40,7 +40,46 @@ export type EditMatterInput = {
 
 export type EditMatterResult = "ok" | "invalid" | "archived" | "closed" | "error" | "NOT_CONFIGURED";
 
-export type LawyerProfileDetail = {
+export const PRACTICE_AREAS = [
+  "criminal", "civil", "family", "land", "labour", "commercial", "cheque_ni_act", "other",
+] as const;
+export const SPOKEN_LANGUAGES = ["bn", "en", "other"] as const;
+/** Fields a lawyer can show on the client contact card (the name is always shown). */
+export const VISIBLE_FIELDS = [
+  "photo", "firm", "phone", "email", "bar_enrollment_no", "courts", "practice_areas",
+  "years_experience", "office_address", "languages", "bio",
+] as const;
+export type PracticeArea = (typeof PRACTICE_AREAS)[number];
+export type SpokenLanguage = (typeof SPOKEN_LANGUAGES)[number];
+export type VisibleField = (typeof VISIBLE_FIELDS)[number];
+
+/** Optional professional details; empty strings and lists mean "not filled in". */
+export type ProfessionalDetails = {
+  barEnrollmentNo: string;
+  courts: string[];
+  practiceAreas: PracticeArea[];
+  yearsExperience: number | null;
+  officeAddress: string;
+  languages: SpokenLanguage[];
+  bio: string;
+  publicPhone: string;
+  publicEmail: string;
+};
+
+/** Details as shown on a profile or contact card; missing or null fields are not shown. */
+export type ShownDetails = {
+  publicPhone?: string | null;
+  publicEmail?: string | null;
+  barEnrollmentNo?: string | null;
+  courts?: string[] | null;
+  practiceAreas?: PracticeArea[] | null;
+  yearsExperience?: number | null;
+  officeAddress?: string | null;
+  languages?: SpokenLanguage[] | null;
+  bio?: string | null;
+};
+
+export type LawyerProfileDetail = ProfessionalDetails & {
   fullName: string;
   email: string;
   phone: string;
@@ -48,16 +87,17 @@ export type LawyerProfileDetail = {
   chamberName: string;
   organizationName: string;
   canEditOrganization: boolean;
-  showContactToClients: boolean;
+  visibleFields: VisibleField[];
+  photoId: string | null;
 };
 
-export type ProfileInput = {
+export type ProfileInput = ProfessionalDetails & {
   fullName: string;
   phone: string;
   preferredLanguage: "en" | "bn";
   chamberName: string;
   organizationName: string;
-  showContactToClients: boolean;
+  visibleFields: VisibleField[];
 };
 
 export type HearingNoteVersion = {
@@ -169,6 +209,8 @@ export type LawyerProfile = {
   email: string;
   firm: Localized;
   location: Localized;
+  /** Current photo version, or null to show initials. */
+  photoId: string | null;
 };
 
 export type LawyerStats = {

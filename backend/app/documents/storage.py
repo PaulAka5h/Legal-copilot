@@ -1,6 +1,7 @@
-"""Object storage for original case documents (MinIO via the minio client).
+"""Object storage for case documents and profile photos (MinIO/B2 via the minio client).
 
-Keys are always cases/{case_id}/documents/{document_id}. Bucket and credentials
+Document keys are cases/{case_id}/documents/{document_id}; profile photos are
+users/{user_id}/avatar/{avatar_id}-{size}.webp (app.lawyer.avatar). Bucket and credentials
 come from Settings (environment). Missing configuration raises
 StorageNotConfigured, which endpoints report as NOT_CONFIGURED.
 """
@@ -20,6 +21,8 @@ class ObjectStore(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
 
     def get(self, key: str) -> bytes: ...
+
+    def delete(self, key: str) -> None: ...
 
 
 def document_key(case_id: UUID, document_id: UUID) -> str:
@@ -68,6 +71,9 @@ class MinioStore:
         finally:
             response.close()
             response.release_conn()
+
+    def delete(self, key: str) -> None:
+        self.client.remove_object(self.bucket, key)
 
 
 def get_store(settings: Settings) -> ObjectStore:

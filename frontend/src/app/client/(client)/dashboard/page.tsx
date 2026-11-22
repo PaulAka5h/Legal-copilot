@@ -5,7 +5,9 @@ import {
   progressFor,
   type CaseProgressStage,
 } from "@/components/CaseProgress";
+import { Avatar, clientLawyerPhotoUrl } from "@/components/Avatar";
 import { ClientDocuments } from "@/components/client/ClientDocuments";
+import { ProfileDetails } from "@/components/lawyer/ProfileDetails";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -149,38 +151,44 @@ export default async function ClientDashboardPage({
 
         <div className="panel lawyer-panel">
           <div className="panel-head">
-            <div>
-              <h2>{pick(caseData.lawyer.name, language)}</h2>
-              <p>{dashboard.lawyerSub}</p>
+            <div className="lawyer-card-head">
+              <Avatar
+                name={caseData.lawyer.name.en}
+                src={clientLawyerPhotoUrl(caseData.id, caseData.lawyer.photoId)}
+                size={48}
+              />
+              <div>
+                <h2>{pick(caseData.lawyer.name, language)}</h2>
+                <p>{dashboard.lawyerSub}</p>
+              </div>
             </div>
           </div>
           {/* Only the fields the lawyer filled in and allows clients to see. */}
-          {caseData.lawyer.firm || caseData.lawyer.phone || caseData.lawyer.email ? (
-            <dl className="profile-list">
-              {caseData.lawyer.firm ? (
-                <div>
-                  <dt>{dashboard.firm}</dt>
-                  <dd>{pick(caseData.lawyer.firm, language)}</dd>
-                </div>
-              ) : null}
-              {caseData.lawyer.phone ? (
-                <div>
-                  <dt>{dashboard.phone}</dt>
-                  <dd>
-                    <a href={`tel:${caseData.lawyer.phone.replace(/[^0-9+]/g, "")}`}>{caseData.lawyer.phone}</a>
-                  </dd>
-                </div>
-              ) : null}
-              {caseData.lawyer.email ? (
-                <div>
-                  <dt>{dashboard.email}</dt>
-                  <dd>
-                    <a href={`mailto:${caseData.lawyer.email}`}>{caseData.lawyer.email}</a>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : null}
+          <dl className="profile-list">
+            {caseData.lawyer.firm ? (
+              <div>
+                <dt>{dashboard.firm}</dt>
+                <dd>{pick(caseData.lawyer.firm, language)}</dd>
+              </div>
+            ) : null}
+            {caseData.lawyer.phone ? (
+              <div>
+                <dt>{dashboard.phone}</dt>
+                <dd>
+                  <a href={`tel:${caseData.lawyer.phone.replace(/[^0-9+]/g, "")}`}>{caseData.lawyer.phone}</a>
+                </dd>
+              </div>
+            ) : null}
+            {caseData.lawyer.email ? (
+              <div>
+                <dt>{dashboard.email}</dt>
+                <dd>
+                  <a href={`mailto:${caseData.lawyer.email}`}>{caseData.lawyer.email}</a>
+                </dd>
+              </div>
+            ) : null}
+            <ProfileDetails details={caseData.lawyer.details} copy={copy.lawyerProfile} language={language} />
+          </dl>
         </div>
 
         <div className="panel docs-panel">

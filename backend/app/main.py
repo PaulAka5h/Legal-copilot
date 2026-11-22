@@ -16,6 +16,7 @@ from app.database import create_database_engine, verify_runtime_role
 from app.errors import register_exception_handlers
 from app.health import router as health_router
 from app.lawyer.router import router as lawyer_router
+from app.lawyer.photo import router as lawyer_photo_router
 from app.lawyer.profile import router as lawyer_profile_router
 from app.client_portal.router import router as client_portal_router
 from app.client_portal.extras import router as client_extras_router
@@ -130,6 +131,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cases_router)
     app.include_router(lawyer_router)
     app.include_router(lawyer_profile_router)
+    app.include_router(lawyer_photo_router)
     app.include_router(client_portal_router)
     app.include_router(client_extras_router)
     app.include_router(visibility_router)

@@ -4,6 +4,8 @@ import { signOut, signOutAll } from "@/app/actions";
 import { Icon } from "@/components/Icon";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PageHeading } from "@/components/lawyer/PageHeading";
+import { PhotoPanel } from "@/components/lawyer/PhotoPanel";
+import { ProfileDetails } from "@/components/lawyer/ProfileDetails";
 import { ProfileForm } from "@/components/lawyer/ProfileForm";
 import { getLawyerProfile, getLawyerProfileDetail } from "@/lib/api/lawyer";
 import { dictionaries, pick, titleFor } from "@/lib/i18n";
@@ -18,12 +20,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; profile?: string }>;
+  searchParams: Promise<{ edit?: string; profile?: string; photo?: string }>;
 }) {
-  const { edit, profile: profileResult } = await searchParams;
+  const { edit, profile: profileResult, photo: photoResult } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
   const settings = copy.settings;
+  const profileCopy = copy.lawyerProfile;
   const [profile, detail] = await Promise.all([getLawyerProfile(), getLawyerProfileDetail()]);
   const editing = edit === "1" && detail !== null;
 
@@ -49,6 +52,10 @@ export default async function SettingsPage({
           </div>
         </section>
 
+        {detail ? (
+          <PhotoPanel name={detail.fullName} photoId={detail.photoId} result={photoResult} copy={profileCopy} />
+        ) : null}
+
         <section className="panel" id="profile">
           <div className="panel-head">
             <div>
@@ -70,6 +77,7 @@ export default async function SettingsPage({
             <ProfileForm
               detail={detail}
               copy={settings}
+              profileCopy={profileCopy}
               error={profileResult !== undefined && profileResult !== "saved"}
             />
           ) : (
@@ -100,6 +108,7 @@ export default async function SettingsPage({
               <dt>{settings.location}</dt>
               <dd>{pick(profile.location, language)}</dd>
             </div>
+            {detail ? <ProfileDetails details={detail} copy={profileCopy} language={language} /> : null}
           </dl>
           )}
         </section>

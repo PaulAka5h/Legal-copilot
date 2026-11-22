@@ -8,6 +8,7 @@ import {
   withDemoFallback,
   type Api,
 } from "@/lib/api/backendClient";
+import type { ShownDetails } from "@/lib/api/lawyerTypes";
 import {
   clientCase,
   clientProfile,
@@ -40,9 +41,12 @@ export type CaseStage = {
 /** Only the fields the lawyer filled in and allows clients to see; the rest are null. */
 export type LawyerContact = {
   name: Localized;
+  /** Photo version when the lawyer shows it; null shows initials. */
+  photoId: string | null;
   firm: Localized | null;
   phone: string | null;
   email: string | null;
+  details: ShownDetails;
 };
 
 export type NextHearing = {
@@ -269,6 +273,16 @@ export async function getClientCase(caseId?: string): Promise<ClientCase | null>
           firm: lawyer?.firm ? same(lawyer.firm) : null,
           phone: lawyer?.phone ?? null,
           email: lawyer?.email ?? null,
+          photoId: lawyer?.photo_id ?? null,
+          details: {
+            barEnrollmentNo: lawyer?.bar_enrollment_no,
+            courts: lawyer?.courts,
+            practiceAreas: lawyer?.practice_areas,
+            yearsExperience: lawyer?.years_experience,
+            officeAddress: lawyer?.office_address,
+            languages: lawyer?.languages,
+            bio: lawyer?.bio,
+          },
         },
         documents: documents.map((document) => ({
           id: document.id,

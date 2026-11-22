@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { removeProfilePhoto, uploadProfilePhoto } from "@/lib/api/lawyerProfile";
+import { PRACTICE_AREAS, SPOKEN_LANGUAGES, VISIBLE_FIELDS } from "@/lib/api/lawyerTypes";
 import { redirect } from "next/navigation";
 import {
   addFact,
@@ -437,21 +439,54 @@ export async function linkClientToCaseAction(formData: FormData) {
 }
 
 /** Edit the lawyer profile (email is not editable; audit-logged by the backend). */
+function listFrom<T extends string>(formData: FormData, name: string, allowed: readonly T[]): T[] {
+  return formData
+    .getAll(name)
+    .map(String)
+    .filter((value): value is T => (allowed as readonly string[]).includes(value));
+}
+
 export async function updateProfileAction(formData: FormData) {
   await requireLawyer();
   const language = formData.get("preferredLanguage") === "bn" ? "bn" : "en";
+  const field = (name: string) => String(formData.get(name) ?? "");
+  const years = field("yearsExperience").trim();
   const result = await updateLawyerProfile(
     {
-      fullName: String(formData.get("fullName") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
+      fullName: field("fullName"),
+      phone: field("phone"),
       preferredLanguage: language,
-      chamberName: String(formData.get("chamberName") ?? ""),
-      organizationName: String(formData.get("organizationName") ?? ""),
-      showContactToClients: formData.get("showContactToClients") === "on",
+      chamberName: field("chamberName"),
+      organizationName: field("organizationName"),
+      barEnrollmentNo: field("barEnrollmentNo"),
+      courts: field("courts").split(/\r?\n/).map((court) => court.trim()).filter(Boolean),
+      practiceAreas: listFrom(formData, "practiceAreas", PRACTICE_AREAS),
+      yearsExperience: years === "" ? null : Number(years),
+      officeAddress: field("officeAddress"),
+      languages: listFrom(formData, "languages", SPOKEN_LANGUAGES),
+      bio: field("bio"),
+      publicPhone: field("publicPhone"),
+      publicEmail: field("publicEmail"),
+      visibleFields: listFrom(formData, "visibleFields", VISIBLE_FIELDS),
     },
     // Decided by the server (owner role), never by the form.
     Boolean((await getLawyerProfileDetail())?.canEditOrganization),
   );
   revalidatePath("/lawyer", "layout");
   redirect(result === "ok" ? "/lawyer/settings?profile=saved" : `/lawyer/settings?edit=1&profile=${result}#profile`);
+}
+
+export async function uploadPhotoAction(formData: FormData) {
+  await requireLawyer();
+  const file = formData.get("photo");
+  const result = file instanceof File && file.size > 0 ? await uploadProfilePhoto(file) : "invalid";
+  revalidatePath("/lawyer", "layout");
+  redirect(`/lawyer/settings?photo=${result}#photo`);
+}
+
+export async function removePhotoAction() {
+  await requireLawyer();
+  const result = await removeProfilePhoto();
+  revalidatePath("/lawyer", "layout");
+  redirect(`/lawyer/settings?photo=${result}#photo`);
 }

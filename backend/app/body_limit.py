@@ -12,6 +12,8 @@ import re
 
 UPLOAD_PATH = re.compile(r"^/api/v1/lawyer/cases/[^/]+/documents/?$")
 UPLOAD_LIMIT = 21 * 1024 * 1024  # 20 MB file plus multipart overhead
+PHOTO_PATH = re.compile(r"^/api/v1/lawyer/profile/photo/?$")
+PHOTO_LIMIT = 6 * 1024 * 1024  # 5 MB photo plus multipart overhead
 DEFAULT_LIMIT = 2 * 1024 * 1024
 
 
@@ -33,7 +35,13 @@ class BodySizeLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        limit = self.upload_limit if UPLOAD_PATH.match(scope.get("path", "")) else self.default_limit
+        path = scope.get("path", "")
+        if UPLOAD_PATH.match(path):
+            limit = self.upload_limit
+        elif PHOTO_PATH.match(path):
+            limit = PHOTO_LIMIT
+        else:
+            limit = self.default_limit
         declared = dict(scope.get("headers") or []).get(b"content-length")
         if declared is not None:
             try:
