@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from uuid import UUID, uuid4
 
@@ -38,6 +39,18 @@ async def _startup_sweep(engine, minutes: int, logger) -> None:
                        extra={"event": "documents.stuck_sweep_failed", "error_type": type(error).__name__})
 
 
+async def _preload_query_embedder(logger) -> None:
+    """Build the query embedder once; on failure search answers 503 later, startup goes on."""
+    from app.rag.search.providers import get_query_embedder
+
+    try:
+        await asyncio.to_thread(get_query_embedder)
+        logger.info("query_embedder.preloaded", extra={"event": "query_embedder.preloaded"})
+    except Exception as error:  # missing model files, not the pinned build, out of memory
+        logger.warning("query_embedder.preload_failed",
+                       extra={"event": "query_embedder.preload_failed", "error_type": type(error).__name__})
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or Settings()
     logger = configure_logging(app_settings.log_level)
@@ -53,6 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await verify_runtime_role(engine)
                 if app_settings.sweep_stuck_documents_on_startup:
                     await _startup_sweep(engine, app_settings.stuck_processing_minutes, logger)
+                if app_settings.preload_query_embedder:
+                    await _preload_query_embedder(logger)
                 app.state.session_factory = async_sessionmaker(
                     engine,
                     expire_on_commit=False,

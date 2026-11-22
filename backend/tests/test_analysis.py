@@ -170,9 +170,12 @@ def test_analysis_isolation(api_client, ready_case):
 
 
 class _QuotaExhausted:
-    """An e5-labelled embedder whose API answers 429 (like the Gemini free tier when the quota is used up)."""
+    """Labelled like the test KB's model; its API answers 429 (like the Gemini free tier when the quota is used up)."""
 
-    from app.rag.ingest.chunking import EMBEDDING_MODEL as model_name, EMBEDDING_VERSION as embedding_version
+    from app.config import Settings
+    from app.rag.search.providers import embedding_target
+
+    model_name, embedding_version = embedding_target(Settings()).model, embedding_target(Settings()).version
 
     def embed_query(self, query):
         from app.rag.search.errors import EmbeddingUnavailable

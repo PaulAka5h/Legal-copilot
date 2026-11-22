@@ -6,15 +6,20 @@ Branch: `deploy/render`. Cost: 0. Nothing here needs a credit card.
 Browser ──► Vercel (Next.js frontend, proxies /api/v1) ──► Render free web service (FastAPI, Docker, 512 MB)
                                                              ├─► Neon Postgres (pgvector, RLS)
                                                              ├─► Backblaze B2 (uploaded documents)
-                                                             └─► Gemini API (query embeddings; analysis with mock fallback)
+                                                             └─► Gemini API (analysis + search query rewriting; mock fallback)
+   (search embeddings: multilingual-e5-small ONNX int8 inside the Render container)
 ```
 
 > **SYNTHETIC DEMO DATA ONLY.** Search text and case facts are sent to Gemini; the database, files and server are third-party free tiers that have not
 > passed the review in `DOCS/providers.md`. Use only `SAMPLE_DATA_NOT_REAL_LAW` cases.
-> `APP_ENV` stays `development` on purpose: the code refuses Gemini (LLM and
-> embeddings) in `production`.
+> `APP_ENV` stays `development` on purpose: the code refuses the Gemini LLM in
+> `production`.
 
-> **Demo knowledge base = 19 Acts (717 chunks), embedded with Gemini.** The free
+> **Knowledge base: after the cutover in section 8, the full bdlaws corpus (1,176 Acts,
+> 39,587 chunks) embedded with multilingual-e5-small inside the container, all approved
+> under the note "Bulk bdlaws import; spot-checked 5 Acts (138, 952, 180, 1054, 1124)
+> against source; not individually reviewed by a lawyer".** Before it (history below):
+> **19 Acts (717 chunks), embedded with Gemini.** The free
 > Gemini tier allows 1,000 embedding requests per day, so the demo carries only Acts
 > whose every chunk has a Gemini vector (no Act is half-embedded, no model is mixed).
 > The full corpus pipeline exists and runs on e5: 29 Acts (2,652 chunks) are ingested
@@ -79,12 +84,16 @@ and the demo lawyer login (`demo.lawyer@example.com` + the password you chose).
 
 The app talks to B2 with the same `minio` client it uses locally (`MINIO_SECURE=true`).
 
-## 3. Gemini API key (embeddings + analysis)
+## 3. Gemini API key (analysis + search query rewriting)
 
 <https://aistudio.google.com/apikey> → **Create API key** → copy → `GEMINI_API_KEY`.
 Free tier, synthetic data only. The same key serves two things:
 
-- **Query embeddings (required).** `EMBEDDING_PROVIDER=gemini` embeds every search
+- **Query embeddings: not any more after the cutover (section 8):** `EMBEDDING_PROVIDER=e5_small_onnx`
+  embeds queries inside the container. `SEARCH_QUERY_REWRITE=true` sends each new search query
+  (and each analysed fact) to the LLM once to get Bangla + English variants and keywords; if the
+  call fails the plain query is searched (warning `query_rewrite_failed`).
+- **Before the cutover: query embeddings (required).** `EMBEDDING_PROVIDER=gemini` embeds every search
   and analysis query with `gemini-embedding-001` (1024 dims, `RETRIEVAL_QUERY`). The
   demo knowledge base in `deploy/demo_data.dump` was embedded with the same model
   (`RETRIEVAL_DOCUMENT`), so the vectors match. Without a key, search answers
@@ -118,11 +127,11 @@ git push -u origin deploy/render
    | `DATABASE_URL` | from step 1 |
    | `MINIO_ENDPOINT` / `MINIO_REGION` / `MINIO_BUCKET` | from step 2 |
    | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | B2 keyID / applicationKey |
-   | `GEMINI_API_KEY` | from step 3 (required: search needs it) |
+   | `GEMINI_API_KEY` | from step 3 (analysis and search query rewriting) |
 
    Everything else is preset by `render.yaml`: `APP_ENV=development`,
-   `SESSION_COOKIE_SECURE=true`, `EMBEDDING_PROVIDER=gemini`,
-   `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`, `LLM_PROVIDER=gemini`,
+   `SESSION_COOKIE_SECURE=true`, `EMBEDDING_PROVIDER=e5_small_onnx` (model built into
+   the image), `SEARCH_QUERY_REWRITE=true`, `LLM_PROVIDER=gemini`,
    `LLM_APPROVED_PROVIDERS=gemini,mock`, `MALWARE_SCANNER=none`, `MINIO_SECURE=true`,
    `OCR_DPI=250`, and a generated `MFA_ENCRYPTION_KEY`.
 6. Click **Apply**. The first build takes about 5 to 10 minutes
@@ -192,6 +201,75 @@ back to keyword-only (full-text) retrieval, the API returns
 Analysis panel shows a "Keyword-only search" notice. In that mode a provision is used
 only if it shares at least 3 content words with the fact (a heuristic, not calibrated).
 
+## 8. Full-corpus cutover (e5-small, 1,176 Acts)
+
+Replaces the 19-Act Gemini-embedded knowledge base in Neon with the full bdlaws corpus
+(1,176 Acts, 35,063 sections, 39,587 chunks) embedded with `intfloat/multilingual-e5-small`
+(ONNX int8, 384 dims), and switches Render to embed queries with the same model inside
+the container. Only the four `legal_*` tables change; users, cases, facts, analyses,
+hearings and documents are not touched (the cutover checks every other table's row count).
+Saved analyses cite chunk ids: a chunk keeps its id when its text is unchanged (rehearsal:
+663 of 717 old chunks kept their ids, all 7 cited chunks still present).
+
+Rehearsed end to end on a Neon-like Postgres 17 (non-superuser owner, RLS forced 37/37,
+app_owner without BYPASSRLS) holding the demo dump: see "Measured results" below.
+
+Run in this order. Stop at the first step that fails.
+
+1. **Local export** (once; reads `legal_copilot_full`, refuses unless every chunk has an
+   e5-small v1 vector and every version is approved):
+   `SOURCE_DB=legal_copilot_full deploy/export_legal_corpus.sh` → `deploy/corpus_e5small/`
+   (284 MB, git-ignored, public statute text only).
+2. **Back up Neon's current legal tables** (the rollback copy, about 10 MB):
+   ```bash
+   export NEON_APP_OWNER_URL='postgresql://app_owner:<APP_OWNER_PW>@<HOST>/neondb?sslmode=require'
+   deploy/neon_legal_backup.sh backup        # -> deploy/backups_neon/legal_<time>.sql
+   ```
+3. **Migrations 0021 + 0022** (0021: vector column of any dimension + one HNSW index per
+   dimension, keeps the Gemini vectors, so the running Render service keeps working;
+   0022: the per-organization query-rewrite cache table, unused by the old code):
+   ```bash
+   cd backend
+   ALEMBIC_DATABASE_URL='postgresql+asyncpg://app_owner:<APP_OWNER_PW>@<HOST>/neondb?sslmode=require' \
+     uv run alembic upgrade head            # ... -> 0022_query_rewrite_cache
+   cd ..
+   ```
+4. **Dry run** (does everything in one transaction, then ROLLBACK; TRUNCATE-based, so it
+   leaves no dead rows behind):
+   ```bash
+   REVIEWER_EMAIL='<your Neon account email>' DRY_RUN=1 deploy/neon_cutover_e5small.sh
+   ```
+   If that account does not exist in Neon yet, also set `REVIEWER_NAME='<your name>'`:
+   it is then created as an active admin without a password. Expect
+   `DRY RUN: every check passed`.
+5. **Real run** (same command with `DRY_RUN=0`, about 30 s; search waits on the table lock
+   meanwhile). Expect `approved_acts 1176 | sections 35063 | chunks 39587 |
+   cited_chunks_no_longer_present 0 | rls_forced 38/38`, then `COMMITTED` and the database
+   size (rehearsal: 307 MB; Neon free limit 0.5 GB). From here until step 6 is live, the
+   old Render service answers search with `503 EMBEDDING_MODEL_MISMATCH` (it embeds with
+   Gemini); keep this window short.
+6. **Deploy**: merge `feat/full-corpus-e5small` into `deploy/render` and push. Render
+   rebuilds the image (the build downloads and quantizes the model and fails unless it has
+   the pinned SHA-256). In Render → Environment, delete `GEMINI_EMBEDDING_MODEL` (a
+   Blueprint does not remove variables it no longer lists; it is ignored anyway).
+7. **Smoke test** (section 7): the search line must say
+   `embeddings intfloat/multilingual-e5-small`. Then delete `deploy/corpus_e5small/`.
+
+### Rollback
+
+No migration downgrade is needed: the pre-cutover code reads the 0021 column fine and
+ignores the 0022 table
+(rehearsed: old image + restored data passes the smoke test).
+
+1. Render → the service → **Events** → previous deploy → **Rollback** (or push the previous
+   `deploy/render` commit). Set `EMBEDDING_PROVIDER=gemini` and
+   `GEMINI_EMBEDDING_MODEL=gemini-embedding-001` in Environment if you changed them.
+2. `deploy/neon_legal_backup.sh restore deploy/backups_neon/legal_<time>.sql`: puts the
+   19 Acts and their Gemini vectors back in one transaction (same ids, so analyses made
+   before the cutover cite existing chunks; analyses made after it may cite chunks that no
+   longer exist). The approval audit events and the reviewer account stay (history).
+3. Smoke test: `embeddings gemini-embedding-001`.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -243,6 +321,35 @@ dump script refuses a database with unembedded chunks or mixed models.
 
 The e5 demo dump from before the switch is kept as `backups/demo_data_e5_20261121.dump`
 (git-ignored).
+
+## Measured results: full corpus on e5-small (local, 2026-11-22)
+
+Neon-like Postgres 17 (non-superuser owner, app_owner without BYPASSRLS, RLS forced 38/38)
+holding the demo dump, then `alembic upgrade head` (0020, 0021, 0022) and the cutover above;
+`backend/Dockerfile.render` image in `docker run --memory=512m --memory-swap=512m`, local
+MinIO, real Gemini LLM. Peak = cgroup `memory.peak`.
+
+| Check | Result |
+|---|---|
+| Image | 1.77 GB on disk, about 456-478 MB compressed (was 1.49 GB / 364 MB); model files 129 MB, SHA-256 checked at build and at load |
+| Database after cutover | 305-307 MB (`pg_database_size`; was 24 MB). Dry run leaves no bloat; re-running the cutover (also after 0022) stays at 306-307 MB |
+| Cutover time | about 30 s (load, HNSW build, 1,176 approvals, checks) |
+| Idle after start (query model preloaded) | 264-269 MiB, start-up peak 335-345 MiB |
+| Smoke test (search + analysis + OCR upload) | ALL PASSED; search top hit NI Act s.138 (cosine 0.88) |
+| 2-3 searches + 1 analysis + 1 OCR upload at once | **peak 392-438 MiB** (4 runs; with batched, cached rewrites) |
+| Stress: 2 searches + 1 analysis + 2 OCR uploads at once | **peak 426-455 MiB** (4 runs, one above 450; no OOM; 501 MiB before `EXTRACTION_MAX_CONCURRENT=1`; the second upload waits about 1 s) |
+| Search latency | 50-180 ms without rewriting (embedding about 5 ms); 3-7 s with rewriting: the Gemini call dominates |
+
+What it took to fit 512 MB:
+- **Tokenizer**: the `tokenizers` XLM-R model (250k pieces) costs about 285 MB of RAM. The query
+  path uses the original `sentencepiece.bpe.model` (about 15 MB) instead: identical ids on
+  all 98 eval queries and on 39,579 of 39,587 chunks (8 have two equal-score segmentations);
+  ingestion and the embed worker keep `tokenizers`, so stored vectors stay reproducible.
+- **ONNX Runtime**: graph optimization level EXTENDED instead of ALL. ALL pre-packs weights
+  (RSS about 475 MB, load peak about 550 MB: OOM-killed on the first search); EXTENDED is
+  about 185 MB with bit-identical vectors.
+- **Preload**: `PRELOAD_QUERY_EMBEDDER=true` loads the model at start-up, so its one-time load
+  peak never coincides with an OCR upload.
 
 ## Measured results (local, 2026-11-21)
 

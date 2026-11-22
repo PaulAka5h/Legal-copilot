@@ -23,6 +23,13 @@ from app.documents import repository as repo
 from app.documents.extraction import document_language, extract_pages
 from app.documents.storage import ObjectStore
 
+_extraction_slots: dict[int, asyncio.Semaphore] = {}
+
+
+def extraction_slots(limit: int) -> asyncio.Semaphore:
+    """Process-wide limit on concurrent extractions (page rendering + Tesseract use the most RAM)."""
+    return _extraction_slots.setdefault(limit, asyncio.Semaphore(limit))
+
 logger = logging.getLogger("app.documents")
 
 
@@ -73,9 +80,10 @@ async def process_document(
 
     try:
         data = await asyncio.to_thread(store.get, document["storage_key"])
-        pages, warnings = await asyncio.to_thread(
-            extract_pages, data, document["mime_type"], settings.ocr_languages, settings.ocr_dpi
-        )
+        async with extraction_slots(settings.extraction_max_concurrent):
+            pages, warnings = await asyncio.to_thread(
+                extract_pages, data, document["mime_type"], settings.ocr_languages, settings.ocr_dpi
+            )
     except Exception as error:
         logger.warning("document.processing_failed", extra={"event": "document.processing_failed",
                                                             "error_type": type(error).__name__})

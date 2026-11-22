@@ -1,9 +1,23 @@
 # Render FREE plan image (512 MB RAM): API only, no torch.
-# Query embeddings come from the Gemini API (EMBEDDING_PROVIDER=gemini, gemini-embedding-001;
-# the demo knowledge base is embedded with the same model), the database is Neon,
-# documents go to Backblaze B2. See DOCS/deploy_render_free.md.
+# Query embeddings: intfloat/multilingual-e5-small as ONNX int8 on this CPU
+# (EMBEDDING_PROVIDER=e5_small_onnx, 384 dims; the knowledge base is embedded with the
+# same build). The database is Neon, documents go to Backblaze B2, the LLM is Gemini.
+# See DOCS/deploy_render_free.md.
 #
 # Build locally:  docker build -f backend/Dockerfile.render -t pokkhoai-render backend
+
+# --- Stage 1: build the e5-small ONNX int8 model from pinned inputs -----------------
+# Downloads the pinned fp32 ONNX + tokenizer (SHA-256 checked), quantizes with the
+# locked onnx/onnxruntime versions, and fails the build unless the result is the exact
+# model the knowledge base was embedded with (E5_SMALL_MODEL_SHA256).
+FROM python:3.12-slim AS e5-model
+COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /usr/local/bin/uv
+RUN uv pip install --system --no-cache numpy==2.5.5 protobuf==7.36.2 onnx==1.23.2 onnxruntime==1.32.0
+COPY scripts/export_e5_small_onnx.py /build/export_e5_small_onnx.py
+RUN python /build/export_e5_small_onnx.py --out /model \
+      --expect-sha256 f5c0888fe75d7bd39d468b23417c8831247b70078ecc19e72041df3d86676842
+
+# --- Stage 2: the API image ----------------------------------------------------------
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,7 +31,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MALLOC_ARENA_MAX=2 \
     # Tesseract: one OpenMP thread (each thread holds its own buffers).
     OMP_THREAD_LIMIT=1 \
-    EMBEDDING_PROVIDER=gemini \
+    EMBEDDING_PROVIDER=e5_small_onnx \
+    E5_ONNX_DIR=/app/models/multilingual-e5-small-onnx-int8 \
+    # Load the query model at startup: its one-time load peak never meets an OCR upload.
+    PRELOAD_QUERY_EMBEDDER=true \
     RERANKER_PROVIDER=mock \
     # OCR render cap: keeps a scanned A4 page + Tesseract under 450 MB (measured).
     OCR_DPI=250 \
@@ -38,6 +55,8 @@ RUN uv sync --frozen --no-default-groups --no-install-project \
  && ! python -c "import torch" 2>/dev/null
 
 COPY app ./app
+# Read-only model bundle; the app re-checks the model SHA-256 when it loads it.
+COPY --from=e5-model /model ./models/multilingual-e5-small-onnx-int8
 
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 USER app

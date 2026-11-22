@@ -159,9 +159,9 @@ def test_local_without_ml_group_is_not_configured(monkeypatch):
         build_query_embedder(Settings(_env_file=None, embedding_provider="local"))
 
 
-def test_default_provider_is_local(monkeypatch):
+def test_default_provider_is_e5_small_onnx(monkeypatch):
     monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
-    assert Settings(_env_file=None).embedding_provider == "local"
+    assert Settings(_env_file=None).embedding_provider == "e5_small_onnx"
 
 
 def test_app_import_does_not_load_torch():

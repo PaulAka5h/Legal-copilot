@@ -1,6 +1,6 @@
 """Retrieval eval and abstain-threshold calibration for the configured EMBEDDING_PROVIDER.
 
-    uv run python -m eval.retrieval --label gemini [--out eval/results/retrieval_gemini.json]
+    uv run python -m eval.retrieval --label e5small [--rewrite] [--out eval/results/retrieval_e5small.json]
 
 No LLM calls, nothing written to the database (LEGAL_INGEST_DATABASE_URL, read only).
 Query sets (synthetic, SAMPLE_DATA_NOT_REAL_LAW):
@@ -8,6 +8,9 @@ Query sets (synthetic, SAMPLE_DATA_NOT_REAL_LAW):
 - search: tests/rag/data/retrieval_queries_20_acts.json (lawyer questions, en + bn)
 Retrieval: hybrid_search, mock reranker, k=10 -> Recall@5, Recall@10, MRR@10 overall
 and per language.
+--rewrite: search and analysis use LLM query rewriting (app.rag.search.query_rewrite; needs
+LLM_PROVIDER=gemini and its key). 429/503 answers are retried here (eval only) so quota
+limits do not distort the numbers; the LLM calls are counted and reported.
 Calibration: the analysis path (case_analysis.service._retrieve over fact_queries)
 gives each query its best cosine similarity, the number the analysis threshold is
 compared with. Relevant = both sets above; unrelated = eval/unrelated_facts.jsonl
@@ -85,6 +88,31 @@ def choose_threshold(relevant: list[float], unrelated: list[float]) -> dict:
             "relevant_abstaining": sum(s < value for s in relevant), "unrelated_passing": sum(s >= value for s in unrelated)}
 
 
+class RetryingLLM:
+    """Eval only: retries the rewrite call on 429/503 and counts calls (the app falls back instead)."""
+
+    def __init__(self, inner, attempts: int = 6, wait: float = 15.0):
+        self.inner, self.attempts, self.wait = inner, attempts, wait
+        self.provider, self.model = inner.provider, inner.model
+        self.calls = self.retries = self.failures = 0
+
+    def complete_json(self, *args):
+        import time
+
+        import httpx
+
+        for attempt in range(self.attempts):
+            self.calls += 1
+            try:
+                return self.inner.complete_json(*args)
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code not in (429, 503) or attempt == self.attempts - 1:
+                    self.failures += 1
+                    raise
+                self.retries += 1
+                time.sleep(self.wait * (attempt + 1))
+
+
 class CountingEmbedder:
     """Caches query vectors per text and counts the calls that reach the provider."""
 
@@ -108,13 +136,14 @@ async def _approved_acts(engine) -> set[str]:
             "ON v.legal_source_id = s.id WHERE v.is_current AND v.review_status = 'approved'"))).scalars())
 
 
-async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None) -> dict:
+async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None, rewrite: bool = False) -> dict:
     from app.case_analysis.analyzer import FactInput
     from app.case_analysis.service import _retrieve
     from app.config import Settings
     from app.rag.ingest.repository import create_ingest_engine
     from app.rag.search.providers import embedding_target, get_query_embedder, get_reranker
-    from app.rag.search.retrieval import hybrid_search
+    from app.rag.search.query_rewrite import QueryRewriter, build_query_rewriter
+    from app.rag.search.retrieval import hybrid_search, rewritten_search
 
     settings = Settings()
     target = embedding_target(settings)
@@ -128,6 +157,14 @@ async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None
     else:
         inner = get_query_embedder()
     embedder, reranker = CountingEmbedder(inner), get_reranker("mock")
+    llm = rewriter = None
+    if rewrite:
+        base = build_query_rewriter(settings).llm
+        if base is None:
+            raise SystemExit("--rewrite needs a configured LLM (LLM_PROVIDER=gemini, GEMINI_API_KEY, GEMINI_MODEL)")
+        llm = RetryingLLM(base)
+        rewriter = QueryRewriter(llm)
+    searches = analysis_queries = rewrites_failed = 0
     engine = create_ingest_engine(os.environ["LEGAL_INGEST_DATABASE_URL"])
     out: dict = {"provider": target.provider, "model": target.model, "embedding_version": target.version,
                  "threshold_in_use": settings.analysis_similarity_threshold, "sets": {}}
@@ -148,12 +185,20 @@ async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None
                 async with AsyncSession(engine) as session, session.begin():
                     entry = {"id": row["id"], "language": row["language"]}
                     if row["expected"]:
-                        search = await hybrid_search(session, query=row["text"], embedder=embedder,
-                                                     reranker=reranker, k=10, keyword_fallback=False)
+                        searches += 1
+                        if rewriter is not None:
+                            search, rw = await rewritten_search(session, query=row["text"], rewriter=rewriter,
+                                                                embedder=embedder, reranker=reranker, k=10,
+                                                                keyword_fallback=False)
+                            rewrites_failed += rw.failed
+                        else:
+                            search = await hybrid_search(session, query=row["text"], embedder=embedder,
+                                                         reranker=reranker, k=10, keyword_fallback=False)
                         entry["rank"] = rank_of(search.hits, row["expected"])
                     fact = FactInput(uuid4(), row["text"], row["category"], "lawyer_entered", "undisputed")
+                    analysis_queries += 1
                     ranked, _ = await _retrieve(session, [fact], embedder, reranker, None, None,
-                                                keyword_fallback=False)
+                                                keyword_fallback=False, rewriter=rewriter)
                     entry["best_score"] = round(ranked[0]["score"], 4) if ranked else 0.0
                 results.append(entry)
             out["sets"][name] = {"rows": results}
@@ -165,6 +210,13 @@ async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None
     unrelated = [r["best_score"] for r in out["sets"]["unrelated"]["rows"]]
     out["calibration"] = choose_threshold(relevant, unrelated)
     out["embedding_calls"] = embedder.calls
+    if llm is not None:
+        # The rewriter caches per text: a search and the analysis of the same text share one call.
+        out["query_rewrite"] = {"llm_model": llm.model, "llm_requests_incl_retries": llm.calls,
+                                "retries_429_503": llm.retries, "failed": llm.failures,
+                                "searches_fell_back_to_plain_query": rewrites_failed,
+                                "searches": searches, "analysis_fact_runs": analysis_queries,
+                                "llm_calls_per_new_search": 1, "llm_calls_per_analysis": "1 per analysis (all fact statements batched)"}
     return out
 
 
@@ -209,11 +261,12 @@ def main() -> None:
     parser.add_argument("--only-acts-in-db", action="store_true", help="Skip queries whose Acts are not approved")
     parser.add_argument("--unrelated", type=int, help="Number of off-topic statements (half en, half bn)")
     parser.add_argument("--dry-run", action="store_true", help="Only count the queries per set; no embedding")
+    parser.add_argument("--rewrite", action="store_true", help="Use LLM query rewriting (search + analysis)")
     args = parser.parse_args()
     if args.dry_run:
         print(json.dumps(asyncio.run(_count_only(args.only_acts_in_db, args.unrelated)), indent=1))
         return
-    result = {"label": args.label, **asyncio.run(evaluate(args.only_acts_in_db, args.unrelated))}
+    result = {"label": args.label, **asyncio.run(evaluate(args.only_acts_in_db, args.unrelated, args.rewrite))}
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")

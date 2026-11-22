@@ -61,3 +61,10 @@ deploy/demo_data.dump.tmp
 
 # Local embedding backups (deploy/embeddings_backup.sh)
 backups/
+
+# e5-small ONNX int8 bundle (built by backend/scripts/export_e5_small_onnx.py; 118 MB)
+backend/models/
+
+# Full legal corpus export for the Neon cutover (deploy/export_legal_corpus.sh)
+deploy/corpus_e5small/
+deploy/backups_neon/

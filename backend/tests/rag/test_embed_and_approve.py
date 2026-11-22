@@ -26,27 +26,34 @@ from app.rag.embed.worker import (
 from app.rag.ingest.pipeline import ingest_batches
 from app.rag.ingest.records import Rejects, iter_act_batches
 from app.rag.ingest.repository import create_ingest_engine
+from app.rag.search.providers import embedding_target
+from app.config import Settings
 from tests.rag.test_ingest import SAMPLE, record, write_jsonl
 
 ORIGIN = {"Origin": "http://localhost:3000"}
 PASSWORD = "correct horse battery staple"
 
 
+TARGET = embedding_target(Settings())  # the suite's EMBEDDING_PROVIDER (conftest)
+
+
 class FakeEmbedder:
-    """Deterministic unit vectors; records every text it is asked to encode."""
+    """Deterministic unit vectors labelled like the configured provider; records every text."""
 
     device = "cpu"
+    model_name, embedding_version = TARGET.model, TARGET.version
 
     def __init__(self):
         self.seen: list[str] = []
 
     def embed(self, texts):
         self.seen.extend(texts)
-        return [[1.0] + [0.0] * (DIMENSION - 1) for _ in texts]
+        return [[1.0] + [0.0] * (TARGET.dimension - 1) for _ in texts]
 
 
 def test_vector_literal_checks_dimension_and_device_choice():
     assert vector_literal([0.5] * DIMENSION).startswith("[0.5,")
+    assert vector_literal([0.5] * 384).startswith("[0.5,")  # e5-small
     with pytest.raises(ValueError):
         vector_literal([0.1, 0.2])
     assert pick_device("cpu") == "cpu"

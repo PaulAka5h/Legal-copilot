@@ -9,6 +9,7 @@
 tests
 eval
 scripts
+!scripts/export_e5_small_onnx.py
 src
 deploy
 *.dump

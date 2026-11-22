@@ -1,7 +1,9 @@
 """Embed pending legal chunks.
 
-- Default embedder: multilingual-e5-large (self-hosted), "passage: " + NFC(chunk
-  text), normalized vectors. Gemini (app.rag.search.gemini_embeddings) is the other.
+- Embedders: multilingual-e5-small ONNX int8 (default, app.rag.search.e5_small_onnx, 384
+  dims), multilingual-e5-large (sentence-transformers, 1024) and Gemini
+  (app.rag.search.gemini_embeddings, 1024); "passage: " + NFC(chunk text) for e5,
+  normalized vectors.
 - A chunk is pending for an embedder when embedding IS NULL and its
   (embedding_model, embedding_version) label equals the embedder's.
 - Resumable: each batch is its own transaction; pending = embedding IS NULL.
@@ -21,7 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.rag.ingest.chunking import EMBEDDING_MODEL, EMBEDDING_VERSION, MAX_TOKENS, PASSAGE_PREFIX
 from app.rag.text import nfc
 
-DIMENSION = 1024
+DIMENSION = 1024  # e5-large and gemini-embedding-001 (as stored)
+SUPPORTED_DIMENSIONS = (384, DIMENSION)  # legal_chunks HNSW indexes (migration 0021)
 
 _CLAIM = text(
     """
@@ -119,8 +122,8 @@ def is_out_of_memory(error: BaseException) -> bool:
 
 
 def vector_literal(vector: list[float]) -> str:
-    if len(vector) != DIMENSION:
-        raise ValueError(f"Expected {DIMENSION} dimensions, got {len(vector)}")
+    if len(vector) not in SUPPORTED_DIMENSIONS:
+        raise ValueError(f"Expected one of {SUPPORTED_DIMENSIONS} dimensions, got {len(vector)}")
     return "[" + ",".join(f"{x:.7g}" for x in vector) + "]"
 
 
