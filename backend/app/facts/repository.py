@@ -67,10 +67,11 @@ async def insert_source(session: AsyncSession, values: dict[str, Any]) -> None:
         text(
             """
             INSERT INTO public.case_fact_sources
-              (fact_id, case_id, organization_id, source_kind, document_id, page_id, page_no, quote, quote_check)
+              (fact_id, case_id, organization_id, source_kind, document_id, page_id, page_no, quote, quote_check,
+               quote_start, quote_end, quote_match)
             VALUES
               (:fact_id, :case_id, :organization_id, :source_kind, :document_id, :page_id, :page_no, :quote,
-               :quote_check)
+               :quote_check, :quote_start, :quote_end, :quote_match)
             """
         ),
         values,
@@ -104,7 +105,8 @@ async def _with_sources(session: AsyncSession, rows: list[dict]) -> list[dict]:
     sources = await session.execute(
         text(
             """
-            SELECT id, fact_id, source_kind, document_id, page_id, page_no, quote, quote_check
+            SELECT id, fact_id, source_kind, document_id, page_id, page_no, quote, quote_check,
+                   quote_start, quote_end, quote_match
             FROM public.case_fact_sources WHERE fact_id = ANY(CAST(:ids AS uuid[])) ORDER BY created_at, id
             """
         ),

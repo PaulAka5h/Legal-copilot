@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 
@@ -25,6 +25,7 @@ from app.cases.repository import (
     list_cases,
     patch_case,
     revoke_case_member,
+    set_case_archived,
     create_case_invitation,
     revoke_case_invitation,
 )
@@ -51,15 +52,23 @@ router = APIRouter(
 @router.get(
     "",
     summary="List cases",
-    description="Lists cases with an active membership for the authenticated lawyer.",
+    description=(
+        "Lists cases with an active membership for the authenticated lawyer. "
+        "Archived cases are hidden unless include_archived is true."
+    ),
     response_model=list[CaseResponse],
-    responses=problem_responses(401, 403, 503),
+    responses=problem_responses(401, 403, 422, 503),
 )
 async def list_cases_endpoint(
     user: LawyerDep,
     session: UserSessionDep,
+    include_archived: Annotated[
+        bool, Query(description="Also return archived cases")
+    ] = False,
 ) -> list[CaseResponse]:
-    return await list_cases(session, acting_user_id=user.id)
+    return await list_cases(
+        session, acting_user_id=user.id, include_archived=include_archived
+    )
 
 
 @router.post(
@@ -137,7 +146,10 @@ async def get_case_endpoint(
 @router.patch(
     "/{case_id}",
     summary="Update a case",
-    description="Updates case details for a lawyer with case-edit permission.",
+    description=(
+        "Updates case details (title, type, court, status open/on_hold, ...) for a "
+        "lawyer with case-edit permission. Closed and archived cases are read-only."
+    ),
     response_model=CaseResponse,
     responses=problem_responses(401, 403, 404, 409, 422, 503),
     dependencies=[Depends(require_same_origin)],
@@ -170,6 +182,11 @@ async def patch_case_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             detail="Closed cases are read-only.",
         )
+    if existing.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Archived cases are read-only. Restore the case first.",
+        )
     try:
         case = await patch_case(
             session,
@@ -199,9 +216,100 @@ async def patch_case_endpoint(
         request_id=getattr(request.state, "request_id", None),
         organization_id=case.organization_id,
         case_id=case.id,
-        details={"fields": sorted(payload.model_fields_set)},
+        details={
+            "fields": sorted(payload.model_fields_set),
+            **(
+                {"status_from": existing.status, "status_to": case.status}
+                if "status" in payload.model_fields_set
+                else {}
+            ),
+        },
     )
     return case
+
+
+async def _set_archived(
+    request: Request,
+    *,
+    case_id: UUID,
+    user,
+    case_access,
+    session,
+    archived: bool,
+) -> CaseResponse:
+    if case_access.role != "lead_lawyer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the lead lawyer can archive or restore a case.",
+        )
+    case = await set_case_archived(
+        session, acting_user_id=user.id, case_id=case_id, archived=archived
+    )
+    if case is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Case is already archived." if archived else "Case is not archived.",
+        )
+    await write_audit_event(
+        session,
+        action="case.archived" if archived else "case.restored",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="case",
+        object_id=case.id,
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        organization_id=case.organization_id,
+        case_id=case.id,
+    )
+    return case
+
+
+@router.post(
+    "/{case_id}/archive",
+    summary="Archive a case",
+    description=(
+        "Soft delete: hides the case from lists by default. Nothing is deleted; "
+        "documents, hearings, analyses and history are kept and the case can be "
+        "restored. Lead lawyer only. Audit-logged."
+    ),
+    response_model=CaseResponse,
+    responses=problem_responses(401, 403, 404, 409, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def archive_case_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+) -> CaseResponse:
+    return await _set_archived(
+        request, case_id=case_id, user=user, case_access=case_access,
+        session=session, archived=True,
+    )
+
+
+@router.post(
+    "/{case_id}/restore",
+    summary="Restore an archived case",
+    description="Shows an archived case in lists again. Lead lawyer only. Audit-logged.",
+    response_model=CaseResponse,
+    responses=problem_responses(401, 403, 404, 409, 422, 503),
+    dependencies=[Depends(require_same_origin)],
+)
+async def restore_case_endpoint(
+    request: Request,
+    case_id: Annotated[UUID, Path(description="Case ID")],
+    user: LawyerDep,
+    case_access: CaseAccessDep,
+    session: UserSessionDep,
+) -> CaseResponse:
+    return await _set_archived(
+        request, case_id=case_id, user=user, case_access=case_access,
+        session=session, archived=False,
+    )
 
 
 @router.get(

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Icon, type IconName } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
 import { QuickActions } from "@/components/lawyer/QuickActions";
@@ -16,6 +17,7 @@ import {
   pick,
   titleFor,
 } from "@/lib/i18n";
+import { dhakaDateLabel, dhakaDayPart } from "@/lib/dhakaDate";
 import { getLanguage } from "@/lib/language";
 import { usedDemoData } from "@/lib/api/backendClient";
 
@@ -49,7 +51,16 @@ function Stat({
   );
 }
 
+const GREETING = {
+  morning: "greeting",
+  afternoon: "greetingAfternoon",
+  evening: "greetingEvening",
+} as const;
+
 export default async function LawyerDashboardPage() {
+  // Render per request so the date is today's, never a build-time value.
+  await connection();
+  const now = new Date();
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.dashboard;
@@ -70,8 +81,8 @@ export default async function LawyerDashboardPage() {
   return (
     <>
       <PageHeading
-        eyebrow={dashboard.eyebrow}
-        title={format(dashboard.greeting, {
+        eyebrow={dhakaDateLabel(now, language)}
+        title={format(dashboard[GREETING[dhakaDayPart(now)]], {
           name: pick(profile.firstName, language),
         })}
         subtitle={dashboard.subtitle}

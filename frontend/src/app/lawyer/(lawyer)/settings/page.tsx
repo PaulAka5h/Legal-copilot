@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { signOut, signOutAll } from "@/app/actions";
 import { Icon } from "@/components/Icon";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PageHeading } from "@/components/lawyer/PageHeading";
-import { getLawyerProfile } from "@/lib/api/lawyer";
+import { ProfileForm } from "@/components/lawyer/ProfileForm";
+import { getLawyerProfile, getLawyerProfileDetail } from "@/lib/api/lawyer";
 import { dictionaries, pick, titleFor } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { usedDemoData } from "@/lib/api/backendClient";
@@ -13,11 +15,17 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: titleFor(language, "lawyerSettings") };
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string; profile?: string }>;
+}) {
+  const { edit, profile: profileResult } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
   const settings = copy.settings;
-  const profile = await getLawyerProfile();
+  const [profile, detail] = await Promise.all([getLawyerProfile(), getLawyerProfileDetail()]);
+  const editing = edit === "1" && detail !== null;
 
   return (
     <>
@@ -41,13 +49,30 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel" id="profile">
           <div className="panel-head">
             <div>
               <h2>{settings.profileTitle}</h2>
               <p>{settings.profileBody}</p>
             </div>
+            {detail && !editing ? (
+              <Link className="outline-button small" href="/lawyer/settings?edit=1#profile">
+                {settings.editProfile}
+              </Link>
+            ) : null}
           </div>
+          {profileResult === "saved" ? (
+            <p className="success-note" role="status">
+              {settings.profileSaved}
+            </p>
+          ) : null}
+          {editing && detail ? (
+            <ProfileForm
+              detail={detail}
+              copy={settings}
+              error={profileResult !== undefined && profileResult !== "saved"}
+            />
+          ) : (
           <dl className="profile-list">
             <div>
               <dt>{settings.name}</dt>
@@ -65,11 +90,18 @@ export default async function SettingsPage() {
               <dt>{settings.email}</dt>
               <dd>{profile.email}</dd>
             </div>
+            {detail?.phone ? (
+              <div>
+                <dt>{settings.phone}</dt>
+                <dd>{detail.phone}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>{settings.location}</dt>
               <dd>{pick(profile.location, language)}</dd>
             </div>
           </dl>
+          )}
         </section>
 
         <section className="panel settings-signout">

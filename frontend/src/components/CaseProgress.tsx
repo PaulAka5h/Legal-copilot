@@ -8,9 +8,10 @@ export type CaseProgressStage = {
   state: "complete" | "current" | "upcoming";
 };
 
+/** Share of stages completed. The current stage is in progress, not reached. */
 export function progressFor(stages: Pick<CaseProgressStage, "state">[]) {
   const total = stages.length;
-  const reached = stages.filter((stage) => stage.state !== "upcoming").length;
+  const reached = stages.filter((stage) => stage.state === "complete").length;
 
   return {
     reached,

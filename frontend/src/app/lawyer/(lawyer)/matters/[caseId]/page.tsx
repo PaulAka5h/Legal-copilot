@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updateMatterStageAction } from "@/app/lawyer/actions";
+import { archiveMatterAction } from "@/app/lawyer/actions";
 import {
   CaseProgress,
   progressFor,
   type CaseProgressStage,
 } from "@/components/CaseProgress";
 import { Icon } from "@/components/Icon";
+import { ArchiveCaseDialog } from "@/components/lawyer/ArchiveCaseDialog";
 import { ClientAccessPanel } from "@/components/lawyer/ClientAccessPanel";
+import { EditCasePanel } from "@/components/lawyer/EditCasePanel";
 import {
   MatterWorkspace,
   type WorkspaceNotice,
@@ -19,6 +21,8 @@ import {
   getCase,
   getCaseIntelligence,
   listDocuments,
+  listCaseTypes,
+  listCourts,
   listHearings,
   listLinkableClients,
   type LinkClientResult,
@@ -31,7 +35,6 @@ import {
   pick,
   titleFor,
   type Dictionary,
-  type Language,
 } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 
@@ -40,34 +43,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: titleFor(language, "lawyerCaseDetail") };
 }
 
-function stagesFor(
-  matter: Matter,
-  language: Language,
-  copy: Dictionary["caseDetail"],
-): CaseProgressStage[] {
-  const currentIndex = Math.max(
-    0,
-    matter.stages.findIndex((stage) => stage.id === matter.currentStageId),
-  );
-  const closed = matter.status === "closed";
-
-  return matter.stages.map((stage, index) => {
-    const complete = closed || index < currentIndex;
-    const current = !complete && index === currentIndex;
-
-    return {
-      id: stage.id,
-      label: pick(stage.label, language),
-      note: complete
-        ? stage.date
-          ? pick(stage.date, language)
-          : copy.complete
-        : current
-          ? copy.inProgress
-          : copy.upcoming,
-      state: complete ? "complete" : current ? "current" : "upcoming",
-    };
-  });
+/** Progress comes from the backend (hearings and status), never a hand-set stage. */
+function stagesFor(matter: Matter, copy: Dictionary["caseDetail"]): CaseProgressStage[] {
+  const notes = { complete: copy.complete, current: copy.inProgress, upcoming: copy.upcoming };
+  return matter.progress.map((stage) => ({
+    id: stage.id,
+    label: copy.stages[stage.id],
+    note: notes[stage.state],
+    state: stage.state,
+  }));
 }
 
 export default async function LawyerMatterPage({
@@ -78,7 +62,11 @@ export default async function LawyerMatterPage({
   searchParams: Promise<{
     hearingError?: string;
     noteError?: string;
-    stageError?: string;
+    edit?: string;
+    edited?: string;
+    editError?: string;
+    archiveError?: string;
+    restored?: string;
     tab?: string;
     ai?: string;
     detail?: string;
@@ -86,15 +74,26 @@ export default async function LawyerMatterPage({
   }>;
 }) {
   const { caseId } = await params;
-  const { hearingError, noteError, stageError, tab, ai, detail, clientLink } =
-    await searchParams;
+  const {
+    hearingError,
+    noteError,
+    edit,
+    edited,
+    editError,
+    archiveError,
+    restored,
+    tab,
+    ai,
+    detail,
+    clientLink,
+  } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
   const matter = await getCase(caseId);
 
   if (!matter) notFound();
 
-  const stages = stagesFor(matter, language, copy.caseDetail);
+  const stages = stagesFor(matter, copy.caseDetail);
   const [hearings, intelligence, linkableClients] = await Promise.all([
     listHearings(caseId),
     getCaseIntelligence(caseId),
@@ -109,11 +108,16 @@ export default async function LawyerMatterPage({
       ? tab
       : "hearings";
   const notice: WorkspaceNotice =
-    ai === "ok" || ai === "error" || ai === "NOT_CONFIGURED"
+    ai === "ok" || ai === "error" || ai === "NOT_CONFIGURED" || ai === "quote_not_found"
       ? { status: ai, detail: detail ?? "" }
       : null;
   const { reached, total, percent } = progressFor(stages);
-  const locked = matter.status === "closed";
+  const locked = matter.status === "closed" || matter.archived;
+  const editing = edit === "1" && !matter.archived;
+  const notices = [
+    edited ? copy.caseDetail.edit.saved : null,
+    restored ? copy.caseDetail.archive.restored : null,
+  ].filter(Boolean);
   const hearingFormError = hearingError
     ? "hearing"
     : noteError
@@ -145,43 +149,70 @@ export default async function LawyerMatterPage({
         </div>
 
         <div className="stage-picker">
-          <label className="stage-label" htmlFor="case-stage">
-            {copy.caseDetail.stageLabel}
-          </label>
-          <form action={updateMatterStageAction}>
-            <input type="hidden" name="caseId" value={matter.id} />
-            <select
-              id="case-stage"
-              name="stageId"
-              defaultValue={matter.currentStageId}
-              disabled={locked}
-            >
-              {matter.stages.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {pick(stage.label, language)}
-                </option>
-              ))}
-            </select>
-            <button type="submit" disabled={locked}>
-              {copy.caseDetail.saveStage}
-            </button>
-          </form>
-          <span className="stage-help">
-            {locked
-              ? copy.caseDetail.stageLocked
-              : stageError
-                ? copy.caseDetail.stageUnsupported
-                : copy.caseDetail.stageHelp}
-          </span>
           <span className="stage-hearing">
             {format(copy.caseDetail.hearing, {
               number: numberFor(language, matter.hearingNumber),
             })}
           </span>
+          <div className="case-actions">
+            {matter.archived ? (
+              matter.isLead ? (
+                <form action={archiveMatterAction}>
+                  <input type="hidden" name="caseId" value={matter.id} />
+                  <input type="hidden" name="archive" value="0" />
+                  <button type="submit" className="case-action">
+                    {copy.caseDetail.archive.restore}
+                  </button>
+                </form>
+              ) : null
+            ) : (
+              <>
+                <Link className="case-action" href={`/lawyer/matters/${encodeURIComponent(matter.id)}?edit=1#edit-case`}>
+                  {copy.caseDetail.edit.open}
+                </Link>
+                {matter.isLead ? (
+                  <ArchiveCaseDialog caseId={matter.id} copy={copy.caseDetail.archive} />
+                ) : null}
+              </>
+            )}
+          </div>
+          <span className="stage-help">
+            {matter.archived
+              ? copy.caseDetail.edit.archivedLocked
+              : matter.isLead
+                ? copy.caseDetail.progressHelp
+                : copy.caseDetail.archive.leadOnly}
+          </span>
         </div>
       </div>
 
       {demo ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {matter.archived ? (
+        <p className="mock-note" role="status">
+          {copy.caseDetail.archive.banner}
+        </p>
+      ) : null}
+      {archiveError ? (
+        <p className="form-error" role="alert">
+          {copy.caseDetail.archive.error}
+        </p>
+      ) : null}
+      {notices.map((notice) => (
+        <p className="success-note" role="status" key={notice}>
+          {notice}
+        </p>
+      ))}
+      {editing ? (
+        <EditCasePanel
+          matter={matter}
+          language={language}
+          copy={copy.caseDetail.edit}
+          statusLabels={copy.matters.status}
+          caseTypes={listCaseTypes()}
+          courts={listCourts()}
+          error={editError ?? null}
+        />
+      ) : null}
 
       <div className="case-layout">
         <div className="panel progress-panel">

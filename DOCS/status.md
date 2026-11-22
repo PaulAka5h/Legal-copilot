@@ -459,3 +459,54 @@ The 19-Act result (Recall@10 mean 0.945 vs Gemini 1.000) was accepted on 2026-11
 - Tests: `tests/rag/test_rewrite_budget.py` (13 cases: 10 facts = 1 call, cached facts = 0, wrong item count falls
   back, no retry + cooldown on 429/503/timeout, invalid output does not pause, NFC key, and the stored cache is
   reused by a new process and not visible to another organization). Full suite: no new failures.
+
+## UI bug fixes (2026-11-23, branch fix/ui-bugs)
+
+Migration `0023_archive_summary_versions` (run on Neon before deploying this branch):
+`cases.archived_at` / `archived_by` (+ UPDATE grant), and `public.hearing_summary_versions`
+(append-only, forced RLS, lawyer case members read/insert only, no client policy).
+
+- Case edit/archive: `PATCH /api/v1/cases/{id}` accepts `status` (open/on_hold; close/reopen keep their
+  endpoints), audit `case.updated` records status_from/status_to. `POST /cases/{id}/archive` and `/restore`:
+  lead lawyer only, soft delete (nothing removed), audit `case.archived` / `case.restored`. Archived cases are
+  hidden from `GET /cases` unless `include_archived=true`, read-only, and excluded from dashboard counts.
+  Matter page: Edit case panel + Archive behind a confirm dialog; My Matters: Show archived toggle, On hold filter.
+  Archiving does not change client access (the client still sees an open archived case); close the case for that.
+- Progress: derived by the backend (`app/cases/progress.py`) from hearings and status; returned as `progress`
+  on `CaseResponse` and on `ClientCaseResponse` (client: confirmed hearings and published updates only). The
+  mock stage list and the unsaved stage picker are removed; percent counts completed stages only.
+- Hearing summary: edits are saved as new versions (`/lawyer/cases/{id}/hearings/{hid}/summary-versions`,
+  base_version check, 409 on a stale edit, audit `hearing_summary.version_saved`). Key notes show the hearing
+  purpose and only the latest hearing-update version, without repeats (earlier versions stay in the timeline).
+- Client share: the client dashboard loaded only the first linked case. It now offers every linked case, opens
+  the one with the newest published update, and progress comes from client-visible data. Publishing a client
+  update is audit-logged (`client_update.published`) and CSRF-checked.
+- Lawyer profile: `GET/PATCH /api/v1/lawyer/profile` (name, phone, preferred language, chamber name,
+  organization name for owners only; email not editable), audit `lawyer.profile_updated` (field names only).
+  Settings page has an Edit profile form.
+- Dashboard date: today's date in Asia/Dhaka (bn/en) and the greeting, computed per request.
+- Tests: `backend/tests/test_ui_bug_fixes.py` (7), `frontend/tests/*.test.mjs` (7, `npm test`).
+  Pre-existing, unrelated: 22 legacy test modules under `tests/{ai,analysis,documents,hearings,legal_kb,strategy}`
+  import a removed `backend.src` package; `test_security.py::test_auth_abuse_invitation_expired_denied` fails on
+  the previous commit too, and `::test_citation_integrity_no_fabricated_sources` expects a list from the research
+  search endpoint, which now returns an object (no code touched by this branch).
+
+## Fact quotes: confirm no longer fails on split sentences (2026-11-23, branch fix/ui-bugs)
+
+Migration `0024_fact_quote_span` (run on Neon before deploying): `case_fact_sources.quote_start`,
+`quote_end`, `quote_match` (exact | normalized), set only when the quote was found.
+
+- Cause: the mock/OCR sentence splitter cut at every "." and every line break, so facts became fragments
+  ("… a cheque, No.", "10 Apr 2026") that were too short to pass the quote check, and confirm returned 409.
+  On `case1_cheque_dishonour.pdf` 7 of 13 extracted facts could not be confirmed.
+- `app/facts/sentences.py`: sentence spans that skip abbreviations (No., Mr., Ltd., Dr., v., s., Tk., নং., initials),
+  never split numbers (5,00,000; 5.5), join wrapped lines, and break after headings and blank lines. The mock
+  quotes the verbatim page span.
+- Quote matching for facts uses the citation verifier's normalization (`quote_locator.locate_normalized`: NFC,
+  whitespace, quotes/dashes/danda, and now line-end hyphens tried as written, joined with the hyphen, and joined
+  without it). No fuzzy match for facts. Found: the stored quote is the exact page span with offsets. Not found:
+  `quote_check = failed` (shown as unverified).
+- Confirm error starts with `QUOTE_NOT_FOUND:`. The facts tab shows a clear message, flags unverified quotes, and
+  offers a prefilled "Edit fact" form (statement + exact quote) that saves a new version and re-checks the quote.
+- Tests: `backend/tests/test_fact_quotes.py` (6), including the brief in `tests/data/`: 13/13 facts confirmable.
+  `tests/rag/test_search.py::test_recall_at_10_on_20_act_queries` (0.933 < 0.95) fails without these changes too.

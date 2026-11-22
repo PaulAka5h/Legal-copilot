@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from sqlalchemy import text
 
 from app.auth.dependencies import LawyerDep, UserSessionDep, require_lawyer, require_same_origin
@@ -79,11 +79,16 @@ async def create_client_update(
 @router.post(
     "/client-updates/{update_id}/publish",
     summary="Publish a client-visible update",
-    description="Makes an update visible to active client members.",
+    description=(
+        "Lawyer approval: makes an update visible to active client members of an "
+        "open case. Audit-logged."
+    ),
     response_model=ClientUpdateResponse,
     responses=problem_responses(401, 403, 404, 422, 503),
+    dependencies=[Depends(require_same_origin)],
 )
 async def publish_client_update(
+    request: Request,
     update_id: Annotated[UUID, Path(description="Update ID")],
     user: LawyerDep,
     session: UserSessionDep,
@@ -106,6 +111,18 @@ async def publish_client_update(
     ).mappings().one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Update was not found.")
+    await write_audit_event(
+        session,
+        action="client_update.published",
+        actor_user_id=user.id,
+        actor_role=user.role,
+        object_type="client_update",
+        object_id=row["id"],
+        ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+        case_id=row["case_id"],
+    )
     return ClientUpdateResponse.model_validate(dict(row))
 
 

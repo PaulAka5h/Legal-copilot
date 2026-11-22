@@ -28,7 +28,10 @@ router = APIRouter(
 @router.get(
     "/cases",
     summary="List open client cases",
-    description="Lists only cases with active client membership.",
+    description=(
+        "Lists every open case with active client membership, the case with the newest "
+        "published update first, with progress from client-visible data."
+    ),
     response_model=list[ClientCaseResponse],
     responses=problem_responses(401, 403, 503),
 )
@@ -39,7 +42,12 @@ async def list_client_cases(
     result = await session.execute(
         text(
             """
-            SELECT c.id, c.title, c.status, c.case_type, c.court
+            SELECT c.id, c.title, c.status, c.case_type, c.court,
+                   EXISTS (SELECT 1 FROM public.hearings h
+                           WHERE h.case_id = c.id AND h.date_status = 'confirmed')
+                     AS has_confirmed_hearing,
+                   (SELECT count(*) FROM public.client_visible_updates u
+                    WHERE u.case_id = c.id AND u.status = 'published') AS published_updates
             FROM public.cases c
             JOIN public.case_members cm
               ON cm.case_id = c.id
@@ -47,7 +55,9 @@ async def list_client_cases(
              AND cm.status = 'active'
              AND cm.role = 'client'
             WHERE c.status = 'open'
-            ORDER BY c.updated_at DESC
+            ORDER BY (SELECT max(u.published_at) FROM public.client_visible_updates u
+                      WHERE u.case_id = c.id AND u.status = 'published') DESC NULLS LAST,
+                     c.updated_at DESC
             """
         ),
         {"user_id": user.id},

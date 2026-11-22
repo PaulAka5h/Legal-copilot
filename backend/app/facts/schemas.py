@@ -72,6 +72,10 @@ class FactSourceOut(BaseModel):
     page_no: int | None
     quote: str | None
     quote_check: Literal["passed", "failed", "not_applicable"]
+    quote_start: int | None = Field(default=None, description="Offset of the exact quote in the page text")
+    quote_end: int | None = Field(default=None, description="End offset (exclusive) of the exact quote")
+    quote_match: Literal["exact", "normalized"] | None = Field(
+        default=None, description="How the quote was found; null when it was not found (unverified)")
 
 
 class FactOut(BaseModel):

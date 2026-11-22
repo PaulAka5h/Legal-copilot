@@ -4217,18 +4217,32 @@
      "cases"
     ],
     "summary": "List cases",
-    "description": "Lists cases with an active membership for the authenticated lawyer.",
+    "description": "Lists cases with an active membership for the authenticated lawyer. Archived cases are hidden unless include_archived is true.",
     "operationId": "list_cases_endpoint_api_v1_cases_get",
+    "parameters": [
+     {
+      "name": "include_archived",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Also return archived cases",
+       "default": false,
+       "title": "Include Archived"
+      },
+      "description": "Also return archived cases"
+     }
+    ],
     "responses": {
      "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {
         "schema": {
+         "type": "array",
          "items": {
           "$ref": "#/components/schemas/CaseResponse"
          },
-         "type": "array",
          "title": "Response List Cases Endpoint Api V1 Cases Get"
         }
        }
@@ -4241,32 +4255,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4274,7 +4287,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4286,32 +4300,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4319,7 +4332,53 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4331,32 +4390,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4364,7 +4422,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4379,6 +4438,7 @@
     "description": "Creates a case, lead-lawyer membership, and default stages atomically. The lawyer must have exactly one active organization membership.",
     "operationId": "create_case_endpoint_api_v1_cases_post",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
@@ -4386,8 +4446,7 @@
         "description": "Case details"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "201": {
@@ -4407,32 +4466,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4440,7 +4498,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4452,32 +4511,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4485,7 +4543,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4497,32 +4556,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4530,7 +4588,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4542,32 +4601,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4575,7 +4633,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4587,32 +4646,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4620,7 +4678,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4632,32 +4691,31 @@
         "schema": {
          "properties": {
           "type": {
-           "type": "string",
+           "default": "about:blank",
            "title": "Type",
-           "default": "about:blank"
+           "type": "string"
           },
           "title": {
-           "type": "string",
-           "title": "Title"
+           "title": "Title",
+           "type": "string"
           },
           "status": {
-           "type": "integer",
-           "title": "Status"
+           "title": "Status",
+           "type": "integer"
           },
           "detail": {
-           "type": "string",
-           "title": "Detail"
+           "title": "Detail",
+           "type": "string"
           },
           "instance": {
-           "type": "string",
-           "title": "Instance"
+           "title": "Instance",
+           "type": "string"
           },
           "request_id": {
-           "type": "string",
-           "title": "Request Id"
+           "title": "Request Id",
+           "type": "string"
           }
          },
-         "type": "object",
          "required": [
           "title",
           "status",
@@ -4665,7 +4723,8 @@
           "instance",
           "request_id"
          ],
-         "title": "Problem"
+         "title": "Problem",
+         "type": "object"
         }
        }
       }
@@ -4938,7 +4997,7 @@
      "cases"
     ],
     "summary": "Update a case",
-    "description": "Updates case details for a lawyer with case-edit permission.",
+    "description": "Updates case details (title, type, court, status open/on_hold, ...) for a lawyer with case-edit permission. Closed and archived cases are read-only.",
     "operationId": "patch_case_endpoint_api_v1_cases__case_id__patch",
     "parameters": [
      {
@@ -4965,6 +5024,618 @@
       }
      }
     },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaseResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/cases/{case_id}/archive": {
+   "post": {
+    "tags": [
+     "cases"
+    ],
+    "summary": "Archive a case",
+    "description": "Soft delete: hides the case from lists by default. Nothing is deleted; documents, hearings, analyses and history are kept and the case can be restored. Lead lawyer only. Audit-logged.",
+    "operationId": "archive_case_endpoint_api_v1_cases__case_id__archive_post",
+    "parameters": [
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Case ID",
+       "title": "Case Id"
+      },
+      "description": "Case ID"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaseResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/cases/{case_id}/restore": {
+   "post": {
+    "tags": [
+     "cases"
+    ],
+    "summary": "Restore an archived case",
+    "description": "Shows an archived case in lists again. Lead lawyer only. Audit-logged.",
+    "operationId": "restore_case_endpoint_api_v1_cases__case_id__restore_post",
+    "parameters": [
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Case ID",
+       "title": "Case Id"
+      },
+      "description": "Case ID"
+     }
+    ],
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -8149,13 +8820,561 @@
     }
    }
   },
+  "/api/v1/lawyer/profile": {
+   "get": {
+    "tags": [
+     "lawyer-profile"
+    ],
+    "summary": "Get the lawyer profile",
+    "description": "The signed-in lawyer's editable profile fields and organization display name.",
+    "operationId": "get_profile_api_v1_lawyer_profile_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LawyerProfileResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "lawyer-profile"
+    ],
+    "summary": "Update the lawyer profile",
+    "description": "Updates name, phone, preferred language, chamber name and (owners only) the organization name. Email cannot be changed here. Audit-logged with the changed field names.",
+    "operationId": "patch_profile_api_v1_lawyer_profile_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LawyerProfilePatch",
+        "description": "Profile fields to change"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LawyerProfileResponse"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     },
+     "503": {
+      "description": "Service Unavailable",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "type": "string",
+           "title": "Type",
+           "default": "about:blank"
+          },
+          "title": {
+           "type": "string",
+           "title": "Title"
+          },
+          "status": {
+           "type": "integer",
+           "title": "Status"
+          },
+          "detail": {
+           "type": "string",
+           "title": "Detail"
+          },
+          "instance": {
+           "type": "string",
+           "title": "Instance"
+          },
+          "request_id": {
+           "type": "string",
+           "title": "Request Id"
+          }
+         },
+         "type": "object",
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/client/cases": {
    "get": {
     "tags": [
      "client-portal"
     ],
     "summary": "List open client cases",
-    "description": "Lists only cases with active client membership.",
+    "description": "Lists every open case with active client membership, the case with the newest published update first, with progress from client-visible data.",
     "operationId": "list_client_cases_api_v1_client_cases_get",
     "responses": {
      "200": {
@@ -10346,7 +11565,7 @@
      "client-visibility"
     ],
     "summary": "Publish a client-visible update",
-    "description": "Makes an update visible to active client members.",
+    "description": "Lawyer approval: makes an update visible to active client members of an open case. Audit-logged.",
     "operationId": "publish_client_update_api_v1_client_updates__update_id__publish_post",
     "parameters": [
      {
@@ -11688,7 +12907,7 @@
      "legal-research"
     ],
     "summary": "Search approved Bangladesh statutes for a case",
-    "description": "Hybrid search over the legal knowledge base: e5-large vector search (HNSW, cosine) and 'simple' full-text search fused with Reciprocal Rank Fusion (k=60), then a reranker (mock by default). Only approved, current statute versions are searched. With `incident_date`, sections not in force on that date are excluded; sections whose status is unknown are included and flagged. Bangla and English versions of the same section are merged and returned as alternates. Results are retrieved sources, not legal conclusions, and are marked unverified. Requires an active lawyer membership in the case. The query text is not logged; an audit event records counts only.",
+    "description": "Hybrid search over the legal knowledge base: vector search with EMBEDDING_PROVIDER's model (multilingual-e5-small by default; HNSW, cosine) and 'simple' full-text search, fused with weighted Reciprocal Rank Fusion (k=30, vector weight 1.5), then a reranker (mock by default). The query is also rewritten once by the configured LLM into Bangla, English and legal keywords, and those result lists are fused too (one LLM call per new query, cached in memory and per organization; without an LLM, or if it fails, the query is searched as typed at once, without retrying, and the `rewrite_failed` warning says so). Only approved, current statute versions are searched. With `incident_date`, sections not in force on that date are excluded; sections whose status is unknown are included and flagged. Bangla and English versions of the same section are merged and returned as alternates. Results are retrieved sources, not legal conclusions, and are marked unverified. Requires an active lawyer membership in the case. The query text is not logged; an audit event records counts only.",
     "operationId": "search_case_research_api_v1_lawyer_cases__case_id__research_search_post",
     "parameters": [
      {
@@ -18439,6 +19658,520 @@
      }
     }
    }
+  },
+  "/api/v1/lawyer/cases/{case_id}/hearings/{hearing_id}/summary-versions": {
+   "get": {
+    "tags": [
+     "hearings"
+    ],
+    "summary": "List edited summary versions",
+    "description": "Lawyer-saved versions of the hearing summary, oldest first. Version 1 (the AI draft) is not stored.",
+    "operationId": "list_summary_versions_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_get",
+    "parameters": [
+     {
+      "name": "hearing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Hearing ID",
+       "title": "Hearing Id"
+      },
+      "description": "Hearing ID"
+     },
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Case ID",
+       "title": "Case Id"
+      },
+      "description": "Case ID"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/SummaryVersionOut"
+         },
+         "title": "Response List Summary Versions Api V1 Lawyer Cases  Case Id  Hearings  Hearing Id  Summary Versions Get"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "hearings"
+    ],
+    "summary": "Save an edited summary version",
+    "description": "Saves the lawyer's edit as a new version (never overwrites). base_version must be the latest version (1 when none was saved), otherwise 409: the summary changed since it was opened. Closed cases are read-only. Audit-logged.",
+    "operationId": "save_summary_version_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_post",
+    "parameters": [
+     {
+      "name": "hearing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Hearing ID",
+       "title": "Hearing Id"
+      },
+      "description": "Hearing ID"
+     },
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "description": "Case ID",
+       "title": "Case Id"
+      },
+      "description": "Case ID"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SummaryVersionCreate",
+        "description": "Edited sections and the version they are based on"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SummaryVersionOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "Forbidden",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -18675,8 +20408,8 @@
        {
         "type": "string",
         "enum": [
-         "bn",
-         "en"
+         "en",
+         "bn"
         ]
        },
        {
@@ -19217,11 +20950,56 @@
        }
       ],
       "title": "Client Objectives"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "open",
+         "on_hold"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status",
+      "description": "Active or on hold. Closing and reopening use /close and /reopen."
      }
     },
     "additionalProperties": false,
     "type": "object",
     "title": "CasePatch"
+   },
+   "CaseProgressStage": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "enum": [
+       "opened",
+       "scheduled",
+       "held",
+       "closed"
+      ],
+      "title": "Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "complete",
+       "current",
+       "upcoming"
+      ],
+      "title": "State"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "state"
+    ],
+    "title": "CaseProgressStage"
    },
    "CaseResponse": {
     "properties": {
@@ -19412,6 +21190,51 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "archived_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Archived At"
+     },
+     "archived_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Archived By"
+     },
+     "hearing_count": {
+      "type": "integer",
+      "title": "Hearing Count",
+      "description": "Hearings on record",
+      "default": 0
+     },
+     "hearings_held": {
+      "type": "integer",
+      "title": "Hearings Held",
+      "description": "Hearings with a recorded outcome",
+      "default": 0
+     },
+     "progress": {
+      "items": {
+       "$ref": "#/components/schemas/CaseProgressStage"
+      },
+      "type": "array",
+      "title": "Progress",
+      "description": "Progress derived from hearings and status",
+      "readOnly": true
      }
     },
     "type": "object",
@@ -19437,7 +21260,8 @@
      "retention_until",
      "created_by",
      "created_at",
-     "updated_at"
+     "updated_at",
+     "progress"
     ],
     "title": "CaseResponse"
    },
@@ -19475,8 +21299,8 @@
        {
         "type": "string",
         "enum": [
-         "bn",
-         "en"
+         "en",
+         "bn"
         ]
        },
        {
@@ -19625,6 +21449,27 @@
        }
       ],
       "title": "Court"
+     },
+     "has_confirmed_hearing": {
+      "type": "boolean",
+      "title": "Has Confirmed Hearing",
+      "description": "A confirmed hearing is on record",
+      "default": false
+     },
+     "published_updates": {
+      "type": "integer",
+      "title": "Published Updates",
+      "description": "Hearing updates the lawyer published",
+      "default": 0
+     },
+     "progress": {
+      "items": {
+       "$ref": "#/components/schemas/CaseProgressStage"
+      },
+      "type": "array",
+      "title": "Progress",
+      "description": "Progress from client-visible data only",
+      "readOnly": true
      }
     },
     "type": "object",
@@ -19633,7 +21478,8 @@
      "title",
      "status",
      "case_type",
-     "court"
+     "court",
+     "progress"
     ],
     "title": "ClientCaseResponse"
    },
@@ -21195,6 +23041,46 @@
        "not_applicable"
       ],
       "title": "Quote Check"
+     },
+     "quote_start": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote Start",
+      "description": "Offset of the exact quote in the page text"
+     },
+     "quote_end": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote End",
+      "description": "End offset (exclusive) of the exact quote"
+     },
+     "quote_match": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "exact",
+         "normalized"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote Match",
+      "description": "How the quote was found; null when it was not found (unverified)"
      }
     },
     "type": "object",
@@ -21821,6 +23707,141 @@
     ],
     "title": "LawyerOverviewResponse"
    },
+   "LawyerProfilePatch": {
+    "properties": {
+     "full_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 30,
+        "pattern": "^[0-9+()\\- ]*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "preferred_language": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "en",
+         "bn"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferred Language"
+     },
+     "chamber_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chamber Name"
+     },
+     "organization_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Name"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "LawyerProfilePatch"
+   },
+   "LawyerProfileResponse": {
+    "properties": {
+     "full_name": {
+      "type": "string",
+      "title": "Full Name"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "preferred_language": {
+      "type": "string",
+      "enum": [
+       "en",
+       "bn"
+      ],
+      "title": "Preferred Language"
+     },
+     "chamber_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chamber Name"
+     },
+     "organization_name": {
+      "type": "string",
+      "title": "Organization Name"
+     },
+     "can_edit_organization": {
+      "type": "boolean",
+      "title": "Can Edit Organization",
+      "description": "True for organization owners"
+     }
+    },
+    "type": "object",
+    "required": [
+     "full_name",
+     "email",
+     "phone",
+     "preferred_language",
+     "chamber_name",
+     "organization_name",
+     "can_edit_organization"
+    ],
+    "title": "LawyerProfileResponse"
+   },
    "LawyerTeamMemberResponse": {
     "properties": {
      "user_id": {
@@ -21849,6 +23870,26 @@
      "org_role"
     ],
     "title": "LawyerTeamMemberResponse"
+   },
+   "LocalizedText": {
+    "properties": {
+     "en": {
+      "type": "string",
+      "maxLength": 20000,
+      "title": "En",
+      "default": ""
+     },
+     "bn": {
+      "type": "string",
+      "maxLength": 20000,
+      "title": "Bn",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "LocalizedText",
+    "description": "Hearing notes can hold the order text and the notes (8000 characters each)."
    },
    "LoginRequest": {
     "properties": {
@@ -22549,8 +24590,8 @@
        {
         "type": "string",
         "enum": [
-         "bn",
-         "en"
+         "en",
+         "bn"
         ]
        },
        {
@@ -23118,6 +25159,169 @@
      "created_at"
     ],
     "title": "StrategyVersionSummary"
+   },
+   "SummaryClaim": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Id"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "document",
+       "lawyer",
+       "ai",
+       "assumption"
+      ],
+      "title": "Type",
+      "description": "Statement type, kept apart (Rule 3)"
+     },
+     "verification": {
+      "type": "string",
+      "enum": [
+       "verified",
+       "unverified"
+      ],
+      "title": "Verification"
+     },
+     "text": {
+      "$ref": "#/components/schemas/LocalizedText"
+     },
+     "source": {
+      "$ref": "#/components/schemas/LocalizedText",
+      "description": "Where the claim comes from (Rule 2)"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "id",
+     "type",
+     "verification",
+     "text",
+     "source"
+    ],
+    "title": "SummaryClaim"
+   },
+   "SummarySection": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "enum": [
+       "keyNotes",
+       "laws",
+       "risks",
+       "rights",
+       "notes",
+       "nextSteps"
+      ],
+      "title": "Id"
+     },
+     "claims": {
+      "items": {
+       "$ref": "#/components/schemas/SummaryClaim"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Claims"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "id",
+     "claims"
+    ],
+    "title": "SummarySection"
+   },
+   "SummaryVersionCreate": {
+    "properties": {
+     "base_version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Version",
+      "description": "The version the lawyer edited. A newer saved version makes this a 409 (stale edit)."
+     },
+     "sections": {
+      "items": {
+       "$ref": "#/components/schemas/SummarySection"
+      },
+      "type": "array",
+      "maxItems": 6,
+      "minItems": 1,
+      "title": "Sections"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_version",
+     "sections"
+    ],
+    "title": "SummaryVersionCreate"
+   },
+   "SummaryVersionOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "hearing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Hearing Id"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version",
+      "description": "2 and up; version 1 is the AI draft built from the reassessment"
+     },
+     "supersedes_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Supersedes Id"
+     },
+     "sections": {
+      "items": {
+       "$ref": "#/components/schemas/SummarySection"
+      },
+      "type": "array",
+      "title": "Sections"
+     },
+     "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Created By"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "hearing_id",
+     "version",
+     "supersedes_id",
+     "sections",
+     "created_by",
+     "created_at"
+    ],
+    "title": "SummaryVersionOut"
    },
    "TimelineEntry": {
     "properties": {

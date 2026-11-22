@@ -17,8 +17,8 @@ import {
   documents,
   hearings,
   lawyerProfile,
-  matterStages,
   matters,
+  type DemoMatter,
 } from "@/lib/mock/lawyer";
 import type {
   Activity,
@@ -33,8 +33,11 @@ import type {
   LawyerProfile,
   LawyerStats,
   Localized,
+  EditMatterInput,
   Matter,
   NewClientInput,
+  ProgressStage,
+  ProgressStageId,
   NewDocumentInput,
   NewHearingInput,
   NewMatterInput,
@@ -42,26 +45,63 @@ import type {
   SummarySection,
 } from "@/lib/api/lawyerTypes";
 
-export function listMatters(): Matter[] {
-  return [...matters];
+const STAGE_IDS: ProgressStageId[] = ["opened", "scheduled", "held", "closed"];
+
+/** Demo progress from the demo hearings and status (same rules as the backend). */
+function demoProgress(matter: DemoMatter): ProgressStage[] {
+  const closed = matter.status === "closed";
+  const caseHearings = hearings[matter.id] ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const reached: Record<ProgressStageId, boolean> = {
+    opened: true,
+    scheduled: closed || caseHearings.length > 0,
+    held: closed || caseHearings.some((hearing) => hearing.date <= today),
+    closed,
+  };
+  const firstOpen = STAGE_IDS.find((id) => !reached[id]);
+  return STAGE_IDS.map((id) => ({
+    id,
+    state: reached[id] ? "complete" : id === firstOpen ? "current" : "upcoming",
+  }));
+}
+
+function toMatter(matter: DemoMatter): Matter {
+  return {
+    ...matter,
+    progress: demoProgress(matter),
+    archived: Boolean(matter.archived),
+    isLead: true,
+  };
+}
+
+export function listMatters(includeArchived = false): Matter[] {
+  return matters.filter((matter) => includeArchived || !matter.archived).map(toMatter);
 }
 
 export function getCase(caseId: string): Matter | null {
-  return matters.find((matter) => matter.id === caseId) ?? null;
+  const matter = matters.find((item) => item.id === caseId);
+  return matter ? toMatter(matter) : null;
 }
 
-export function setCaseStage(caseId: string, stageId: string): boolean {
-  const matter = matters.find((item) => item.id === caseId);
+/** Demo edit: replaces the in-memory record (no history is kept in demo mode). */
+export function editMatter(caseId: string, input: EditMatterInput): boolean {
+  const index = matters.findIndex((item) => item.id === caseId);
+  if (index < 0 || matters[index].archived) return false;
+  const current = matters[index];
+  matters[index] = {
+    ...current,
+    title: { en: input.title, bn: input.title },
+    caseType: { en: input.caseType, bn: input.caseType },
+    court: { en: input.court, bn: input.court },
+    status: input.status,
+  };
+  return true;
+}
 
-  if (
-    !matter ||
-    matter.status === "closed" ||
-    !matter.stages.some((stage) => stage.id === stageId)
-  ) {
-    return false;
-  }
-
-  matter.currentStageId = stageId;
+export function setArchived(caseId: string, archived: boolean): boolean {
+  const index = matters.findIndex((item) => item.id === caseId);
+  if (index < 0 || Boolean(matters[index].archived) === archived) return false;
+  matters[index] = { ...matters[index], archived };
   return true;
 }
 
@@ -355,7 +395,7 @@ export function getClientDetail(clientId: string): ClientDetail | null {
 
   return {
     ...client,
-    cases: matters.filter((matter) => matter.clientId === clientId),
+    cases: matters.filter((matter) => matter.clientId === clientId).map(toMatter),
   };
 }
 
@@ -386,7 +426,7 @@ export function createMatter(input: NewMatterInput): Matter | null {
 
   if (!client || !court || !caseType || !title) return null;
 
-  const matter: Matter = {
+  const matter: DemoMatter = {
     id: `LC-${Math.floor(10000 + Math.random() * 90000)}`,
     title: { en: title, bn: title },
     clientId: client.id,
@@ -395,27 +435,26 @@ export function createMatter(input: NewMatterInput): Matter | null {
     caseType,
     hearingNumber: 1,
     status: "active",
-    stages: matterStages.map((stage) => ({ ...stage })),
-    currentStageId: "filed",
   };
 
   matters.unshift(matter);
-  return matter;
+  return toMatter(matter);
 }
 
 export function getRecentMatters(limit = 3): Matter[] {
-  return matters.filter((matter) => matter.status === "active").slice(0, limit);
+  return listMatters().filter((matter) => matter.status === "active").slice(0, limit);
 }
 
 export function getLawyerStats(): LawyerStats {
-  const active = matters.filter((matter) => matter.status === "active");
+  const visible = matters.filter((matter) => !matter.archived);
+  const active = visible.filter((matter) => matter.status === "active");
   const next = active
     .filter((matter) => matter.nextHearing)
     .sort((a, b) => (a.nextHearing?.day ?? 0) - (b.nextHearing?.day ?? 0))[0];
 
   return {
     activeCases: active.length,
-    totalMatters: matters.length,
+    totalMatters: visible.length,
     totalClients: clients.length,
     nextHearing: next?.nextHearing
       ? {

@@ -14,7 +14,7 @@ import {
 
 type Filter = "all" | MatterStatus;
 
-const filters: Filter[] = ["all", "active", "closed"];
+const filters: Filter[] = ["all", "active", "on_hold", "closed"];
 
 export function MattersTable({
   language,
@@ -30,6 +30,7 @@ export function MattersTable({
   const counts = {
     all: matters.length,
     active: matters.filter((matter) => matter.status === "active").length,
+    on_hold: matters.filter((matter) => matter.status === "on_hold").length,
     closed: matters.filter((matter) => matter.status === "closed").length,
   };
 
@@ -93,7 +94,10 @@ export function MattersTable({
           >
             <span className="matter-cell">
               <small>{matter.id}</small>
-              <b>{pick(matter.title, language)}</b>
+              <b>
+                {pick(matter.title, language)}
+                {matter.archived ? <span className="archived-chip">{copy.archived}</span> : null}
+              </b>
             </span>
             <span data-label={copy.columns.client}>
               {pick(matter.clientName, language)}

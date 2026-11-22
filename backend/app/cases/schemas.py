@@ -2,7 +2,9 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+
+from app.cases.progress import CaseProgressStage, case_progress
 
 CaseStatus = Literal["draft", "open", "on_hold", "closed"]
 
@@ -35,12 +37,16 @@ class CasePatch(BaseModel):
     description: str | None = Field(default=None, max_length=10000)
     internal_notes: str | None = Field(default=None, max_length=10000)
     client_objectives: str | None = Field(default=None, max_length=10000)
+    status: Literal["open", "on_hold"] | None = Field(
+        default=None,
+        description="Active or on hold. Closing and reopening use /close and /reopen.",
+    )
 
     @model_validator(mode="after")
     def validate_patch(self) -> "CasePatch":
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided.")
-        for field in ("reference_no", "title", "case_type"):
+        for field in ("reference_no", "title", "case_type", "status"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null.")
         return self
@@ -69,6 +75,19 @@ class CaseResponse(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+    archived_at: datetime | None = None
+    archived_by: UUID | None = None
+    hearing_count: int = Field(default=0, description="Hearings on record")
+    hearings_held: int = Field(default=0, description="Hearings with a recorded outcome")
+
+    @computed_field(description="Progress derived from hearings and status")  # type: ignore[prop-decorator]
+    @property
+    def progress(self) -> list[CaseProgressStage]:
+        return case_progress(
+            status=self.status,
+            has_hearing=self.hearing_count > 0,
+            has_held_hearing=self.hearings_held > 0,
+        )
 
 
 class CaseAccess(BaseModel):

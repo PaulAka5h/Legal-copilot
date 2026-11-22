@@ -1,7 +1,11 @@
 /** UI data shapes for the lawyer portal. The API layer adapts backend responses to these. */
 
 export type Localized = { en: string; bn: string };
-export type MatterStatus = "active" | "closed";
+export type MatterStatus = "active" | "on_hold" | "closed";
+export type ProgressStageId = "opened" | "scheduled" | "held" | "closed";
+export type ProgressState = "complete" | "current" | "upcoming";
+/** Derived by the backend from hearings and case status (never hand-set). */
+export type ProgressStage = { id: ProgressStageId; state: ProgressState };
 export type DocumentStatus = "uploading" | "processing" | "ready" | "failed";
 export type SummaryStatus = "none" | "processing" | "draft_ready" | "approved";
 
@@ -9,12 +13,6 @@ export type UpcomingHearing = {
   day: number;
   month: Localized;
   time: Localized;
-};
-
-export type MatterStage = {
-  id: string;
-  label: Localized;
-  date?: Localized;
 };
 
 export type Matter = {
@@ -27,8 +25,37 @@ export type Matter = {
   hearingNumber: number;
   status: MatterStatus;
   nextHearing?: UpcomingHearing;
-  stages: MatterStage[];
-  currentStageId: string;
+  progress: ProgressStage[];
+  archived: boolean;
+  /** The signed-in lawyer is the lead lawyer (only they may archive). */
+  isLead: boolean;
+};
+
+export type EditMatterInput = {
+  title: string;
+  caseType: string;
+  court: string;
+  status: MatterStatus;
+};
+
+export type EditMatterResult = "ok" | "invalid" | "archived" | "closed" | "error" | "NOT_CONFIGURED";
+
+export type LawyerProfileDetail = {
+  fullName: string;
+  email: string;
+  phone: string;
+  preferredLanguage: "en" | "bn";
+  chamberName: string;
+  organizationName: string;
+  canEditOrganization: boolean;
+};
+
+export type ProfileInput = {
+  fullName: string;
+  phone: string;
+  preferredLanguage: "en" | "bn";
+  chamberName: string;
+  organizationName: string;
 };
 
 export type HearingNoteVersion = {
@@ -42,6 +69,8 @@ export type Hearing = {
   date: string;
   court: Localized;
   notes: HearingNoteVersion[];
+  /** Current notes for the summary (latest update only, no repeats). Demo hearings omit it. */
+  keyNotes?: HearingNoteVersion[];
   summaryStatus: SummaryStatus;
 };
 
@@ -202,6 +231,7 @@ export type FactCategory =
 export type FactReview = "draft" | "lawyer_reviewed" | "lawyer_rejected";
 
 export type FactSource = {
+  documentId: string | null;
   page: number | null;
   quote: string | null;
   verification: Verification;
@@ -216,6 +246,13 @@ export type CaseFact = {
   aiMock: boolean;
   usableInAnalysis: boolean;
   sources: FactSource[];
+};
+
+export type EditFactInput = {
+  statement: string;
+  documentId: string;
+  page: number;
+  quote: string;
 };
 
 export type NewFactInput = {
