@@ -26,6 +26,7 @@ async def get_lawyer_overview(
                    WHERE cp.organization_id = :organization_id) AS total_clients
                 FROM public.cases c
                 WHERE c.organization_id = :organization_id
+                  AND c.archived_at IS NULL
                   AND EXISTS (
                     SELECT 1 FROM public.case_members cm
                     WHERE cm.case_id = c.id

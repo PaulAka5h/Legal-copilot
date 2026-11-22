@@ -13,10 +13,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: titleFor(language, "lawyerMatters") };
 }
 
-export default async function LawyerMattersPage() {
+export default async function LawyerMattersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ showArchived?: string; archivedCase?: string }>;
+}) {
+  const { showArchived, archivedCase } = await searchParams;
+  const includeArchived = showArchived === "1";
   const language = await getLanguage();
   const copy = dictionaries[language];
-  const matters = await listMatters();
+  const matters = await listMatters(includeArchived);
 
   return (
     <>
@@ -32,6 +38,19 @@ export default async function LawyerMattersPage() {
         }
       />
       {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
+      {archivedCase ? (
+        <p className="success-note" role="status">
+          {copy.caseDetail.archive.done}
+        </p>
+      ) : null}
+      <p className="archived-toggle">
+        <Link
+          className="outline-button small"
+          href={includeArchived ? "/lawyer/matters" : "/lawyer/matters?showArchived=1"}
+        >
+          {includeArchived ? copy.matters.hideArchived : copy.matters.showArchived}
+        </Link>
+      </p>
       <MattersTable language={language} matters={matters} />
     </>
   );

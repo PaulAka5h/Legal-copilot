@@ -11,6 +11,7 @@ import {
   clientProfile,
   storedSummaries,
 } from "@/lib/mock/client";
+import { dictionaries } from "@/lib/i18n";
 import { getSession } from "@/lib/session";
 
 /*
@@ -81,6 +82,8 @@ export type ClientSummaryDetail = ClientSummary & {
   sections: ClientSummarySection[];
 };
 
+export type ClientCaseOption = { id: string; title: Localized };
+
 export type ClientCase = {
   id: string;
   title: Localized;
@@ -93,6 +96,8 @@ export type ClientCase = {
   lawyer: LawyerContact;
   documents: SharedDocument[];
   summaries: ClientSummary[];
+  /** Every case the client is linked to (for the case switcher). */
+  cases: ClientCaseOption[];
 };
 
 function approvedSummaries(): ClientSummary[] {
@@ -194,12 +199,22 @@ function toNextHearing(
   };
 }
 
-/** The backend keeps no client-visible stage, so only the first stage is shown as current. */
-function stagesFor(closed: boolean): CaseStage[] {
-  return clientCase.stages.map((stage, index) => ({
-    ...stage,
-    note: same(""),
-    state: closed ? "complete" : index === 0 ? "current" : "upcoming",
+function bothLanguages(read: (copy: (typeof dictionaries)["en"]) => string): Localized {
+  return { en: read(dictionaries.en), bn: read(dictionaries.bn) };
+}
+
+/** Progress derived by the backend from client-visible data (confirmed hearings, published updates, status). */
+function stagesFor(progress: Api["ClientCaseResponse"]["progress"]): CaseStage[] {
+  const note = {
+    complete: bothLanguages((copy) => copy.caseDetail.complete),
+    current: bothLanguages((copy) => copy.caseDetail.inProgress),
+    upcoming: bothLanguages((copy) => copy.caseDetail.upcoming),
+  };
+  return progress.map((stage) => ({
+    id: stage.id,
+    label: bothLanguages((copy) => copy.caseDetail.stages[stage.id]),
+    note: note[stage.state],
+    state: stage.state,
   }));
 }
 
@@ -216,10 +231,16 @@ export async function getClientProfile(): Promise<ClientProfile> {
   return user ? { name: same(user.full_name || user.email) } : clientProfile;
 }
 
-export async function getClientCase(): Promise<ClientCase | null> {
+/**
+ * One of the client's cases: the requested one, else the case with the newest
+ * published update (the backend lists that first). Every linked case is
+ * offered in the switcher, so an update shared on any case is reachable.
+ */
+export async function getClientCase(caseId?: string): Promise<ClientCase | null> {
   return withDemoFallback(
     async () => {
-      const [row] = await myCases();
+      const rows = await myCases();
+      const row = rows.find((item) => item.id === caseId) ?? rows[0];
       if (!row) return null;
       const [hearing, documents, updates] = await Promise.all([
         backendOrNull<Api["ClientHearingResponse"] | null>(clientCaseUrl(row.id, "/hearing")),
@@ -234,7 +255,7 @@ export async function getClientCase(): Promise<ClientCase | null> {
         caseType: same(row.case_type),
         court: same(row.court ?? ""),
         hearingNumber: updates.length,
-        stages: stagesFor(closed),
+        stages: stagesFor(row.progress),
         nextHearing: toNextHearing(hearing, row.court ?? null),
         // Lawyer contact details are not exposed to clients by the API yet.
         lawyer: {
@@ -251,9 +272,10 @@ export async function getClientCase(): Promise<ClientCase | null> {
           sharedOn: dateLabel(document.shared_at, DAY_MONTH_YEAR),
         })),
         summaries: updates.map(toSummary),
+        cases: rows.map((item) => ({ id: item.id, title: same(item.title) })),
       };
     },
-    () => ({ ...clientCase, summaries: approvedSummaries() }),
+    () => ({ ...clientCase, summaries: approvedSummaries(), cases: [] }),
   );
 }
 

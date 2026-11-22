@@ -22,7 +22,11 @@ _CASE_FIELDS = """
     c.workflow_template_id, c.court, c.court_case_no, c.jurisdiction,
     c.opposing_party, c.description, c.internal_notes, c.client_objectives,
     c.status, c.current_stage, c.key_dates, c.closed_at, c.closed_by,
-    c.retention_until, c.created_by, c.created_at, c.updated_at
+    c.retention_until, c.created_by, c.created_at, c.updated_at,
+    c.archived_at, c.archived_by,
+    (SELECT count(*) FROM public.hearings h WHERE h.case_id = c.id) AS hearing_count,
+    (SELECT count(*) FROM public.hearings h
+     WHERE h.case_id = c.id AND h.date_status = 'held') AS hearings_held
 """
 DEFAULT_CASE_STAGES = (
     ("Case intake", "Case intake"),
@@ -38,6 +42,7 @@ async def list_cases(
     session: AsyncSession,
     *,
     acting_user_id: UUID,
+    include_archived: bool = False,
 ) -> list[CaseResponse]:
     result = await session.execute(
         text(
@@ -49,10 +54,11 @@ async def list_cases(
               WHERE cm.case_id = c.id
                 AND cm.user_id = :acting_user_id
                 AND cm.status = 'active')
+              AND (:include_archived OR c.archived_at IS NULL)
             ORDER BY c.updated_at DESC, c.id
             """
         ),
-        {"acting_user_id": acting_user_id},
+        {"acting_user_id": acting_user_id, "include_archived": include_archived},
     )
     return [
         CaseResponse.model_validate(dict(row))
@@ -445,6 +451,7 @@ async def patch_case(
         "description": "description",
         "internal_notes": "internal_notes",
         "client_objectives": "client_objectives",
+        "status": "status",
     }
     assignments = ", ".join(f"{columns[field]} = :{field}" for field in updates)
     result = await session.execute(
@@ -466,6 +473,32 @@ async def patch_case(
             "acting_user_id": acting_user_id,
             "case_id": case_id,
         },
+    )
+    row = result.mappings().one_or_none()
+    return CaseResponse.model_validate(dict(row)) if row is not None else None
+
+
+async def set_case_archived(
+    session: AsyncSession,
+    *,
+    acting_user_id: UUID,
+    case_id: UUID,
+    archived: bool,
+) -> CaseResponse | None:
+    """Soft delete: only archived_at/archived_by change; nothing is removed."""
+    result = await session.execute(
+        text(
+            f"""
+            UPDATE public.cases AS c
+            SET archived_at = CASE WHEN :archived THEN now() END,
+                archived_by = CASE WHEN :archived THEN CAST(:acting_user_id AS uuid) END,
+                updated_at = now()
+            WHERE c.id = :case_id
+              AND (c.archived_at IS NULL) = :archived
+            RETURNING {_CASE_FIELDS}
+            """
+        ),
+        {"acting_user_id": acting_user_id, "case_id": case_id, "archived": archived},
     )
     row = result.mappings().one_or_none()
     return CaseResponse.model_validate(dict(row)) if row is not None else None

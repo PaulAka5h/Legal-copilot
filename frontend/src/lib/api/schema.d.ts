@@ -361,7 +361,7 @@ export interface paths {
         };
         /**
          * List cases
-         * @description Lists cases with an active membership for the authenticated lawyer.
+         * @description Lists cases with an active membership for the authenticated lawyer. Archived cases are hidden unless include_archived is true.
          */
         get: operations["list_cases_endpoint_api_v1_cases_get"];
         put?: never;
@@ -395,9 +395,49 @@ export interface paths {
         head?: never;
         /**
          * Update a case
-         * @description Updates case details for a lawyer with case-edit permission.
+         * @description Updates case details (title, type, court, status open/on_hold, ...) for a lawyer with case-edit permission. Closed and archived cases are read-only.
          */
         patch: operations["patch_case_endpoint_api_v1_cases__case_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a case
+         * @description Soft delete: hides the case from lists by default. Nothing is deleted; documents, hearings, analyses and history are kept and the case can be restored. Lead lawyer only. Audit-logged.
+         */
+        post: operations["archive_case_endpoint_api_v1_cases__case_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived case
+         * @description Shows an archived case in lists again. Lead lawyer only. Audit-logged.
+         */
+        post: operations["restore_case_endpoint_api_v1_cases__case_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/cases/{case_id}/members": {
@@ -604,6 +644,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lawyer/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the lawyer profile
+         * @description The signed-in lawyer's editable profile fields and organization display name.
+         */
+        get: operations["get_profile_api_v1_lawyer_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update the lawyer profile
+         * @description Updates name, phone, preferred language, chamber name and (owners only) the organization name. Email cannot be changed here. Audit-logged with the changed field names.
+         */
+        patch: operations["patch_profile_api_v1_lawyer_profile_patch"];
+        trace?: never;
+    };
     "/api/v1/client/cases": {
         parameters: {
             query?: never;
@@ -613,7 +677,7 @@ export interface paths {
         };
         /**
          * List open client cases
-         * @description Lists only cases with active client membership.
+         * @description Lists every open case with active client membership, the case with the newest published update first, with progress from client-visible data.
          */
         get: operations["list_client_cases_api_v1_client_cases_get"];
         put?: never;
@@ -795,7 +859,7 @@ export interface paths {
         put?: never;
         /**
          * Publish a client-visible update
-         * @description Makes an update visible to active client members.
+         * @description Lawyer approval: makes an update visible to active client members of an open case. Audit-logged.
          */
         post: operations["publish_client_update_api_v1_client_updates__update_id__publish_post"];
         delete?: never;
@@ -895,7 +959,7 @@ export interface paths {
         put?: never;
         /**
          * Search approved Bangladesh statutes for a case
-         * @description Hybrid search over the legal knowledge base: e5-large vector search (HNSW, cosine) and 'simple' full-text search fused with Reciprocal Rank Fusion (k=60), then a reranker (mock by default). Only approved, current statute versions are searched. With `incident_date`, sections not in force on that date are excluded; sections whose status is unknown are included and flagged. Bangla and English versions of the same section are merged and returned as alternates. Results are retrieved sources, not legal conclusions, and are marked unverified. Requires an active lawyer membership in the case. The query text is not logged; an audit event records counts only.
+         * @description Hybrid search over the legal knowledge base: vector search with EMBEDDING_PROVIDER's model (multilingual-e5-small by default; HNSW, cosine) and 'simple' full-text search, fused with weighted Reciprocal Rank Fusion (k=30, vector weight 1.5), then a reranker (mock by default). The query is also rewritten once by the configured LLM into Bangla, English and legal keywords, and those result lists are fused too (one LLM call per new query, cached in memory and per organization; without an LLM, or if it fails, the query is searched as typed at once, without retrying, and the `rewrite_failed` warning says so). Only approved, current statute versions are searched. With `incident_date`, sections not in force on that date are excluded; sections whose status is unknown are included and flagged. Bangla and English versions of the same section are merged and returned as alternates. Results are retrieved sources, not legal conclusions, and are marked unverified. Requires an active lawyer membership in the case. The query text is not logged; an audit event records counts only.
          */
         post: operations["search_case_research_api_v1_lawyer_cases__case_id__research_search_post"];
         delete?: never;
@@ -1364,6 +1428,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lawyer/cases/{case_id}/hearings/{hearing_id}/summary-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List edited summary versions
+         * @description Lawyer-saved versions of the hearing summary, oldest first. Version 1 (the AI draft) is not stored.
+         */
+        get: operations["list_summary_versions_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_get"];
+        put?: never;
+        /**
+         * Save an edited summary version
+         * @description Saves the lawyer's edit as a new version (never overwrites). base_version must be the latest version (1 when none was saved), otherwise 409: the summary changed since it was opened. Closed cases are read-only. Audit-logged.
+         */
+        post: operations["save_summary_version_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1469,7 +1557,7 @@ export interface components {
              * Language
              * @description Restrict statute language; omit for both
              */
-            language?: ("bn" | "en") | null;
+            language?: ("en" | "bn") | null;
         };
         /** AnalysisVersionSummary */
         AnalysisVersionSummary: {
@@ -1637,6 +1725,24 @@ export interface components {
             internal_notes?: string | null;
             /** Client Objectives */
             client_objectives?: string | null;
+            /**
+             * Status
+             * @description Active or on hold. Closing and reopening use /close and /reopen.
+             */
+            status?: ("open" | "on_hold") | null;
+        };
+        /** CaseProgressStage */
+        CaseProgressStage: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "opened" | "scheduled" | "held" | "closed";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "complete" | "current" | "upcoming";
         };
         /** CaseResponse */
         CaseResponse: {
@@ -1704,6 +1810,27 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
+            /** Archived By */
+            archived_by?: string | null;
+            /**
+             * Hearing Count
+             * @description Hearings on record
+             * @default 0
+             */
+            hearing_count: number;
+            /**
+             * Hearings Held
+             * @description Hearings with a recorded outcome
+             * @default 0
+             */
+            hearings_held: number;
+            /**
+             * Progress
+             * @description Progress derived from hearings and status
+             */
+            readonly progress: components["schemas"]["CaseProgressStage"][];
         };
         /** CitationOut */
         CitationOut: {
@@ -1717,7 +1844,7 @@ export interface components {
             /** Section */
             section: string | null;
             /** Language */
-            language: ("bn" | "en") | null;
+            language: ("en" | "bn") | null;
             /** Source Url */
             source_url: string | null;
             /** Quote */
@@ -1783,6 +1910,23 @@ export interface components {
             case_type: string;
             /** Court */
             court: string | null;
+            /**
+             * Has Confirmed Hearing
+             * @description A confirmed hearing is on record
+             * @default false
+             */
+            has_confirmed_hearing: boolean;
+            /**
+             * Published Updates
+             * @description Hearing updates the lawyer published
+             * @default 0
+             */
+            published_updates: number;
+            /**
+             * Progress
+             * @description Progress from client-visible data only
+             */
+            readonly progress: components["schemas"]["CaseProgressStage"][];
         };
         /** ClientCreate */
         ClientCreate: {
@@ -2600,6 +2744,42 @@ export interface components {
             /** Next Hearing */
             next_hearing: null;
         };
+        /** LawyerProfilePatch */
+        LawyerProfilePatch: {
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Preferred Language */
+            preferred_language?: ("en" | "bn") | null;
+            /** Chamber Name */
+            chamber_name?: string | null;
+            /** Organization Name */
+            organization_name?: string | null;
+        };
+        /** LawyerProfileResponse */
+        LawyerProfileResponse: {
+            /** Full Name */
+            full_name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone: string | null;
+            /**
+             * Preferred Language
+             * @enum {string}
+             */
+            preferred_language: "en" | "bn";
+            /** Chamber Name */
+            chamber_name: string | null;
+            /** Organization Name */
+            organization_name: string;
+            /**
+             * Can Edit Organization
+             * @description True for organization owners
+             */
+            can_edit_organization: boolean;
+        };
         /** LawyerTeamMemberResponse */
         LawyerTeamMemberResponse: {
             /**
@@ -2613,6 +2793,19 @@ export interface components {
             email: string;
             /** Org Role */
             org_role: string;
+        };
+        /** LocalizedText */
+        LocalizedText: {
+            /**
+             * En
+             * @default
+             */
+            en: string;
+            /**
+             * Bn
+             * @default
+             */
+            bn: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -2921,7 +3114,7 @@ export interface components {
              * Language
              * @description Only search statutes in this language; omit for both
              */
-            language?: ("bn" | "en") | null;
+            language?: ("en" | "bn") | null;
             /**
              * Incident Date
              * @description Date of the incident; sections not in force on this date are excluded
@@ -3171,6 +3364,77 @@ export interface components {
             origin: string;
             /** Moves */
             moves: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SummaryClaim */
+        SummaryClaim: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @description Statement type, kept apart (Rule 3)
+             * @enum {string}
+             */
+            type: "document" | "lawyer" | "ai" | "assumption";
+            /**
+             * Verification
+             * @enum {string}
+             */
+            verification: "verified" | "unverified";
+            text: components["schemas"]["LocalizedText"];
+            /** @description Where the claim comes from (Rule 2) */
+            source: components["schemas"]["LocalizedText"];
+        };
+        /** SummarySection */
+        SummarySection: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "keyNotes" | "laws" | "risks" | "rights" | "notes" | "nextSteps";
+            /** Claims */
+            claims: components["schemas"]["SummaryClaim"][];
+        };
+        /** SummaryVersionCreate */
+        SummaryVersionCreate: {
+            /**
+             * Base Version
+             * @description The version the lawyer edited. A newer saved version makes this a 409 (stale edit).
+             */
+            base_version: number;
+            /** Sections */
+            sections: components["schemas"]["SummarySection"][];
+        };
+        /** SummaryVersionOut */
+        SummaryVersionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Hearing Id
+             * Format: uuid
+             */
+            hearing_id: string;
+            /**
+             * Version
+             * @description 2 and up; version 1 is the AI draft built from the reassessment
+             */
+            version: number;
+            /** Supersedes Id */
+            supersedes_id: string | null;
+            /** Sections */
+            sections: components["schemas"]["SummarySection"][];
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
             /**
              * Created At
              * Format: date-time
@@ -5809,7 +6073,10 @@ export interface operations {
     };
     list_cases_endpoint_api_v1_cases_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Also return archived cases */
+                include_archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5852,6 +6119,31 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6239,6 +6531,352 @@ export interface operations {
                 "application/json": components["schemas"]["CasePatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    archive_case_endpoint_api_v1_cases__case_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    restore_case_endpoint_api_v1_cases__case_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7986,6 +8624,325 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    get_profile_api_v1_lawyer_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerProfileResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    patch_profile_api_v1_lawyer_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LawyerProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerProfileResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13785,6 +14742,285 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_summary_versions_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Hearing ID */
+                hearing_id: string;
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryVersionOut"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    save_summary_version_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Hearing ID */
+                hearing_id: string;
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SummaryVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryVersionOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
                 };
             };
         };

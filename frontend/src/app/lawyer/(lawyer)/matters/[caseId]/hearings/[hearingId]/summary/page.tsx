@@ -222,6 +222,7 @@ function SummaryEditor({
       <input type="hidden" name="caseId" value={caseId} />
       <input type="hidden" name="hearingId" value={hearingId} />
       <input type="hidden" name="language" value={language} />
+      <input type="hidden" name="baseVersion" value={summary.version} />
 
       <div className="rounded-lg border border-[#e8d9b5] bg-[#fbf6e9] px-4 py-3">
         <h2 className="m-0 text-[13px] font-bold text-[#6b5326]">
@@ -455,7 +456,7 @@ export default async function HearingSummaryPage({
 
         {editError ? (
           <p className="form-error mt-4" role="alert">
-            {copy.saveError}
+            {editError === "stale" ? copy.staleError : copy.saveError}
           </p>
         ) : null}
         {approveError ? (

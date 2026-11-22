@@ -459,3 +459,34 @@ The 19-Act result (Recall@10 mean 0.945 vs Gemini 1.000) was accepted on 2026-11
 - Tests: `tests/rag/test_rewrite_budget.py` (13 cases: 10 facts = 1 call, cached facts = 0, wrong item count falls
   back, no retry + cooldown on 429/503/timeout, invalid output does not pause, NFC key, and the stored cache is
   reused by a new process and not visible to another organization). Full suite: no new failures.
+
+## UI bug fixes (2026-11-23, branch fix/ui-bugs)
+
+Migration `0023_archive_summary_versions` (run on Neon before deploying this branch):
+`cases.archived_at` / `archived_by` (+ UPDATE grant), and `public.hearing_summary_versions`
+(append-only, forced RLS, lawyer case members read/insert only, no client policy).
+
+- Case edit/archive: `PATCH /api/v1/cases/{id}` accepts `status` (open/on_hold; close/reopen keep their
+  endpoints), audit `case.updated` records status_from/status_to. `POST /cases/{id}/archive` and `/restore`:
+  lead lawyer only, soft delete (nothing removed), audit `case.archived` / `case.restored`. Archived cases are
+  hidden from `GET /cases` unless `include_archived=true`, read-only, and excluded from dashboard counts.
+  Matter page: Edit case panel + Archive behind a confirm dialog; My Matters: Show archived toggle, On hold filter.
+  Archiving does not change client access (the client still sees an open archived case); close the case for that.
+- Progress: derived by the backend (`app/cases/progress.py`) from hearings and status; returned as `progress`
+  on `CaseResponse` and on `ClientCaseResponse` (client: confirmed hearings and published updates only). The
+  mock stage list and the unsaved stage picker are removed; percent counts completed stages only.
+- Hearing summary: edits are saved as new versions (`/lawyer/cases/{id}/hearings/{hid}/summary-versions`,
+  base_version check, 409 on a stale edit, audit `hearing_summary.version_saved`). Key notes show the hearing
+  purpose and only the latest hearing-update version, without repeats (earlier versions stay in the timeline).
+- Client share: the client dashboard loaded only the first linked case. It now offers every linked case, opens
+  the one with the newest published update, and progress comes from client-visible data. Publishing a client
+  update is audit-logged (`client_update.published`) and CSRF-checked.
+- Lawyer profile: `GET/PATCH /api/v1/lawyer/profile` (name, phone, preferred language, chamber name,
+  organization name for owners only; email not editable), audit `lawyer.profile_updated` (field names only).
+  Settings page has an Edit profile form.
+- Dashboard date: today's date in Asia/Dhaka (bn/en) and the greeting, computed per request.
+- Tests: `backend/tests/test_ui_bug_fixes.py` (7), `frontend/tests/*.test.mjs` (7, `npm test`).
+  Pre-existing, unrelated: 22 legacy test modules under `tests/{ai,analysis,documents,hearings,legal_kb,strategy}`
+  import a removed `backend.src` package; `test_security.py::test_auth_abuse_invitation_expired_denied` fails on
+  the previous commit too, and `::test_citation_integrity_no_fabricated_sources` expects a list from the research
+  search endpoint, which now returns an object (no code touched by this branch).

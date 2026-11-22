@@ -11,17 +11,20 @@ import {
   createClient,
   createMatter,
   downloadHearingSummary,
+  editMatter,
   extractFacts,
   getDocumentStatus,
   getHearingSummary,
+  getLawyerProfileDetail,
   linkClientToCase,
   rejectFact,
   resetClientPassword,
   runAnalysis,
   runStrategy,
   saveHearingSummaryVersion,
-  setCaseStage,
+  setMatterArchived,
   submitHearingUpdate,
+  updateLawyerProfile,
   uploadDocument,
   type ActionResult,
   type CaseDocument,
@@ -29,6 +32,7 @@ import {
   type CreateClientState,
   type DocumentStatus,
   type FactCategory,
+  type MatterStatus,
   type ResetPasswordState,
   type SummarySection,
   type Verification,
@@ -36,6 +40,7 @@ import {
 import { dictionaries } from "@/lib/i18n";
 import { getLanguage } from "@/lib/language";
 import { getSession } from "@/lib/session";
+import { editLocalized } from "@/lib/summaryNotes";
 
 const claimTypes: ClaimType[] = [
   "document",
@@ -70,21 +75,46 @@ export async function createMatterAction(formData: FormData) {
   redirect("/lawyer/matters");
 }
 
-export async function updateMatterStageAction(formData: FormData) {
-  const session = await getSession();
-  if (!session || session.role !== "lawyer") redirect("/lawyer/login");
+const MATTER_STATUSES: MatterStatus[] = ["active", "on_hold", "closed"];
 
-  const caseId = String(formData.get("caseId") ?? "");
-  const stageId = String(formData.get("stageId") ?? "");
-
-  if (!(await setCaseStage(caseId, stageId))) {
-    redirect(`/lawyer/matters/${encodeURIComponent(caseId)}?stageError=1`);
-  }
-
+/** Pages that show case data; revalidated after any case change. */
+function revalidateMatter(caseId: string) {
   revalidatePath(`/lawyer/matters/${caseId}`);
   revalidatePath("/lawyer/matters");
   revalidatePath("/lawyer/dashboard");
-  redirect(`/lawyer/matters/${caseId}`);
+  revalidatePath("/client/dashboard");
+}
+
+/** Edit title, case type, court and status (audit-logged by the backend). */
+export async function editMatterAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = String(formData.get("caseId") ?? "");
+  if (!caseId) redirect("/lawyer/matters");
+  const path = `/lawyer/matters/${encodeURIComponent(caseId)}`;
+  const status = String(formData.get("status") ?? "") as MatterStatus;
+  const result = MATTER_STATUSES.includes(status)
+    ? await editMatter(caseId, {
+        title: String(formData.get("title") ?? ""),
+        caseType: String(formData.get("caseType") ?? ""),
+        court: String(formData.get("court") ?? ""),
+        status,
+      })
+    : "invalid";
+  revalidateMatter(caseId);
+  redirect(result === "ok" ? `${path}?edited=1` : `${path}?edit=1&editError=${result}#edit-case`);
+}
+
+/** Soft delete or restore (lead lawyer only; the backend enforces it and audits). */
+export async function archiveMatterAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = String(formData.get("caseId") ?? "");
+  if (!caseId) redirect("/lawyer/matters");
+  const archive = formData.get("archive") === "1";
+  const done = await setMatterArchived(caseId, archive);
+  revalidateMatter(caseId);
+  const path = `/lawyer/matters/${encodeURIComponent(caseId)}`;
+  if (!done) redirect(`${path}?archiveError=1`);
+  redirect(archive ? "/lawyer/matters?archivedCase=1" : `${path}?restored=1`);
 }
 
 export async function addHearingAction(formData: FormData) {
@@ -103,9 +133,7 @@ export async function addHearingAction(formData: FormData) {
 
   if (!hearing) redirect(`${path}?hearingError=1`);
 
-  revalidatePath(path);
-  revalidatePath("/lawyer/matters");
-  revalidatePath("/lawyer/dashboard");
+  revalidateMatter(caseId);
   redirect(path);
 }
 
@@ -137,11 +165,16 @@ export async function saveHearingSummaryAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   const hearingId = String(formData.get("hearingId") ?? "");
   const language = formData.get("language") === "bn" ? "bn" : "en";
+  const baseVersion = Number(formData.get("baseVersion"));
   const path = summaryPath(caseId, hearingId);
   const current = await getHearingSummary(caseId, hearingId);
 
   if (!caseId || !hearingId || !current) {
     redirect(`/lawyer/matters/${encodeURIComponent(caseId)}`);
+  }
+  // The editor was opened on an older version: never apply it over a newer one.
+  if (!Number.isInteger(baseVersion) || baseVersion !== current.version) {
+    redirect(`${path}?edit=1&editError=stale#editor`);
   }
 
   let invalid = false;
@@ -171,16 +204,16 @@ export async function saveHearingSummaryAction(formData: FormData) {
         ...claim,
         type,
         verification,
-        text: { ...claim.text, [language]: text },
-        source: { ...claim.source, [language]: source },
+        text: editLocalized(claim.text, language, text),
+        source: editLocalized(claim.source, language, source),
       };
     }),
   }));
 
-  if (invalid) redirect(`${path}?editError=1#editor`);
+  if (invalid) redirect(`${path}?edit=1&editError=invalid#editor`);
 
-  const saved = await saveHearingSummaryVersion(caseId, hearingId, sections);
-  if (!saved) redirect(`${path}?editError=1#editor`);
+  const saved = await saveHearingSummaryVersion(caseId, hearingId, baseVersion, sections);
+  if (saved !== "ok") redirect(`${path}?edit=1&editError=${saved}#editor`);
 
   revalidatePath(path);
   revalidatePath(`/lawyer/matters/${caseId}`);
@@ -331,7 +364,7 @@ export async function submitHearingUpdateAction(formData: FormData) {
     nextHearingDate: /^\d{4}-\d{2}-\d{2}$/.test(nextDate) ? nextDate : null,
     nextHearingConfirmed: formData.get("nextHearingConfirmed") === "on",
   });
-  revalidatePath("/lawyer/dashboard");
+  revalidateMatter(caseId);
   finish(caseId, "hearings", result);
 }
 
@@ -380,4 +413,23 @@ export async function linkClientToCaseAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/lawyer/clients");
   redirect(`${path}?clientLink=${result}#client-access`);
+}
+
+/** Edit the lawyer profile (email is not editable; audit-logged by the backend). */
+export async function updateProfileAction(formData: FormData) {
+  await requireLawyer();
+  const language = formData.get("preferredLanguage") === "bn" ? "bn" : "en";
+  const result = await updateLawyerProfile(
+    {
+      fullName: String(formData.get("fullName") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      preferredLanguage: language,
+      chamberName: String(formData.get("chamberName") ?? ""),
+      organizationName: String(formData.get("organizationName") ?? ""),
+    },
+    // Decided by the server (owner role), never by the form.
+    Boolean((await getLawyerProfileDetail())?.canEditOrganization),
+  );
+  revalidatePath("/lawyer", "layout");
+  redirect(result === "ok" ? "/lawyer/settings?profile=saved" : `/lawyer/settings?edit=1&profile=${result}#profile`);
 }

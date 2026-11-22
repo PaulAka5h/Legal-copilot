@@ -15,7 +15,7 @@ export const clientProfile: ClientProfile = {
   name: { en: "Fahim Rahman", bn: "ফাহিম রহমান" },
 };
 
-export const clientCase: Omit<ClientCase, "summaries"> = {
+export const clientCase: Omit<ClientCase, "summaries" | "cases"> = {
   id: "LC-24018",
   title: { en: "Rahman vs. Karim", bn: "রহমান বনাম করিম" },
   statusLabel: { en: "Active", bn: "সক্রিয়" },

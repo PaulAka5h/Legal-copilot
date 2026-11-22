@@ -16,6 +16,7 @@ from app.database import create_database_engine, verify_runtime_role
 from app.errors import register_exception_handlers
 from app.health import router as health_router
 from app.lawyer.router import router as lawyer_router
+from app.lawyer.profile import router as lawyer_profile_router
 from app.client_portal.router import router as client_portal_router
 from app.cases.visibility_router import router as visibility_router
 from app.rag.search.router import router as research_router
@@ -24,6 +25,7 @@ from app.facts.router import router as facts_router
 from app.case_analysis.router import router as analysis_router
 from app.strategy_tree.router import router as strategy_tree_router
 from app.hearing_updates.router import router as hearing_updates_router
+from app.hearing_updates.summary_router import router as hearing_summary_router
 from app.logging_config import configure_logging
 
 
@@ -125,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(clients_router)
     app.include_router(cases_router)
     app.include_router(lawyer_router)
+    app.include_router(lawyer_profile_router)
     app.include_router(client_portal_router)
     app.include_router(visibility_router)
     app.include_router(research_router)
@@ -133,6 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(strategy_tree_router)
     app.include_router(hearing_updates_router)
+    app.include_router(hearing_summary_router)
     return app
 
 

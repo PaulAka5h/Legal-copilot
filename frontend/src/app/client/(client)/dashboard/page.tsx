@@ -25,11 +25,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: titleFor(language, "clientDashboard") };
 }
 
-export default async function ClientDashboardPage() {
+export default async function ClientDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ case?: string }>;
+}) {
+  const { case: caseId } = await searchParams;
   const language = await getLanguage();
   const copy = dictionaries[language];
   const dashboard = copy.clientDashboard;
-  const caseData = await getClientCase();
+  const caseData = await getClientCase(caseId);
   if (!caseData) {
     return (
       <div className="panel empty-state">
@@ -61,6 +66,21 @@ export default async function ClientDashboardPage() {
       />
 
       {usedDemoData() ? <p className="mock-note">{copy.common.mockData}</p> : null}
+
+      {caseData.cases.length > 1 ? (
+        <nav className="filter-pills case-switcher" aria-label={dashboard.yourCases}>
+          {caseData.cases.map((item) => (
+            <Link
+              key={item.id}
+              href={`/client/dashboard?case=${encodeURIComponent(item.id)}`}
+              className={item.id === caseData.id ? "active" : ""}
+              aria-current={item.id === caseData.id ? "page" : undefined}
+            >
+              {pick(item.title, language)}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
 
       <div className="case-hero">
         <div>

@@ -22,17 +22,22 @@ import type {
   CreateClientError,
   ClientSummary,
   DocumentStatus,
+  EditMatterInput,
+  EditMatterResult,
   Hearing,
   HearingSummary,
   HearingUpdateInput,
   LawyerProfile,
+  LawyerProfileDetail,
   LawyerStats,
   Localized,
   Matter,
+  MatterStatus,
   NewClientInput,
   NewFactInput,
   NewHearingInput,
   NewMatterInput,
+  ProfileInput,
   Reassessment,
   ResetPasswordState,
   Strength,
@@ -42,8 +47,8 @@ import type {
   SummarySection,
   Verification,
 } from "@/lib/api/lawyerTypes";
-import { matterStages } from "@/lib/mock/lawyer";
 import { getSession } from "@/lib/session";
+import { currentKeyNotes } from "@/lib/summaryNotes";
 
 export type * from "@/lib/api/lawyerTypes";
 
@@ -109,9 +114,14 @@ function nextHearingOf(rows: HearingRow[]): Matter["nextHearing"] {
   };
 }
 
-function toMatter(row: Api["CaseResponse"], hearings: HearingRow[] = []): Matter {
-  const stages = matterStages.map((stage) => ({ ...stage }));
-  const current = stages.find((stage) => stage.id === row.current_stage);
+const STATUS: Record<Api["CaseResponse"]["status"], MatterStatus> = {
+  draft: "active",
+  open: "active",
+  on_hold: "on_hold",
+  closed: "closed",
+};
+
+function toMatter(row: Api["CaseResponse"], hearings: HearingRow[] = [], isLead = false): Matter {
   return {
     id: row.id,
     title: same(row.title),
@@ -120,18 +130,23 @@ function toMatter(row: Api["CaseResponse"], hearings: HearingRow[] = []): Matter
     clientName: same("—"),
     court: same(row.court ?? ""),
     caseType: same(row.case_type),
-    hearingNumber: hearings.length,
-    status: row.status === "closed" ? "closed" : "active",
+    hearingNumber: row.hearing_count ?? hearings.length,
+    status: STATUS[row.status],
     nextHearing: nextHearingOf(hearings),
-    stages,
-    currentStageId: current?.id ?? stages[0].id,
+    // Derived by the backend from hearings and status; never a hand-set stage.
+    progress: row.progress,
+    archived: Boolean(row.archived_at),
+    isLead,
   };
 }
 
-export async function listMatters(): Promise<Matter[]> {
+export async function listMatters(includeArchived = false): Promise<Matter[]> {
   return withDemoFallback(
-    async () => (await backend<Api["CaseResponse"][]>("/api/v1/cases")).map((row) => toMatter(row)),
-    () => demo.listMatters(),
+    async () =>
+      (await backend<Api["CaseResponse"][]>(`/api/v1/cases${includeArchived ? "?include_archived=true" : ""}`)).map(
+        (row) => toMatter(row),
+      ),
+    () => demo.listMatters(includeArchived),
   );
 }
 
@@ -140,18 +155,80 @@ export async function getCase(caseId: string): Promise<Matter | null> {
     async () => {
       const row = await backendOrNull<Api["CaseResponse"]>(`/api/v1/cases/${encodeURIComponent(caseId)}`);
       if (!row) return null;
-      const hearings = (await backendOrNull<HearingRow[]>(caseUrl(caseId, "/hearings"))) ?? [];
-      return toMatter(row, hearings);
+      const [hearings, members, session] = await Promise.all([
+        backendOrNull<HearingRow[]>(caseUrl(caseId, "/hearings")),
+        backendOrNull<Api["CaseMemberResponse"][]>(`/api/v1/cases/${encodeURIComponent(caseId)}/members`),
+        getSession(),
+      ]);
+      const me = session?.user?.id;
+      const isLead = Boolean(me && members?.some((m) => m.user_id === me && m.role === "lead_lawyer"));
+      return toMatter(row, hearings ?? [], isLead);
     },
     () => demo.getCase(caseId),
   );
 }
 
-/** The backend does not store a lawyer-chosen stage yet; only the demo data can change it. */
-export async function setCaseStage(caseId: string, stageId: string): Promise<boolean> {
+/**
+ * Edit title, case type, court and status. Active/on hold go through PATCH;
+ * closing and reopening use the dedicated endpoints (client access changes).
+ * Every step is audit-logged by the backend.
+ */
+export async function editMatter(caseId: string, input: EditMatterInput): Promise<EditMatterResult> {
+  const title = input.title.trim();
+  const caseType = input.caseType.trim();
+  const court = input.court.trim();
+  if (!title || title.length > 300 || !caseType || caseType.length > 100 || court.length > 200) return "invalid";
+  return withDemoFallback<EditMatterResult>(
+    async () => {
+      const url = `/api/v1/cases/${encodeURIComponent(caseId)}`;
+      try {
+        const current = await backend<Api["CaseResponse"]>(url);
+        if (current.archived_at) return "archived";
+        const changed =
+          title !== current.title || caseType !== current.case_type || (court || null) !== (current.court ?? null);
+        // Closed cases are read-only: only a status change (reopen) is allowed.
+        if (current.status === "closed" && input.status === "closed") return changed ? "closed" : "ok";
+        if (current.status === "closed" && input.status !== "closed") {
+          await backend(`${url}/reopen`, { method: "POST" });
+        }
+        await backend<Api["CaseResponse"]>(url, {
+          method: "PATCH",
+          json: {
+            title,
+            case_type: caseType,
+            court: court || null,
+            ...(input.status === "closed" ? {} : { status: input.status === "on_hold" ? "on_hold" : "open" }),
+          } satisfies Api["CasePatch"],
+        });
+        if (current.status !== "closed" && input.status === "closed") {
+          await backend(`${url}/close`, { method: "POST", json: {} satisfies Api["CaseCloseRequest"] });
+        }
+        return "ok";
+      } catch (error) {
+        if (!(error instanceof BackendError)) throw error;
+        return error.status === 422 ? "invalid" : "error";
+      }
+    },
+    () => (demo.editMatter(caseId, { title, caseType, court, status: input.status }) ? "ok" : "error"),
+  );
+}
+
+/** Soft delete (archive) or restore. Lead lawyer only; nothing is deleted. */
+export async function setMatterArchived(caseId: string, archived: boolean): Promise<boolean> {
   return withDemoFallback(
-    async () => false,
-    () => demo.setCaseStage(caseId, stageId),
+    async () => {
+      try {
+        await backend<Api["CaseResponse"]>(
+          `/api/v1/cases/${encodeURIComponent(caseId)}/${archived ? "archive" : "restore"}`,
+          { method: "POST" },
+        );
+        return true;
+      } catch (error) {
+        if (error instanceof BackendError) return false;
+        throw error;
+      }
+    },
+    () => demo.setArchived(caseId, archived),
   );
 }
 
@@ -168,14 +245,15 @@ function toHearings(
   reassessments: Reassessment[],
 ): Hearing[] {
   return sortHearings(rows).map((row, index) => {
-    const updates = timeline.filter((entry) => entry.hearing_id === row.id);
-    const notes = [
-      ...(row.purpose ? [{ id: `${row.id}-purpose`, text: row.purpose }] : []),
-      ...updates.map((entry) => ({
+    const updates = timeline
+      .filter((entry) => entry.hearing_id === row.id)
+      .map((entry) => ({
         id: entry.hearing_update_id,
         text: [entry.order_text, entry.notes].filter(Boolean).join("\n"),
-      })),
-    ];
+      }));
+    const purpose = row.purpose ? { id: `${row.id}-purpose`, text: row.purpose } : null;
+    // Full history for the timeline (every append-only version is kept).
+    const notes = [...(purpose ? [purpose] : []), ...updates];
     const reassessment = reassessments.find((item) => item.hearingId === row.id);
     return {
       id: row.id,
@@ -183,6 +261,7 @@ function toHearings(
       date: (row.scheduled_at ?? row.created_at).slice(0, 10),
       court: matter.court,
       notes: notes.length > 0 ? notes : [{ id: `${row.id}-empty`, text: "" }],
+      keyNotes: currentKeyNotes(purpose, updates),
       summaryStatus: !reassessment
         ? "none"
         : reassessment.clientUpdateStatus === "published"
@@ -605,9 +684,10 @@ function summarySections(
   reassessment: Reassessment,
   analysis: CaseAnalysis | null,
 ): SummarySection[] {
-  const keyNotes = hearing.notes
-    .filter((note) => note.text)
-    .map((note) => claim(`note-${note.id}`, "lawyer", "verified", note.text, SOURCES.hearing));
+  // Current notes only: superseded update versions are history, not extra key notes.
+  const keyNotes = (hearing.keyNotes ?? currentKeyNotes(null, hearing.notes)).map((note) =>
+    claim(`note-${note.id}`, "lawyer", "verified", note.text, SOURCES.hearing),
+  );
   const laws = (analysis?.findings ?? []).map((finding, index) =>
     claim(
       `finding-${index}`,
@@ -651,11 +731,19 @@ function summarySections(
   return sections.filter((section) => section.claims.length > 0);
 }
 
+const LAWYER_EDIT: Localized = { en: "Lawyer edit", bn: "আইনজীবীর সম্পাদনা" };
+
+function summaryVersionsUrl(caseId: string, hearingId: string) {
+  return caseUrl(caseId, `/hearings/${encodeURIComponent(hearingId)}/summary-versions`);
+}
+
 async function realSummary(caseId: string, hearingId: string): Promise<HearingSummary | null> {
-  const [matter, hearings, reassessments] = await Promise.all([
+  const [matter, hearings, reassessments, saved, session] = await Promise.all([
     getCase(caseId),
     listHearings(caseId),
     listReassessments(caseId),
+    backend<Api["SummaryVersionOut"][]>(summaryVersionsUrl(caseId, hearingId)),
+    getSession(),
   ]);
   const hearing = hearings.find((item) => item.id === hearingId);
   const reassessment = reassessments.find((item) => item.hearingId === hearingId);
@@ -665,6 +753,25 @@ async function realSummary(caseId: string, hearingId: string): Promise<HearingSu
     caseUrl(caseId, `/analysis/versions/${reassessment.analysisVersion}`),
   );
   const sections = summarySections(hearing, reassessment, analysisRow ? toAnalysis(analysisRow) : null);
+  const me = session?.user;
+  const versions = [
+    {
+      id: reassessment.id,
+      version: 1,
+      createdAt: reassessment.createdAt,
+      editedBy: { en: "AI draft", bn: "এআই খসড়া" },
+      sections,
+    },
+    // Lawyer edits: append-only versions stored by the backend (Rule 6).
+    ...saved.map((row) => ({
+      id: row.id,
+      version: row.version,
+      createdAt: row.created_at,
+      editedBy: me && row.created_by === me.id ? same(me.full_name || me.email) : LAWYER_EDIT,
+      sections: row.sections,
+    })),
+  ];
+  const latest = versions[versions.length - 1];
   return {
     caseId,
     hearingId,
@@ -674,17 +781,9 @@ async function realSummary(caseId: string, hearingId: string): Promise<HearingSu
     matterTitle: matter.title,
     clientName: matter.clientName,
     status: hearing.summaryStatus,
-    version: 1,
-    sections,
-    versions: [
-      {
-        id: reassessment.id,
-        version: 1,
-        createdAt: reassessment.createdAt,
-        editedBy: { en: "AI draft", bn: "এআই খসড়া" },
-        sections,
-      },
-    ],
+    version: latest.version,
+    sections: latest.sections,
+    versions,
   };
 }
 
@@ -695,18 +794,33 @@ export async function getHearingSummary(caseId: string, hearingId: string): Prom
   );
 }
 
+export type SaveSummaryResult = "ok" | "stale" | "error";
+
 /**
- * Edited summary versions exist only in the demo data; the backend keeps the
- * reassessment immutable and the client text as a client update.
+ * Save the lawyer's edit as a new version (never an overwrite). baseVersion is
+ * the version the editor was opened on; a newer saved version makes this
+ * "stale" so a concurrent edit is never silently replaced.
  */
 export async function saveHearingSummaryVersion(
   caseId: string,
   hearingId: string,
+  baseVersion: number,
   sections: SummarySection[],
-): Promise<boolean> {
-  return withDemoFallback(
-    async () => false,
-    () => demo.saveHearingSummaryVersion(caseId, hearingId, sections) !== null,
+): Promise<SaveSummaryResult> {
+  return withDemoFallback<SaveSummaryResult>(
+    async () => {
+      try {
+        await backend<Api["SummaryVersionOut"]>(summaryVersionsUrl(caseId, hearingId), {
+          method: "POST",
+          json: { base_version: baseVersion, sections } satisfies Api["SummaryVersionCreate"],
+        });
+        return "ok";
+      } catch (error) {
+        if (!(error instanceof BackendError)) throw error;
+        return error.status === 409 ? "stale" : "error";
+      }
+    },
+    () => (demo.saveHearingSummaryVersion(caseId, hearingId, sections) !== null ? "ok" : "error"),
   );
 }
 
@@ -923,16 +1037,69 @@ export async function getRecentActivity(): Promise<Activity[]> {
   );
 }
 
+function toProfileDetail(row: Api["LawyerProfileResponse"]): LawyerProfileDetail {
+  return {
+    fullName: row.full_name,
+    email: row.email,
+    phone: row.phone ?? "",
+    preferredLanguage: row.preferred_language,
+    chamberName: row.chamber_name ?? "",
+    organizationName: row.organization_name,
+    canEditOrganization: row.can_edit_organization,
+  };
+}
+
+/** Editable profile fields; null in demo mode (profile edit needs the backend). */
+export async function getLawyerProfileDetail(): Promise<LawyerProfileDetail | null> {
+  return withDemoFallback<LawyerProfileDetail | null>(
+    async () => toProfileDetail(await backend<Api["LawyerProfileResponse"]>("/api/v1/lawyer/profile")),
+    () => null,
+  );
+}
+
+export type ProfileResult = "ok" | "invalid" | "error" | "NOT_CONFIGURED";
+
+/** Update the profile (audit-logged by the backend). Email is never sent. */
+export async function updateLawyerProfile(input: ProfileInput, canEditOrganization: boolean): Promise<ProfileResult> {
+  const fullName = input.fullName.trim();
+  const phone = input.phone.trim();
+  const organizationName = input.organizationName.trim();
+  if (!fullName || fullName.length > 200 || phone.length > 30 || !/^[0-9+()\- ]*$/.test(phone)) return "invalid";
+  if (input.chamberName.trim().length > 200 || (canEditOrganization && !organizationName)) return "invalid";
+  return withDemoFallback<ProfileResult>(
+    async () => {
+      try {
+        await backend<Api["LawyerProfileResponse"]>("/api/v1/lawyer/profile", {
+          method: "PATCH",
+          json: {
+            full_name: fullName,
+            phone: phone || null,
+            preferred_language: input.preferredLanguage,
+            chamber_name: input.chamberName.trim() || null,
+            ...(canEditOrganization ? { organization_name: organizationName } : {}),
+          } satisfies Api["LawyerProfilePatch"],
+        });
+        return "ok";
+      } catch (error) {
+        if (!(error instanceof BackendError)) throw error;
+        return error.status === 422 ? "invalid" : "error";
+      }
+    },
+    () => "NOT_CONFIGURED",
+  );
+}
+
 export async function getLawyerProfile(): Promise<LawyerProfile> {
   const session = await getSession();
   const user = session?.user;
   if (!user) return demo.getLawyerProfile();
-  const name = user.full_name || user.email;
+  const detail = await getLawyerProfileDetail();
+  const name = detail?.fullName || user.full_name || user.email;
   return {
     firstName: same(name.split(" ")[0]),
     name: same(name),
     email: user.email,
-    firm: same(""),
+    firm: same(detail ? detail.chamberName || detail.organizationName : ""),
     location: same(""),
   };
 }
