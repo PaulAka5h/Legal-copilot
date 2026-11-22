@@ -9374,7 +9374,7 @@
      "lawyer-profile"
     ],
     "summary": "Upload or replace the profile photo",
-    "description": "JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are ignored). Images over 25 megapixels are refused before decoding. The server strips all metadata (EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous photo is deleted. Audit-logged without image content.",
+    "description": "JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are ignored). Images over 16 megapixels are refused before decoding. The server strips all metadata (EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous photo is deleted. At most 10 uploads or removals per hour per user (429 with Retry-After). Audit-logged without image content.",
     "operationId": "upload_photo_api_v1_lawyer_profile_photo_put",
     "requestBody": {
      "required": true,
@@ -9622,6 +9622,51 @@
        }
       }
      },
+     "429": {
+      "description": "Too Many Requests",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
      "503": {
       "description": "Service Unavailable",
       "content": {
@@ -9674,7 +9719,7 @@
      "lawyer-profile"
     ],
     "summary": "Remove the profile photo",
-    "description": "Removes the photo (clients then see initials). Deletes the stored files. Audit-logged.",
+    "description": "Removes the photo (clients then see initials). Deletes the stored files. Shares the upload limit (10 per hour per user). Audit-logged.",
     "operationId": "delete_photo_api_v1_lawyer_profile_photo_delete",
     "responses": {
      "200": {
@@ -9777,6 +9822,51 @@
        }
       }
      },
+     "429": {
+      "description": "Too Many Requests",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
      "503": {
       "description": "Service Unavailable",
       "content": {
@@ -9829,7 +9919,7 @@
      "lawyer-profile"
     ],
     "summary": "Get my profile photo",
-    "description": "The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none.",
+    "description": "The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none. At most 600 photo requests per hour per user (429 with Retry-After).",
     "operationId": "get_my_photo_api_v1_lawyer_profile_photo_get",
     "parameters": [
      {
@@ -9989,6 +10079,51 @@
      },
      "422": {
       "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too Many Requests",
       "content": {
        "application/problem+json": {
         "schema": {
@@ -11960,7 +12095,7 @@
      "client-portal"
     ],
     "summary": "Get the lawyer's photo",
-    "description": "The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to clients. Otherwise 404. Open cases with client membership only.",
+    "description": "The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to clients. Otherwise 404. Open cases with client membership only. At most 600 photo requests per hour per user (429 with Retry-After).",
     "operationId": "lawyer_photo_api_v1_client_cases__case_id__lawyer_photo_get",
     "parameters": [
      {
@@ -12132,6 +12267,51 @@
      },
      "422": {
       "description": "Unprocessable Entity",
+      "content": {
+       "application/problem+json": {
+        "schema": {
+         "properties": {
+          "type": {
+           "default": "about:blank",
+           "title": "Type",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "integer"
+          },
+          "detail": {
+           "title": "Detail",
+           "type": "string"
+          },
+          "instance": {
+           "title": "Instance",
+           "type": "string"
+          },
+          "request_id": {
+           "title": "Request Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "request_id"
+         ],
+         "title": "Problem",
+         "type": "object"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "Too Many Requests",
       "content": {
        "application/problem+json": {
         "schema": {

@@ -6,6 +6,7 @@ const MESSAGES = {
   too_large: "photoTooLarge",
   wrong_type: "photoWrongType",
   invalid: "photoInvalid",
+  rate_limited: "photoRateLimited",
   error: "photoError",
   NOT_CONFIGURED: "photoNotConfigured",
 } as const;

@@ -53,7 +53,8 @@ export function isValidProfileInput(input: ProfileInput, canEditOrganization: bo
   return checks.every(Boolean);
 }
 
-export type PhotoResult = "saved" | "removed" | "too_large" | "wrong_type" | "invalid" | "error" | "NOT_CONFIGURED";
+export type PhotoResult =
+  | "saved" | "removed" | "too_large" | "wrong_type" | "invalid" | "rate_limited" | "error" | "NOT_CONFIGURED";
 
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -74,6 +75,7 @@ export async function uploadProfilePhoto(file: File): Promise<PhotoResult> {
         if (error.status === 413) return "too_large";
         if (error.status === 415) return "wrong_type";
         if (error.status === 422) return "invalid";
+        if (error.status === 429) return "rate_limited";
         return error.status === 503 ? "NOT_CONFIGURED" : "error";
       }
     },
@@ -89,6 +91,7 @@ export async function removeProfilePhoto(): Promise<PhotoResult> {
         return "removed";
       } catch (error) {
         if (!(error instanceof BackendError)) throw error;
+        if (error.status === 429) return "rate_limited";
         return error.status === 503 ? "NOT_CONFIGURED" : "error";
       }
     },

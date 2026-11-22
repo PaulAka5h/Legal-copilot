@@ -17,11 +17,12 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from app.auth.dependencies import ClientDep, UserSessionDep, request_ip
+from app.auth.dependencies import ClientDep, SessionFactoryDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
 from app.documents.storage import StorageNotConfigured, get_store
 from app.errors import problem_responses
-from app.lawyer.photo import WEBP_RESPONSE, check_size, read_photo
+from app.lawyer.photo import PHOTO_READ_LIMIT, WEBP_RESPONSE, check_size, read_photo
+from app.rate_limit import enforce_user_quota
 from app.lawyer.profile_schemas import LawyerContact
 from app.pdf.render import Document, attachment_headers, render_pdf
 
@@ -71,14 +72,16 @@ async def lawyer_contact(case_id: Annotated[UUID, Path(description="Case ID")], 
     "/cases/{case_id}/lawyer/photo",
     summary="Get the lawyer's photo",
     description=("The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to "
-                 "clients. Otherwise 404. Open cases with client membership only."),
+                 "clients. Otherwise 404. Open cases with client membership only. At most 600 photo requests per "
+                 "hour per user (429 with Retry-After)."),
     response_class=Response,
-    responses={**WEBP_RESPONSE, **problem_responses(401, 403, 404, 422, 503)},
+    responses={**WEBP_RESPONSE, **problem_responses(401, 403, 404, 422, 429, 503)},
 )
 async def lawyer_photo(request: Request, case_id: Annotated[UUID, Path(description="Case ID")], user: ClientDep,
-                       session: UserSessionDep,
+                       session: UserSessionDep, session_factory: SessionFactoryDep,
                        size: Annotated[int, Query(description="Square size in pixels: 512 or 96")] = 96) -> Response:
     check_size(size)
+    await enforce_user_quota(session_factory, user.id, PHOTO_READ_LIMIT)
     row = await _lawyer_contact_row(session, case_id)
     if row["avatar_id"] is None:
         raise HTTPException(status_code=404, detail="Photo was not found.")

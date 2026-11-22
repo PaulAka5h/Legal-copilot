@@ -588,3 +588,14 @@ Rows with `show_contact_to_clients = false` become `client_visible_fields = {pho
 - Tests: `tests/test_lawyer_profile.py` (upload valid/too large/wrong type/fake extension, resize and EXIF strip,
   pixel limit, client sees only allowed fields, another lawyer's photo not reachable).
 - Not done: the settings and client card UI were type-checked and built but not clicked through in a browser.
+
+## Release 2026-11-23 (branch release/2026-11-23 from deploy/render)
+
+Merges feat/branding (PokkhoAI logo, metadata, brand palette) and feat/lawyer-profile; fix/ui-bugs was already in
+deploy/render. The lawyer-profile CSS now uses the `--brand-*` variables (no `--color-green/deep/mid` left).
+
+Migration `0027_user_rate_limits` (run on Neon after 0026, before deploying): per-user fixed-window limits, the same
+mechanism as the login limiter (`public.user_rate_limits`, RLS forced with no app_user access, updated only through
+`app.consume_user_rate_limit`). Profile photo upload and removal: 10 per hour per user; photo serving (own photo and
+the client's view of their lawyer's photo): 600 per hour per user. Over the limit: 429 with `Retry-After`.
+Tests: `tests/test_photo_rate_limits.py`.

@@ -2735,7 +2735,7 @@
 }
 
 .edit-case-grid textarea:focus {
-  border-color: var(--color-green);
+  border-color: var(--brand-600);
 }
 
 .edit-case-grid .wide {
@@ -2771,7 +2771,7 @@
 }
 
 .profile-checks input {
-  accent-color: var(--color-deep);
+  accent-color: var(--brand-800);
 }
 
 .photo-row {

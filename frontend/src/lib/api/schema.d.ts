@@ -677,18 +677,18 @@ export interface paths {
         };
         /**
          * Get my profile photo
-         * @description The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none.
+         * @description The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none. At most 600 photo requests per hour per user (429 with Retry-After).
          */
         get: operations["get_my_photo_api_v1_lawyer_profile_photo_get"];
         /**
          * Upload or replace the profile photo
-         * @description JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are ignored). Images over 25 megapixels are refused before decoding. The server strips all metadata (EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous photo is deleted. Audit-logged without image content.
+         * @description JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are ignored). Images over 16 megapixels are refused before decoding. The server strips all metadata (EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous photo is deleted. At most 10 uploads or removals per hour per user (429 with Retry-After). Audit-logged without image content.
          */
         put: operations["upload_photo_api_v1_lawyer_profile_photo_put"];
         post?: never;
         /**
          * Remove the profile photo
-         * @description Removes the photo (clients then see initials). Deletes the stored files. Audit-logged.
+         * @description Removes the photo (clients then see initials). Deletes the stored files. Shares the upload limit (10 per hour per user). Audit-logged.
          */
         delete: operations["delete_photo_api_v1_lawyer_profile_photo_delete"];
         options?: never;
@@ -865,7 +865,7 @@ export interface paths {
         };
         /**
          * Get the lawyer's photo
-         * @description The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to clients. Otherwise 404. Open cases with client membership only.
+         * @description The lead lawyer's photo (WebP, 512 or 96 pixels square), only when the lawyer shows it to clients. Otherwise 404. Open cases with client membership only. At most 600 photo requests per hour per user (429 with Retry-After).
          */
         get: operations["lawyer_photo_api_v1_client_cases__case_id__lawyer_photo_get"];
         put?: never;
@@ -9448,6 +9448,31 @@ export interface operations {
                     };
                 };
             };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
             /** @description Service Unavailable */
             503: {
                 headers: {
@@ -9622,6 +9647,31 @@ export interface operations {
                     };
                 };
             };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
             /** @description Service Unavailable */
             503: {
                 headers: {
@@ -9694,6 +9744,31 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10902,6 +10977,31 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

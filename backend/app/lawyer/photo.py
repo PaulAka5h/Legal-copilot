@@ -18,11 +18,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import LawyerDep, UserSessionDep, request_ip, require_same_origin
+from app.auth.dependencies import LawyerDep, SessionFactoryDep, UserSessionDep, request_ip, require_same_origin
 from app.auth.repository import write_audit_event
 from app.documents.storage import ObjectStore, StorageNotConfigured, get_store
 from app.errors import problem_responses
 from app.lawyer.avatar import MAX_PHOTO_BYTES, SIZES, PhotoRejected, avatar_key, process_photo
+from app.rate_limit import RateLimit, enforce_user_quota
 from app.tenancy import resolve_actor_organization
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,10 @@ router = APIRouter(prefix="/api/v1/lawyer/profile/photo", tags=["lawyer-profile"
 
 WEBP_RESPONSE = {200: {"content": {"image/webp": {}}, "description": "The photo (WebP)"}}
 NOT_CONFIGURED = 503
+# Per signed-in user. Uploads decode an image; removals share the bucket. Serving allows normal browsing
+# (pages show the 96 px photo; browsers cache it privately for a day).
+PHOTO_WRITE_LIMIT = RateLimit("profile_photo_write", limit=10, window_seconds=3600)
+PHOTO_READ_LIMIT = RateLimit("profile_photo_read", limit=600, window_seconds=3600)
 
 
 class PhotoResponse(BaseModel):
@@ -93,10 +98,11 @@ async def _audit(session: AsyncSession, request: Request, user, action: str, det
         "JPEG, PNG or WebP up to 5 MB, detected from the file content (the extension and declared type are "
         "ignored). Images over 16 megapixels are refused before decoding. The server strips all metadata "
         "(EXIF, GPS, ICC), center-crops to 512x512 plus a 96x96 thumbnail, and stores WebP only. The previous "
-        "photo is deleted. Audit-logged without image content."
+        "photo is deleted. At most 10 uploads or removals per hour per user (429 with Retry-After). "
+        "Audit-logged without image content."
     ),
     response_model=PhotoResponse,
-    responses=problem_responses(401, 403, 413, 415, 422, 503),
+    responses=problem_responses(401, 403, 413, 415, 422, 429, 503),
     dependencies=[Depends(require_same_origin)],
 )
 async def upload_photo(
@@ -104,8 +110,10 @@ async def upload_photo(
     background: BackgroundTasks,
     user: LawyerDep,
     session: UserSessionDep,
+    session_factory: SessionFactoryDep,
     file: Annotated[UploadFile, File(description="The photo (JPEG, PNG or WebP, at most 5 MB)")],
 ) -> PhotoResponse:
+    await enforce_user_quota(session_factory, user.id, PHOTO_WRITE_LIMIT)
     data = await file.read(MAX_PHOTO_BYTES + 1)
     try:
         photo = await asyncio.to_thread(process_photo, data)
@@ -145,13 +153,15 @@ async def upload_photo(
 @router.delete(
     "",
     summary="Remove the profile photo",
-    description="Removes the photo (clients then see initials). Deletes the stored files. Audit-logged.",
+    description=("Removes the photo (clients then see initials). Deletes the stored files. Shares the upload "
+                 "limit (10 per hour per user). Audit-logged."),
     response_model=PhotoResponse,
-    responses=problem_responses(401, 403, 503),
+    responses=problem_responses(401, 403, 429, 503),
     dependencies=[Depends(require_same_origin)],
 )
 async def delete_photo(request: Request, background: BackgroundTasks, user: LawyerDep,
-                       session: UserSessionDep) -> PhotoResponse:
+                       session: UserSessionDep, session_factory: SessionFactoryDep) -> PhotoResponse:
+    await enforce_user_quota(session_factory, user.id, PHOTO_WRITE_LIMIT)
     previous = await _current_avatar(session, user.id)
     if previous is None:
         return PhotoResponse(photo_id=None)
@@ -168,15 +178,17 @@ async def delete_photo(request: Request, background: BackgroundTasks, user: Lawy
 @router.get(
     "",
     summary="Get my profile photo",
-    description="The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none.",
+    description=("The signed-in lawyer's own photo as WebP (512 or 96 pixels square). 404 when there is none. "
+                 "At most 600 photo requests per hour per user (429 with Retry-After)."),
     response_class=Response,
-    responses={**WEBP_RESPONSE, **problem_responses(401, 403, 404, 422, 503)},
+    responses={**WEBP_RESPONSE, **problem_responses(401, 403, 404, 422, 429, 503)},
 )
 async def get_my_photo(
-    request: Request, user: LawyerDep, session: UserSessionDep,
+    request: Request, user: LawyerDep, session: UserSessionDep, session_factory: SessionFactoryDep,
     size: Annotated[int, Query(description="Square size in pixels: 512 or 96")] = 96,
 ) -> Response:
     check_size(size)
+    await enforce_user_quota(session_factory, user.id, PHOTO_READ_LIMIT)
     avatar_id = await _current_avatar(session, user.id)
     if avatar_id is None:
         raise HTTPException(status_code=404, detail="Photo was not found.")
