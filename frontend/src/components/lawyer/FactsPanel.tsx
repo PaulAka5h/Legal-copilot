@@ -22,7 +22,7 @@ const CATEGORIES: FactCategory[] = [
 
 const reviewTone: Record<CaseFact["review"], string> = {
   draft: "bg-[#f5efe1] text-[#806b43]",
-  lawyer_reviewed: "bg-[#eaf6ef] text-[var(--color-deep)]",
+  lawyer_reviewed: "bg-[var(--brand-100)] text-[var(--brand-800)]",
   lawyer_rejected: "bg-[#f8e9e5] text-[#8a2e1e]",
 };
 
@@ -123,7 +123,7 @@ function FactItem({
           {copy.categories[fact.category]}
         </Pill>
         {fact.usableInAnalysis ? (
-          <Pill tone="bg-[#eaf6ef] text-[var(--color-deep)]">{copy.usable}</Pill>
+          <Pill tone="bg-[var(--brand-100)] text-[var(--brand-800)]">{copy.usable}</Pill>
         ) : null}
         {fact.aiMock ? (
           <Pill tone="bg-[#f5efe1] text-[#806b43]">{copy.mockOrigin}</Pill>

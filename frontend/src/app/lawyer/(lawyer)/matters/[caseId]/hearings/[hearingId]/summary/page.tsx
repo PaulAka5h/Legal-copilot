@@ -34,13 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const claimTone: Record<ClaimType, string> = {
   document: "bg-[color:var(--color-pale)] text-[#26617f]",
-  lawyer: "bg-[#eaf6ef] text-[var(--color-deep)]",
+  lawyer: "bg-[var(--brand-100)] text-[var(--brand-800)]",
   ai: "bg-[#f5efe1] text-[#806b43]",
   assumption: "bg-[color:var(--color-surface)] text-[color:var(--color-muted)]",
 };
 
 const inputClass =
-  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
+  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--brand-600)]";
 
 function hearingDateLabel(date: string, language: Language) {
   const label = new Intl.DateTimeFormat(language === "bn" ? "bn-BD" : "en-GB", {
@@ -143,7 +143,7 @@ function SummaryBody({
   return sections.map((section, index) => (
     <section key={section.id} className="mt-7">
       <div className="flex items-baseline gap-3 border-b border-[color:var(--color-border)] pb-2">
-        <span className="font-serif text-[20px] leading-none text-[color:var(--color-green)]">
+        <span className="font-serif text-[20px] leading-none text-[color:var(--brand-800)]">
           {numberFor(language, index + 1)}.
         </span>
         <h2 className="m-0 text-[14px] font-bold text-[color:var(--color-ink)]">
@@ -168,7 +168,7 @@ function SummaryBody({
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold ${
                     verified
-                      ? "bg-[#eaf6ef] text-[var(--color-deep)]"
+                      ? "bg-[var(--brand-100)] text-[var(--brand-800)]"
                       : "border border-[#f0cfc6] bg-[#fdf3f0] text-[#8a2e1e]"
                   }`}
                 >
@@ -387,13 +387,13 @@ export default async function HearingSummaryPage({
       <article className="panel mx-auto max-w-[840px] p-6 sm:p-10">
         <header className="border-b-2 border-[color:var(--color-ink)] pb-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[color:var(--color-green)]">
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[color:var(--brand-800)]">
               {copy.eyebrow}
             </span>
             <span
               className={`rounded-full border px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.1em] ${
                 isApproved
-                  ? "border-[#bfe3cd] bg-[#eaf6ef] text-[var(--color-deep)]"
+                  ? "border-[var(--brand-300)] bg-[var(--brand-100)] text-[var(--brand-800)]"
                   : "border-[#f0cfc6] bg-[#fdf3f0] text-[#8a2e1e]"
               }`}
             >
@@ -461,7 +461,7 @@ export default async function HearingSummaryPage({
         ) : null}
         {saved && !editError ? (
           <p
-            className="mt-4 rounded-md border border-[#bfe3cd] bg-[#eaf6ef] px-3 py-2 text-[9px] font-semibold text-[var(--color-deep)]"
+            className="mt-4 rounded-md border border-[var(--brand-300)] bg-[var(--brand-100)] px-3 py-2 text-[9px] font-semibold text-[var(--brand-800)]"
             role="status"
           >
             {format(copy.savedNotice, {
@@ -471,7 +471,7 @@ export default async function HearingSummaryPage({
         ) : null}
         {approved && !approveError ? (
           <p
-            className="mt-4 rounded-md border border-[#bfe3cd] bg-[#eaf6ef] px-3 py-2 text-[9px] font-semibold text-[var(--color-deep)]"
+            className="mt-4 rounded-md border border-[var(--brand-300)] bg-[var(--brand-100)] px-3 py-2 text-[9px] font-semibold text-[var(--brand-800)]"
             role="status"
           >
             {copy.approvedNotice}
@@ -545,7 +545,7 @@ export default async function HearingSummaryPage({
                       })}
                     </b>
                     {current ? (
-                      <span className="rounded-full bg-[#eaf6ef] px-2 py-0.5 text-[8px] font-bold text-[var(--color-deep)]">
+                      <span className="rounded-full bg-[var(--brand-100)] px-2 py-0.5 text-[8px] font-bold text-[var(--brand-800)]">
                         {copy.currentVersion}
                       </span>
                     ) : null}

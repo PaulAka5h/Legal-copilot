@@ -158,8 +158,8 @@ export function MatterWorkspace({
   const tabClass = (active: boolean) =>
     `rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${
       active
-        ? "bg-[var(--color-deep)] text-white"
-        : "text-[color:var(--color-muted)] hover:text-[color:var(--color-deep)]"
+        ? "bg-[var(--brand-800)] text-white"
+        : "text-[color:var(--color-muted)] hover:text-[color:var(--brand-800)]"
     }`;
 
   return (
@@ -280,7 +280,7 @@ export function MatterWorkspace({
                     </div>
                     <SummaryBadge status={hearing.summaryStatus} copy={copy} />
                     <Link
-                      className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
+                      className="text-[8px] font-bold text-[color:var(--brand-700)] underline underline-offset-2"
                       href={`/lawyer/matters/${caseId}/hearings/${hearing.id}/summary`}
                     >
                       {copy.viewSummary}

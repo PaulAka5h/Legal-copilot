@@ -17,7 +17,7 @@ import type {
 import { format, numberFor, type Language } from "@/lib/i18n";
 
 const elementTone = {
-  met: "bg-[#eaf6ef] text-[var(--color-deep)]",
+  met: "bg-[var(--brand-100)] text-[var(--brand-800)]",
   missing: "bg-[#f8e9e5] text-[#8a2e1e]",
   disputed: "bg-[#f5efe1] text-[#806b43]",
 } as const;
