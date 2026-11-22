@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Body, HTTPException, Path, Query, Request, status
 
-from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_provider
+from app.ai.llm import LLMNotConfigured, mock_allowed, resolve_chain
 from app.auth.dependencies import require_same_origin, LawyerDep, SessionFactoryDep, UserSessionDep, request_ip
 from app.auth.repository import write_audit_event
 from app.cases.dependencies import CaseAccessDep, CaseAccessShortDep, require_case_permission
@@ -85,7 +85,7 @@ async def extract_facts(
 ) -> ExtractionResponse:
     require_case_permission(access, "can_run_ai")
     try:
-        llm = resolve_provider(request.app.state.settings, getattr(request.app.state, "llm_transport", None))
+        llm = resolve_chain(request.app.state.settings, getattr(request.app.state, "llm_transport", None))
     except LLMNotConfigured as error:
         raise HTTPException(status_code=503, detail=f"NOT_CONFIGURED: {error}") from error
     settings = request.app.state.settings

@@ -537,3 +537,30 @@ Migration `0025_client_docs_lawyer_contact` (run on Neon before deploying): `law
 - Progress: "Case closed" is complete only for a closed case and otherwise upcoming (never current).
 - Tests: `backend/tests/test_portal_fixes.py` (4), progress cases in `test_ui_bug_fixes.py`,
   `frontend/tests/routeAccess.test.mjs` (5).
+
+## Strategy with a real LLM, and the free-provider fallback chain (2026-11-23, branch fix/ui-bugs)
+
+No migration.
+
+- Root cause (live: one-node ai_mock strategy after a verified Gemini analysis): strategy called the LLM only
+  when a finding was fully verified (`verification == "verified"`). With a real model, element quotes are
+  often not locatable, so findings stay "unverified" even though their section citation is verified (the
+  analysis still succeeds on verified citations). Strategy then skipped the LLM entirely and stored an empty
+  tree labelled ai_mock ("The analysis found no verified finding."). Now strategy uses findings with a verified
+  citation (`usable_findings`), tells the model which elements are unproven, and logs
+  `llm.fallback_to_mock` with `reason=strategy:no_finding_with_verified_citation` when it really has nothing.
+- Strategy output: flat node list with `parent_id` (`StrategyFlatDraft`, prompt `strategy-tree-v2-flat`),
+  rebuilt into the 3-ply tree in code (`nest_nodes`: misplaced/duplicate nodes and bad chunk ids dropped with
+  warnings). The verifier still runs on every node. Strategy has its own 90 s LLM budget, analysis 60 s, both
+  capped by the 105 s request deadline (frontend timeout 120 s).
+- `app/ai/structured.py`: no backoff; 429/503/timeouts/transport errors go to the next provider at once;
+  invalid output gets one repair request with the validation errors (field paths only), then the next
+  provider; then the labelled mock. Logs: `llm.provider_failed`, `llm.answered`, `llm.fallback_to_mock`
+  with `reason` and `schema` (the log formatter dropped any reason field before; now allow-listed).
+- Provider chain (`LLM_FALLBACK_CHAIN`, `app/ai/llm.py` `resolve_chain`): gemini, gemini_fallback, groq,
+  cerebras, openrouter (OpenAI-compatible, JSON mode + schema in the prompt), mock. Skips providers without a
+  key/model or approval; free tiers refused in production. UI shows "ai (provider)". DOCS/providers.md updated.
+- Tests: `tests/test_llm_chain.py` (mocked HTTP per provider, order, skips, failover, logs),
+  `tests/test_strategy_llm.py` (flat/nest, Gemini path with repair and 3 plies, the root cause, skip logging,
+  live cheque case opt-in: `LIVE_LLM_TEST=1` + `GEMINI_API_KEY`/`GEMINI_MODEL`),
+  `tests/ai/test_structured_retries.py` rewritten for no-backoff + repair.

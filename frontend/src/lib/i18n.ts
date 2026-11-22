@@ -286,6 +286,7 @@ const en = {
       draftNotice:
         "AI output is a draft for your review. It is not legal advice and does not predict the outcome.",
       mockOrigin: "Mock AI output (ai_mock) — not from a model",
+      aiOrigin: "ai ({provider})",
       done: "Saved.",
       failed: "The request failed: {detail}",
       quoteNotFound:
@@ -962,6 +963,7 @@ const bn: Dictionary = {
       draftNotice:
         "এআই-এর ফলাফল আপনার পর্যালোচনার জন্য খসড়া। এটি আইনি পরামর্শ নয় এবং ফলাফলের পূর্বাভাস দেয় না।",
       mockOrigin: "মক এআই ফলাফল (ai_mock) — কোনো মডেল থেকে নয়",
+      aiOrigin: "এআই ({provider})",
       done: "সংরক্ষিত হয়েছে।",
       failed: "অনুরোধটি ব্যর্থ হয়েছে: {detail}",
       quoteNotFound:

@@ -2,7 +2,7 @@
 
 This file is the single list of external services that may receive project data. The LLM gateway reads the approved list from configuration (`LLM_APPROVED_PROVIDERS`) and refuses to send case content to anything not on it.
 
-Last updated: 2026-11-21
+Last updated: 2026-11-23
 
 ## Current state
 
@@ -10,7 +10,10 @@ Last updated: 2026-11-21
 |---|---|---|---|
 | mock | Tests and local development | Synthetic only | Approved for all non-production use |
 | Ollama (local, OpenAI-compatible API at `LLM_BASE_URL=http://localhost:11434/v1`) | LLM for fact extraction | Client case data, **development only**; runs on this machine, no data leaves it | Approved by Arafath 2026-11-20 for development; see review record. Production use needs a full review |
-| Google Gemini API (free tier), model from `GEMINI_MODEL`, then `GEMINI_FALLBACK_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`), and search query rewriting (`app/rag/search/query_rewrite.py`, `SEARCH_QUERY_REWRITE`: the text of legal searches and of analysed case facts) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Fallback chain: `GEMINI_MODEL` (429/503 retried at 2 s, 5 s, 10 s) -> `GEMINI_FALLBACK_MODEL` -> mock, within a 100 s per-request budget; mock output is labelled `ai_mock`; the answering model is logged (`llm.answered`) and stored with the analysis |
+| Google Gemini API (free tier), model from `GEMINI_MODEL`, then `GEMINI_FALLBACK_MODEL` | LLM for fact extraction, case analysis, strategy (`app/ai/llm.py`), and search query rewriting (`app/rag/search/query_rewrite.py`, `SEARCH_QUERY_REWRITE`: the text of legal searches and of analysed case facts) | **SYNTHETIC SAMPLE DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`). Never client documents. Refused in production by code | Enabled by Arafath 2026-11-20 for the demo. Free-tier terms allow Google to use submitted data to improve its products, which is why only synthetic data is allowed. Chain position `gemini` then `gemini_fallback` (see "LLM fallback chain" below); mock output is labelled `ai_mock`; the answering provider and model are logged (`llm.answered`) and stored with the analysis/strategy |
+| Groq API (free tier, OpenAI-compatible, `https://api.groq.com/openai/v1`), model `GROQ_MODEL` (e.g. `openai/gpt-oss-120b`) | LLM fallback for case analysis, strategy, hearing reassessment and fact extraction (`LLM_FALLBACK_CHAIN` entry `groq`) | **SYNTHETIC / PUBLIC DATA ONLY** (`SAMPLE_DATA_NOT_REAL_LAW`, public statute text). Never client documents. Refused when `APP_ENV=production` by code | Requested by the project owner 2026-11-23 for the free demo; review checklist not completed. JSON mode (`json_object`) with the schema in the prompt, Pydantic validation, one repair |
+| Cerebras Inference API (free tier, OpenAI-compatible, `https://api.cerebras.ai/v1`), model `CEREBRAS_MODEL` | Same as Groq (`LLM_FALLBACK_CHAIN` entry `cerebras`) | **SYNTHETIC / PUBLIC DATA ONLY**. Refused in production by code | Requested by the project owner 2026-11-23; review checklist not completed |
+| OpenRouter (free models, OpenAI-compatible, `https://openrouter.ai/api/v1`), model `OPENROUTER_MODEL` (a `:free` model) | Same as Groq (`LLM_FALLBACK_CHAIN` entry `openrouter`) | **SYNTHETIC / PUBLIC DATA ONLY**. Free models may be served by third-party hosts that log or train on prompts. Refused in production by code | Requested by the project owner 2026-11-23; review checklist not completed |
 | (none yet) | External LLM for client data | None | No external provider has been reviewed or approved for client case data |
 | self-hosted `intfloat/multilingual-e5-small`, ONNX int8 (`EMBEDDING_PROVIDER=e5_small_onnx`, default) | Embeddings: legal knowledge base and queries (Render demo: inside the container) | Runs on our own hardware or the app server; no external data transfer | Chosen by the project owner 2026-11-22. Model files downloaded from Hugging Face at a pinned revision with pinned SHA-256 (build time only) |
 | self-hosted `intfloat/multilingual-e5-large` | Embeddings | Runs on our own hardware; no external data transfer | In use for the legal knowledge base (public statute text only) |
@@ -22,6 +25,18 @@ Last updated: 2026-11-21
 | Neon (managed Postgres, free plan) | Database for the Render demo | Synthetic only (demo lawyer, `SAMPLE_DATA_NOT_REAL_LAW` case, public statute text) | Directed by the project owner 2026-11-21 for the demo; review checklist not completed. RLS stays forced (see `deploy/neon_setup.md`) |
 | Backblaze B2 (S3-compatible, free tier) | Original uploaded documents for the Render demo | Synthetic only | Directed by the project owner 2026-11-21 for the demo; review checklist not completed |
 | Render (free web service) | Hosts the demo API container | Synthetic only (processes all demo requests in memory) | Directed by the project owner 2026-11-21 for the demo; review checklist not completed |
+
+### LLM fallback chain
+
+`LLM_FALLBACK_CHAIN` (e.g. `gemini,gemini_fallback,groq,cerebras,openrouter,mock`) orders the providers for
+analysis, strategy, hearing reassessment and fact extraction (`app/ai/llm.py`, `app/ai/structured.py`). A
+provider is skipped when it has no key/model or is not in `LLM_APPROVED_PROVIDERS`; the free-tier providers
+are refused in production. On 429, 503, a timeout, a transport error, or output that is still invalid after
+one repair attempt (the validation errors, by field path, are sent back once), the next provider is tried at
+once, without backoff, within the call's own budget (analysis 60 s, strategy 90 s) and the request deadline
+(105 s, below the frontend's 120 s). The mock comes last and is labelled `ai_mock`. Logged without prompt
+text: `llm.provider_failed` (provider, model, reason), `llm.answered` (provider, model, attempts, schema),
+`llm.fallback_to_mock` (reasons). The UI shows the answering provider, e.g. "ai (groq)".
 
 Until a provider passes the review below, the platform runs with the mock provider or with synthetic data only. Real client documents must not be uploaded to any environment that can reach an unapproved provider.
 

@@ -495,6 +495,7 @@ function toAnalysis(row: Api["AnalysisOut"]): CaseAnalysis {
     version: row.version,
     status: row.status,
     aiMock: row.origin === "ai_mock",
+    provider: row.provider,
     // Backend KEYWORD_ONLY_WARNING: semantic search was unavailable for this run.
     keywordOnly: row.warnings.some((warning) => warning.startsWith("keyword_only_fallback")),
     createdAt: row.created_at,
@@ -542,6 +543,7 @@ function toStrategy(row: Api["StrategyOut"]): StrategyTree {
     analysisVersion: row.analysis_version,
     status: row.status,
     aiMock: row.origin === "ai_mock",
+    provider: row.provider,
     createdAt: row.created_at,
     moves: row.root.children.map(toMove),
     missingInformation: row.missing_information,

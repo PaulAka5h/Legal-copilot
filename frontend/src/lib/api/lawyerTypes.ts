@@ -294,6 +294,8 @@ export type CaseAnalysis = {
   version: number;
   status: "succeeded" | "insufficient_information" | "failed";
   aiMock: boolean;
+  /** The provider that answered (gemini, groq, ...); "mock" for ai_mock output. */
+  provider: string;
   keywordOnly: boolean;
   createdAt: string;
   findings: Finding[];
@@ -324,6 +326,7 @@ export type StrategyTree = {
   analysisVersion: number;
   status: "succeeded" | "insufficient_information";
   aiMock: boolean;
+  provider: string;
   createdAt: string;
   moves: StrategyMove[];
   missingInformation: string[];
