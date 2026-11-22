@@ -30,8 +30,8 @@ BEGIN
   IF current_user <> 'app_owner' THEN
     RAISE EXCEPTION 'connect as app_owner, not %', current_user;
   END IF;
-  IF (SELECT version_num FROM public.alembic_version) <> '0021_e5_small_embeddings' THEN
-    RAISE EXCEPTION 'run alembic upgrade head (0021_e5_small_embeddings) first; database is at %',
+  IF (SELECT version_num FROM public.alembic_version) <> '0022_query_rewrite_cache' THEN
+    RAISE EXCEPTION 'run alembic upgrade head (0022_query_rewrite_cache) first; database is at %',
       (SELECT version_num FROM public.alembic_version);
   END IF;
 END $$;

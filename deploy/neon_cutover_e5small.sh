@@ -10,7 +10,7 @@
 # it is created as an active admin without a password), NOTE (approval note),
 # CORPUS_DIR (default deploy/corpus_e5small).
 #
-# Prerequisite: migration 0021 applied as app_owner (alembic upgrade head).
+# Prerequisite: migrations through 0022 applied as app_owner (alembic upgrade head).
 # What it does, in ONE transaction (deploy/neon_cutover_e5small.sql): stage the files in
 # temp tables, keep existing ids where the text is identical (saved analyses cite chunk
 # ids), replace the four legal_* tables, rebuild the 384-dim HNSW index, approve every

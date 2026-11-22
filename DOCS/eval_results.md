@@ -92,3 +92,40 @@ Gemini run above; `eval/retrieval.py --only-acts-in-db --unrelated 12`. SAMPLE_D
 - Calibration with rewriting: relevant best cosine >= 0.83, off-topic <= 0.81, threshold 0.82 (a narrow gap).
 - Stop rule (within 5 points of Gemini on Recall@10 and bn >= 0.85): bn met; Recall@10 mean 0.945 = 5.5 points
   below, met in 2 of 5 runs. Full-corpus work paused for a decision.
+
+## Full corpus (1,176 Acts), e5-small + rewriting (2026-11-22)
+
+`legal_copilot_full`: 39,587 chunks, all approved; `eval/retrieval.py --rewrite` (60 relevant queries: 30 fact
+patterns + 30 search questions, 15 bn; 24 off-topic), gemini-3.5-flash-lite rewrites, typed-query weight 2.0.
+**One run** (runs 2 and 3 were stopped: Gemini refused nearly every rewrite after the free-tier quota ran out, so
+they would have measured the plain query). Run 1: 114 Gemini requests incl. 28 retries after 429/503 (the eval
+retries, the app does not); 2 of 60 searches fell back to the plain query. SAMPLE_DATA_NOT_REAL_LAW.
+
+| View | n | Recall@5 | Recall@10 | MRR@10 |
+|---|---|---|---|---|
+| All relevant | 60 | 0.783 | **0.850** | 0.610 |
+| Bangla | 15 | 0.733 | 0.800 | 0.569 |
+| English | 45 | 0.800 | 0.867 | 0.624 |
+| Fact patterns | 30 | 0.700 | 0.733 | 0.520 |
+| Fact patterns, Bangla | 11 | 0.818 | 0.818 | 0.629 |
+| Search questions | 30 | 0.867 | 0.967 | 0.701 |
+| Search questions, Bangla | 4 | 0.500 | 0.750 | 0.406 |
+| The 33 queries of the 19-Act set | 33 | 0.788 | 0.848 | 0.622 |
+| Those 33, Bangla | 7 | 0.571 | 0.714 | 0.387 |
+
+- Same 33 queries: Recall@10 0.848 on the full corpus vs 0.945 on 19 Acts; the extra 1,157 Acts add near misses.
+- Typed-query weight in the fused rewrite (`ORIGINAL_QUERY_WEIGHT`), replaying one set of cached rewrites:
+
+  | Weight | All Recall@10 | Bangla Recall@10 | Bangla facts Recall@10 | MRR |
+  |---|---|---|---|---|
+  | 1.0 (before) | 0.783 | 0.600 | 0.455 | 0.529 |
+  | 1.5 | 0.833 | 0.800 | 0.727 | 0.556 |
+  | **2.0 (kept)** | **0.850** | **0.867** | 0.818 | 0.602 |
+  | 3.0 | 0.817 | 0.667 | 0.818 | 0.611 |
+  | typed query only | 0.800 | 0.667 | 0.818 | 0.600 |
+
+  At 1.0 a rewrite that drifts to another Act (e.g. a Press Act for a Bangla defamation fact) outvoted the typed
+  query's correct hits.
+- Calibration: lowest relevant best cosine 0.8065, highest off-topic 0.8208 (overlap). Threshold stays 0.82:
+  0 off-topic queries pass, 2 relevant fact patterns abstain. No recalibration.
+

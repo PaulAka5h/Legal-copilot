@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.rag.embed.worker import vector_literal
 from app.rag.search.errors import EmbeddingModelMismatch, EmbeddingUnavailable
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.search.query_rewrite import QueryRewriter, Rewrite
+from app.rag.search.query_rewrite import QueryRewriter, Rewrite, resolve_rewrites
 from app.rag.text import BANGLA_STOPWORDS, nfc
 
 # Tuned 2026-11-22 for e5-small on the 19-Act set (33 queries; DOCS/eval_results.md):
@@ -353,12 +353,17 @@ async def rewritten_search(
     k: int = 10,
     keyword_fallback: bool = True,
     fusion: FusionConfig = DEFAULT_FUSION,
+    case_id: UUID | None = None,
+    rewrite: Rewrite | None = None,
 ) -> tuple[SearchResult, Rewrite]:
     """hybrid_search for the query and its LLM variants, fused by canonical section (RRF).
 
-    One LLM call per new query (cached); without a usable LLM this is hybrid_search alone.
+    At most one LLM call per new query (cached in process and, with `case_id`, per
+    organization); `rewrite` skips that step (an analysis rewrites all its facts in one
+    batched call first). Without a usable LLM this is hybrid_search alone.
     """
-    rewrite = await asyncio.to_thread(rewriter.rewrite, query)
+    if rewrite is None:
+        (rewrite,), _ = await resolve_rewrites(session, rewriter, [query], case_id)
     results = [
         await hybrid_search(session, query=q, embedder=embedder, reranker=reranker, language=language,
                             incident_date=incident_date, k=VARIANT_POOL, keyword_fallback=keyword_fallback,

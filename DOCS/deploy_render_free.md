@@ -225,12 +225,13 @@ Run in this order. Stop at the first step that fails.
    export NEON_APP_OWNER_URL='postgresql://app_owner:<APP_OWNER_PW>@<HOST>/neondb?sslmode=require'
    deploy/neon_legal_backup.sh backup        # -> deploy/backups_neon/legal_<time>.sql
    ```
-3. **Migration 0021** (vector column of any dimension + one HNSW index per dimension;
-   keeps the Gemini vectors, so the running Render service keeps working):
+3. **Migrations 0021 + 0022** (0021: vector column of any dimension + one HNSW index per
+   dimension, keeps the Gemini vectors, so the running Render service keeps working;
+   0022: the per-organization query-rewrite cache table, unused by the old code):
    ```bash
    cd backend
    ALEMBIC_DATABASE_URL='postgresql+asyncpg://app_owner:<APP_OWNER_PW>@<HOST>/neondb?sslmode=require' \
-     uv run alembic upgrade head            # ... -> 0021_e5_small_embeddings
+     uv run alembic upgrade head            # ... -> 0022_query_rewrite_cache
    cd ..
    ```
 4. **Dry run** (does everything in one transaction, then ROLLBACK; TRUNCATE-based, so it
@@ -243,8 +244,8 @@ Run in this order. Stop at the first step that fails.
    `DRY RUN: every check passed`.
 5. **Real run** (same command with `DRY_RUN=0`, about 30 s; search waits on the table lock
    meanwhile). Expect `approved_acts 1176 | sections 35063 | chunks 39587 |
-   cited_chunks_no_longer_present 0 | rls_forced 37/37`, then `COMMITTED` and the database
-   size (rehearsal: 305 MB; Neon free limit 0.5 GB). From here until step 6 is live, the
+   cited_chunks_no_longer_present 0 | rls_forced 38/38`, then `COMMITTED` and the database
+   size (rehearsal: 307 MB; Neon free limit 0.5 GB). From here until step 6 is live, the
    old Render service answers search with `503 EMBEDDING_MODEL_MISMATCH` (it embeds with
    Gemini); keep this window short.
 6. **Deploy**: merge `feat/full-corpus-e5small` into `deploy/render` and push. Render
@@ -256,7 +257,8 @@ Run in this order. Stop at the first step that fails.
 
 ### Rollback
 
-No migration downgrade is needed: the pre-cutover code reads the 0021 column fine
+No migration downgrade is needed: the pre-cutover code reads the 0021 column fine and
+ignores the 0022 table
 (rehearsed: old image + restored data passes the smoke test).
 
 1. Render → the service → **Events** → previous deploy → **Rollback** (or push the previous
@@ -322,20 +324,20 @@ The e5 demo dump from before the switch is kept as `backups/demo_data_e5_2026112
 
 ## Measured results: full corpus on e5-small (local, 2026-11-22)
 
-Neon-like Postgres 17 (non-superuser owner, app_owner without BYPASSRLS, RLS forced 37/37)
-holding the demo dump, then `alembic upgrade head` (0020, 0021) and the cutover above;
+Neon-like Postgres 17 (non-superuser owner, app_owner without BYPASSRLS, RLS forced 38/38)
+holding the demo dump, then `alembic upgrade head` (0020, 0021, 0022) and the cutover above;
 `backend/Dockerfile.render` image in `docker run --memory=512m --memory-swap=512m`, local
 MinIO, real Gemini LLM. Peak = cgroup `memory.peak`.
 
 | Check | Result |
 |---|---|
-| Image | 1.77 GB on disk, 456 MB compressed (was 1.49 GB / 364 MB); model files 129 MB, SHA-256 checked at build and at load |
-| Database after cutover | 305 MB (`pg_database_size`; was 24 MB). Dry run leaves 25 MB (no bloat); re-running the cutover stays at 306 MB |
+| Image | 1.77 GB on disk, about 456-478 MB compressed (was 1.49 GB / 364 MB); model files 129 MB, SHA-256 checked at build and at load |
+| Database after cutover | 305-307 MB (`pg_database_size`; was 24 MB). Dry run leaves no bloat; re-running the cutover (also after 0022) stays at 306-307 MB |
 | Cutover time | about 30 s (load, HNSW build, 1,176 approvals, checks) |
-| Idle after start (query model preloaded) | 265 MiB, start-up peak 337 MiB |
+| Idle after start (query model preloaded) | 264-269 MiB, start-up peak 335-345 MiB |
 | Smoke test (search + analysis + OCR upload) | ALL PASSED; search top hit NI Act s.138 (cosine 0.88) |
-| 2-3 searches + 1 analysis + 1 OCR upload at once | **peak 417 MiB** |
-| Stress: 2 searches + 1 analysis + 2 OCR uploads at once | **peak 440 MiB** (501 MiB before `EXTRACTION_MAX_CONCURRENT=1`; the second upload waits about 1 s) |
+| 2-3 searches + 1 analysis + 1 OCR upload at once | **peak 392-438 MiB** (4 runs; with batched, cached rewrites) |
+| Stress: 2 searches + 1 analysis + 2 OCR uploads at once | **peak 426-455 MiB** (4 runs, one above 450; no OOM; 501 MiB before `EXTRACTION_MAX_CONCURRENT=1`; the second upload waits about 1 s) |
 | Search latency | 50-180 ms without rewriting (embedding about 5 ms); 3-7 s with rewriting: the Gemini call dominates |
 
 What it took to fit 512 MB:

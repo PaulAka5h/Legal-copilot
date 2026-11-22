@@ -408,8 +408,9 @@ Lawyers create the client's portal login directly; invitations are optional.
 
 ## e5-small ONNX embeddings, fusion tuning, LLM query rewriting (2026-11-22, branch feat/full-corpus-e5small)
 
-Not deployed; Render and Neon unchanged. Full-corpus rollout paused: see DOCS/eval_results.md (Recall@10 mean
-0.945 vs Gemini 1.000 on the 19-Act set, 5.5 points; the agreed bar was 5).
+Not deployed; Render and Neon unchanged until the cutover is approved (DOCS/deploy_render_free.md section 8).
+The 19-Act result (Recall@10 mean 0.945 vs Gemini 1.000) was accepted on 2026-11-22; full-corpus Recall@10 is
+0.850 (one run, DOCS/eval_results.md).
 
 - `EMBEDDING_PROVIDER=e5_small_onnx` (new default): intfloat/multilingual-e5-small, ONNX int8 (U8U8 dynamic
   quantization of the authors' ONNX export, pinned revision and SHA-256; `scripts/export_e5_small_onnx.py`,
@@ -422,18 +423,39 @@ Not deployed; Render and Neon unchanged. Full-corpus rollout paused: see DOCS/ev
 - Search: weighted RRF k=30, dense weight 1.5 (was k=60, 1:1). `rewritten_search`: the configured LLM rewrites
   each new query once into Bangla + English + keywords (`SEARCH_QUERY_REWRITE`, 8 s timeout, cached); on failure
   the plain query is searched (`rewrite_failed` warning). Analysis rewrites each fact statement (one call per
-  fact); the audit event records `query_rewrite_llm_calls`. With the mock LLM nothing changes.
+  fact; now batched, see below); the audit event records `query_rewrite_llm_calls`. With the mock LLM nothing changes.
 - Embedding: `python -m app.rag.embed run` (several processes share the queue), export/import carry and check
   `model_sha256`; `scripts/kaggle_embed_e5small.py` runs the same int8 model on CPU (a GPU cannot run the int8
   kernels and fp32 would give different vectors).
 - Chunking counts tokens with the bundled XLM-R tokenizer (same ids as e5-large; it keeps a trailing-whitespace
   token, so ~5% of long sections split one word differently from older chunks).
 - Local data: `legal_copilot_full` holds all 1,176 Acts (35,063 sections, 39,587 chunks, 0 rejects, 187 sections
-  repealed by title marker), all embedded with e5-small (27.6 min, 4 workers x 2 threads), versions still
-  pending (not approved). 319 MB on disk. `legal_copilot_test` re-embedded with e5-small.
+  repealed by title marker), all embedded with e5-small (27.6 min, 4 workers x 2 threads), all 1,176 versions
+  approved by the project owner's admin account ("Bulk bdlaws import; spot-checked 5 Acts (138, 952, 180, 1054,
+  1124) against source; not individually reviewed by a lawyer"). 319 MB on disk. `legal_copilot_test` re-embedded with e5-small.
 - Tests: `tests/rag/test_e5_small_and_rewrite.py` (19); the suite runs with `TEST_EMBEDDING_PROVIDER`
   (default e5_small_onnx). `psycopg2-binary` is in the dev group. Same failures as before the change
   (MinIO not configured locally, fact/recovery/security tests that need it).
-- Open: peak RAM in a 512 MB container (search + analysis + OCR) is not measured; Dockerfile.render does not
-  bundle the model yet; effective dates stay NULL (the scraper has `enactment_date` only, which is not a
-  commencement date).
+- 512 MB container, Neon cutover tooling and render.yaml: DOCS/deploy_render_free.md sections 8 and "Measured
+  results". Effective dates stay NULL (the scraper has `enactment_date` only, which is not a commencement date).
+
+### Gemini budget for query rewriting (2026-11-22)
+
+- An analysis rewrites all its fact statements in ONE call (a JSON list, `BATCH_SYSTEM`, 20 s timeout
+  `ANALYSIS_REWRITE_TIMEOUT_SECONDS`; more than 40 new statements make one call per 40). A search-box query still
+  makes one call (8 s timeout).
+- Cache: in-process LRU (1,024) plus migration `0022_query_rewrite_cache`: `public.query_rewrites`
+  (organization_id, sha256 of prompt version + LLM model + NFC query, variants jsonb). The query itself is not
+  stored; rows are per organization, forced RLS, read/insert for the organization's active owners and lawyers
+  only, no update/delete grant. Cache errors never break a search (savepoint, logged).
+- Failure: no retry. A 429/503 or timeout skips rewriting for `SEARCH_REWRITE_COOLDOWN_SECONDS` (60 s), so later
+  searches answer at once with the plain query and the `rewrite_failed` warning; logged as
+  `search.query_rewrite_failed` / `search.query_rewrite_skipped` (no query text).
+- Gemini calls (embeddings are local): 1 search = 1 (0 if the query was seen before in the organization);
+  1 analysis with 10 facts = 1 rewrite + 1 analysis = 2 (was 11); 1 hearing reassessment = 0-1 rewrite (only
+  new or changed facts) + 1 analysis + 1 strategy = 2-3 (was 12). Analysis and strategy calls keep their own
+  retry policy (`app.ai.structured`: 429/503 retried 2/5/10 s, then `GEMINI_FALLBACK_MODEL`), so a refusing
+  provider can add up to 7 requests per call.
+- Tests: `tests/rag/test_rewrite_budget.py` (13 cases: 10 facts = 1 call, cached facts = 0, wrong item count falls
+  back, no retry + cooldown on 429/503/timeout, invalid output does not pause, NFC key, and the stored cache is
+  reused by a new process and not visible to another organization). Full suite: no new failures.

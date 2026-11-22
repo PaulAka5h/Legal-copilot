@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     # the mock LLM, or if the call fails, the query is searched as typed.
     search_query_rewrite: bool = True
     search_rewrite_timeout_seconds: float = Field(default=8, gt=0, le=60)
+    # An analysis rewrites all its fact statements in ONE call (a JSON list): longer output.
+    analysis_rewrite_timeout_seconds: float = Field(default=20, gt=0, le=60)
+    # After a 429/503 or timeout, skip rewriting (plain query, no wait) for this long.
+    search_rewrite_cooldown_seconds: float = Field(default=60, ge=0, le=3600)
 
     # Analysis abstains when no retrieved provision reaches this cosine similarity (mock
     # reranker). Unset = the calibrated default for the embedding model, because

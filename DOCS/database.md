@@ -984,3 +984,14 @@ The sections above are the original design. This section is what the migrations 
 - `app.complete_password_change(password_hash, keep_session_id)` (SECURITY DEFINER): for `app.current_user_id()` only; sets the hash, clears the flag, revokes the user's other sessions.
 - `app.accept_case_invitation`: a profile whose login still has a lawyer-set temporary password (`must_change_password`) can accept; the invitation sets the client's own password, clears the flag, revokes the login's earlier sessions and unused reset tokens, and adds case membership. A login whose client already chose a password is refused (never overwritten).
 - Linking a new client to a case is a plain `case_members` insert under the existing `case_members_create` policy (lead lawyer).
+
+### 17.9 Query-rewrite cache (0022)
+
+- `query_rewrites (organization_id, cache_key, variants, created_at)`, primary key `(organization_id, cache_key)`.
+  `cache_key` = sha256 hex of prompt version + LLM model + NFC query; `variants` = jsonb array of 1-3 LLM
+  rewrites (Bangla, English, keywords). The query text itself is not stored, but the variants paraphrase it
+  (case facts too), so the table is organization data.
+- RLS (forced): SELECT and INSERT for `app.is_org_lawyer(organization_id)` (active owners and lawyers); no
+  UPDATE or DELETE grant, no client policy. `app.ensure_owner_policies()` is called for app_owner (0019).
+- Written by `app.rag.search.query_rewrite.resolve_rewrites` after a successful LLM rewrite (`ON CONFLICT DO
+  NOTHING`, inside a savepoint); read before any LLM call.

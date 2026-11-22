@@ -24,8 +24,9 @@ router = APIRouter(prefix="/api/v1/lawyer", tags=["legal-research"])
         "fused with weighted Reciprocal Rank Fusion (k=30, vector weight 1.5), then a reranker "
         "(mock by default). The query is also rewritten once by the configured LLM into Bangla, "
         "English and legal keywords, and those result lists are fused too (one LLM call per new "
-        "query, cached; without an LLM, or if it fails, the query is searched as typed and the "
-        "`rewrite_failed` warning says so). Only approved, current statute versions are searched. "
+        "query, cached in memory and per organization; without an LLM, or if it fails, the query "
+        "is searched as typed at once, without retrying, and the `rewrite_failed` warning says so). "
+        "Only approved, current statute versions are searched. "
         "With `incident_date`, sections not in force on that date are excluded; sections whose "
         "status is unknown are included and flagged. Bangla and English versions of the same "
         "section are merged and returned as alternates. Results are retrieved sources, not "
@@ -61,6 +62,7 @@ async def search_case_research(
         language=payload.language,
         incident_date=payload.incident_date,
         k=payload.k,
+        case_id=access.case_id,
     )
     await write_audit_event(
         session,

@@ -216,7 +216,7 @@ async def evaluate(only_acts_in_db: bool = False, unrelated_n: int | None = None
                                 "retries_429_503": llm.retries, "failed": llm.failures,
                                 "searches_fell_back_to_plain_query": rewrites_failed,
                                 "searches": searches, "analysis_fact_runs": analysis_queries,
-                                "llm_calls_per_new_search": 1, "llm_calls_per_analysis": "1 per fact (statement only)"}
+                                "llm_calls_per_new_search": 1, "llm_calls_per_analysis": "1 per analysis (all fact statements batched)"}
     return out
 
 

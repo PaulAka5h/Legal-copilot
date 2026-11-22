@@ -34,7 +34,7 @@ from app.database import user_transaction
 from app.facts import repository as facts_repo
 from app.facts.service import fact_set_hash
 from app.rag.search.providers import QueryEmbedder, Reranker
-from app.rag.search.query_rewrite import QueryRewriter, get_query_rewriter
+from app.rag.search.query_rewrite import QueryRewriter, get_query_rewriter, resolve_rewrites
 from app.rag.search.retrieval import KEYWORD_ONLY_WARNING, hybrid_search, rewritten_search
 from app.rag.quote_locator import segment_hint
 from app.rag.text import BANGLA_STOPWORDS, normalize_for_match
@@ -97,20 +97,24 @@ def fact_queries(fact: FactInput) -> list[str]:
 
 async def _retrieve(session, facts, embedder, reranker, incident_date, language,
                     keyword_fallback: bool = True, rewriter: QueryRewriter | None = None,
-                    llm_calls: list[int] | None = None) -> tuple[list[dict], list[str]]:
-    """Searches per fact; the statement itself is also LLM-rewritten (at most one call per fact,
-    cached) when a rewriter is given. `llm_calls`, if given, counts the rewrite calls."""
+                    llm_calls: list[int] | None = None, case_id: UUID | None = None) -> tuple[list[dict], list[str]]:
+    """Searches per fact; with a rewriter, every fact statement is also LLM-rewritten, all of
+    them in ONE batched call (cached statements cost nothing; app.rag.search.query_rewrite).
+    `llm_calls`, if given, counts the rewrite calls."""
     by_chunk: dict[UUID, dict[str, Any]] = {}
     warnings: set[str] = set()
-    for fact in facts:
+    rewrites = []
+    if rewriter is not None:
+        rewrites, calls = await resolve_rewrites(session, rewriter, [fact_queries(f)[0] for f in facts], case_id)
+        if llm_calls is not None:
+            llm_calls[0] += calls
+    for position, fact in enumerate(facts):
         for index, query in enumerate(fact_queries(fact)):
             if index == 0 and rewriter is not None:
-                result, rewrite = await rewritten_search(
+                result, _ = await rewritten_search(
                     session, query=query, rewriter=rewriter, embedder=embedder, reranker=reranker,
                     language=language, incident_date=incident_date, k=HITS_PER_QUERY,
-                    keyword_fallback=keyword_fallback)
-                if llm_calls is not None:
-                    llm_calls[0] += rewrite.llm_called
+                    keyword_fallback=keyword_fallback, rewrite=rewrites[position])
             else:
                 result = await hybrid_search(session, query=query, embedder=embedder, reranker=reranker,
                                              language=language, incident_date=incident_date, k=HITS_PER_QUERY,
@@ -212,7 +216,7 @@ async def run_analysis(
         rewrite_calls = [0]
         ranked, retrieval_warnings = await _retrieve(session, facts, embedder, reranker, incident_date, language,
                                                      rewriter=rewriter or get_query_rewriter(),
-                                                     llm_calls=rewrite_calls)
+                                                     llm_calls=rewrite_calls, case_id=case_id)
         precedents = await judgments_available(session)
     using_reranker = reranker.name != "mock"
     threshold = thresholds.min_rerank_score if using_reranker else thresholds.min_similarity
