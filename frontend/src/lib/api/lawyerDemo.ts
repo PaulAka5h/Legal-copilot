@@ -58,7 +58,8 @@ function demoProgress(matter: DemoMatter): ProgressStage[] {
     held: closed || caseHearings.some((hearing) => hearing.date <= today),
     closed,
   };
-  const firstOpen = STAGE_IDS.find((id) => !reached[id]);
+  // "Case closed" is never current: it is complete only when the case is closed.
+  const firstOpen = STAGE_IDS.find((id) => id !== "closed" && !reached[id]);
   return STAGE_IDS.map((id) => ({
     id,
     state: reached[id] ? "complete" : id === firstOpen ? "current" : "upcoming",

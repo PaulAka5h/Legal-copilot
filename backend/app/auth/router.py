@@ -101,7 +101,9 @@ async def register(
     summary="Create a session",
     description=(
         "Verifies account status and Argon2id password, enforces account lockout "
-        "and per-IP throttling, then sets a hashed server-side session cookie."
+        "and per-IP throttling, then sets a hashed server-side session cookie. With "
+        "expected_role, an account of another role gets the same generic 401 as a "
+        "wrong password and no session."
     ),
     response_model=UserResponse,
     responses=problem_responses(400, 401, 403, 422, 429, 503),
@@ -203,6 +205,24 @@ async def login(
                 ip_address=ip_address,
                 user_agent=request.headers.get("user-agent", "")[:512] or None,
                 request_id=getattr(request.state, "request_id", None),
+            )
+        raise _invalid_credentials()
+
+    if payload.expected_role is not None and login_user["user_role"] != payload.expected_role:
+        # Wrong portal: same response as a wrong password (no account enumeration), no
+        # session. Not counted toward lockout; the password was correct.
+        async with user_transaction(session_factory, login_user["user_id"]) as session:
+            await write_audit_event(
+                session,
+                action="auth.login_wrong_portal",
+                actor_user_id=login_user["user_id"],
+                actor_role=login_user["user_role"],
+                object_type="user",
+                object_id=login_user["user_id"],
+                ip_address=ip_address,
+                user_agent=request.headers.get("user-agent", "")[:512] or None,
+                request_id=getattr(request.state, "request_id", None),
+                details={"expected_role": payload.expected_role},
             )
         raise _invalid_credentials()
 

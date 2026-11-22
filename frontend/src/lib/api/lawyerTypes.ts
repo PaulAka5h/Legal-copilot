@@ -48,6 +48,7 @@ export type LawyerProfileDetail = {
   chamberName: string;
   organizationName: string;
   canEditOrganization: boolean;
+  showContactToClients: boolean;
 };
 
 export type ProfileInput = {
@@ -56,6 +57,7 @@ export type ProfileInput = {
   preferredLanguage: "en" | "bn";
   chamberName: string;
   organizationName: string;
+  showContactToClients: boolean;
 };
 
 export type HearingNoteVersion = {
@@ -131,6 +133,8 @@ export type CaseDocument = {
   size: number;
   mimeType: string;
   status: DocumentStatus;
+  /** Shared with the client (lawyer's choice, default off). */
+  sharedWithClient?: boolean;
 };
 
 export type NewDocumentInput = {

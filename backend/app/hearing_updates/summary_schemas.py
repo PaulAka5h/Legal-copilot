@@ -65,3 +65,35 @@ class SummaryVersionOut(BaseModel):
     sections: list[SummarySection]
     created_by: UUID
     created_at: datetime
+
+
+class PdfMetaRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(min_length=1, max_length=100)
+    value: str = Field(max_length=500)
+
+
+class PdfItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=20000)
+    tags: list[str] = Field(default_factory=list, max_length=4, description="Statement type and verification labels")
+    source: str | None = Field(default=None, max_length=1000)
+
+
+class PdfSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    heading: str = Field(min_length=1, max_length=200)
+    items: list[PdfItem] = Field(max_length=100)
+
+
+class SummaryPdfRequest(BaseModel):
+    """The summary as the lawyer sees it, with labels already in the lawyer's language."""
+
+    model_config = ConfigDict(extra="forbid")
+    eyebrow: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=300)
+    meta: list[PdfMetaRow] = Field(default_factory=list, max_length=12)
+    notice: str | None = Field(default=None, max_length=2000, description="Not-legal-advice / draft notice")
+    sections: list[PdfSection] = Field(max_length=10)
+    footer: str | None = Field(default=None, max_length=2000)
+    filename: str = Field(min_length=1, max_length=150, pattern=r"^[A-Za-z0-9._-]+\.pdf$")

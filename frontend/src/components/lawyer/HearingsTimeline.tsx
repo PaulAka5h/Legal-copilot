@@ -223,6 +223,7 @@ export function HearingsTimeline({
                       language={language}
                       copy={copy}
                       onRetry={onRetry}
+                      share={locked || demo ? undefined : { caseId, tab: "hearings" }}
                     />
                     {!locked ? (
                       <HearingUpload

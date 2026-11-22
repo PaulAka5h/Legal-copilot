@@ -64,6 +64,18 @@ export function ProfileForm({
           {detail.canEditOrganization ? null : <span className="field-hint">{copy.organizationOwnerOnly}</span>}
         </label>
       </div>
+      <label className="mt-4 flex items-start gap-2 text-[12px]">
+        <input
+          type="checkbox"
+          name="showContactToClients"
+          defaultChecked={detail.showContactToClients}
+          className="mt-0.5"
+        />
+        <span>
+          <b>{copy.showContact}</b>
+          <span className="field-hint">{copy.showContactHint}</span>
+        </span>
+      </label>
       <div className="confirm-actions">
         <Link className="ghost-button" href="/lawyer/settings">
           {copy.cancel}

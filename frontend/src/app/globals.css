@@ -2285,7 +2285,9 @@
   font-size: 7px;
 }
 
-.document-row button {
+.document-row button,
+.document-row a.document-download {
+  text-decoration: none;
   padding: 7px;
   display: flex;
   align-items: center;
@@ -2463,7 +2465,8 @@
     grid-template-columns: 35px 1fr auto;
   }
 
-  .document-row button span {
+  .document-row button span,
+  .document-row a.document-download span {
     display: none;
   }
 

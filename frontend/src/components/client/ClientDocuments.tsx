@@ -36,14 +36,26 @@ export function ClientDocuments({
                 {pick(document.size, language)} · {pick(document.sharedOn, language)}
               </small>
             </span>
-            <button
-              type="button"
-              onClick={() => setToast(notice)}
-              aria-label={`${download} ${pick(document.name, language)}`}
-            >
-              <Icon name="download" size={18} />
-              <span>{download}</span>
-            </button>
+            {document.href ? (
+              <a
+                href={document.href}
+                download
+                className="document-download"
+                aria-label={`${download} ${pick(document.name, language)}`}
+              >
+                <Icon name="download" size={18} />
+                <span>{download}</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setToast(notice)}
+                aria-label={`${download} ${pick(document.name, language)}`}
+              >
+                <Icon name="download" size={18} />
+                <span>{download}</span>
+              </button>
+            )}
           </div>
         ))}
       </div>

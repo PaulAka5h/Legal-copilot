@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, Path, Request
+from fastapi import APIRouter, Body, HTTPException, Path
 from sqlalchemy import text
 
 from app.auth.dependencies import ClientDep, UserSessionDep
@@ -11,18 +11,35 @@ from app.client_portal.schemas import (
     ClientDocumentResponse,
     ClientNotificationResponse,
     ClientHearingResponse,
-    DownloadUrlResponse,
     ClientTaskResponse,
     ClientUpdateResponse,
 )
 from app.cases.schemas import ClientTaskPatch
-from app.auth.repository import write_audit_event
-from app.auth.dependencies import request_ip
 
 router = APIRouter(
     prefix="/api/v1/client",
     tags=["client-portal"],
 )
+
+
+async def _require_open_case_member(session, case_id: UUID, user_id: UUID) -> None:
+    """An empty list is only returned to a client member of the open case; anyone else gets 404."""
+    access = await session.scalar(
+        text(
+            """
+            SELECT EXISTS (
+              SELECT 1 FROM public.cases c
+              JOIN public.case_members cm ON cm.case_id = c.id
+              WHERE c.id = :case_id AND c.status = 'open'
+                AND cm.user_id = :user_id
+                AND cm.status = 'active' AND cm.role = 'client'
+            )
+            """
+        ),
+        {"case_id": case_id, "user_id": user_id},
+    )
+    if not access:
+        raise HTTPException(status_code=404, detail="Case was not found.")
 
 
 @router.get(
@@ -93,23 +110,7 @@ async def list_client_updates(
     )
     rows = result.mappings().all()
     if not rows:
-        # RLS and membership determine whether this is a 404 or an empty result.
-        access = await session.scalar(
-            text(
-                """
-                SELECT EXISTS (
-                  SELECT 1 FROM public.cases c
-                  JOIN public.case_members cm ON cm.case_id = c.id
-                  WHERE c.id = :case_id AND c.status = 'open'
-                    AND cm.user_id = :user_id
-                    AND cm.status = 'active' AND cm.role = 'client'
-                )
-                """
-            ),
-            {"case_id": case_id, "user_id": user.id},
-        )
-        if not access:
-            raise HTTPException(status_code=404, detail="Case was not found.")
+        await _require_open_case_member(session, case_id, user.id)
     return [
         ClientUpdateResponse.model_validate(dict(row))
         for row in rows
@@ -181,7 +182,7 @@ async def client_tasks(
 @router.get(
     "/cases/{case_id}/documents",
     summary="List shared client documents",
-    description="Lists currently shared documents for an open client case.",
+    description="Lists documents the lawyer shared (not revoked) for an open client case; 404 for other cases.",
     response_model=list[ClientDocumentResponse],
     responses=problem_responses(401, 403, 404, 422, 503),
 )
@@ -201,10 +202,10 @@ async def client_documents(
         ),
         {"case_id": case_id},
     )
-    return [
-        ClientDocumentResponse.model_validate(dict(row))
-        for row in result.mappings().all()
-    ]
+    rows = result.mappings().all()
+    if not rows:
+        await _require_open_case_member(session, case_id, user.id)
+    return [ClientDocumentResponse.model_validate(dict(row)) for row in rows]
 
 @router.patch(
     "/tasks/{task_id}",
@@ -265,45 +266,3 @@ async def client_notifications(
         ClientNotificationResponse.model_validate(dict(row))
         for row in result.mappings().all()
     ]
-
-
-@router.get(
-    "/documents/{document_id}/download-url",
-    summary="Get a client document download URL",
-    description="Performs full authorization before returning the storage stub.",
-    response_model=DownloadUrlResponse,
-    responses=problem_responses(401, 403, 404, 422, 503),
-)
-async def client_document_download(
-    request: Request,
-    document_id: Annotated[UUID, Path(description="Document ID")],
-    user: ClientDep,
-    session: UserSessionDep,
-) -> DownloadUrlResponse:
-    row = (
-        await session.execute(
-            text(
-                """
-                SELECT id
-                FROM public.client_shared_documents
-                WHERE document_id = :document_id
-                  AND revoked_at IS NULL
-                """
-            ),
-            {"document_id": document_id},
-        )
-    ).mappings().one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Document was not found.")
-    await write_audit_event(
-        session,
-        action="client.document_download_requested",
-        actor_user_id=user.id,
-        actor_role=user.role,
-        object_type="shared_document",
-        object_id=row["id"],
-        ip_address=request_ip(request),
-        user_agent=request.headers.get("user-agent", "")[:512] or None,
-        request_id=getattr(request.state, "request_id", None),
-    )
-    return DownloadUrlResponse(status="NOT_CONFIGURED")

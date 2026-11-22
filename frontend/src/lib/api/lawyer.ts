@@ -4,7 +4,9 @@ import {
   BackendError,
   backend,
   backendOrNull,
+  backendRequest,
   caseUrl,
+  sessionToken,
   withDemoFallback,
   type Api,
 } from "@/lib/api/backendClient";
@@ -48,6 +50,7 @@ import type {
   SummarySection,
   Verification,
 } from "@/lib/api/lawyerTypes";
+import { dictionaries, format, numberFor, pick, type Language } from "@/lib/i18n";
 import { getSession } from "@/lib/session";
 import { currentKeyNotes } from "@/lib/summaryNotes";
 
@@ -384,10 +387,14 @@ function toDocument(row: Api["DocumentResponse"], hearings: Hearing[]): CaseDocu
 
 export async function listDocuments(caseId: string, hearings: Hearing[]): Promise<CaseDocument[]> {
   return withDemoFallback(
-    async () =>
-      (await backend<Api["DocumentResponse"][]>(caseUrl(caseId, "/documents"))).map((row) =>
-        toDocument(row, hearings),
-      ),
+    async () => {
+      const [rows, shares] = await Promise.all([
+        backend<Api["DocumentResponse"][]>(caseUrl(caseId, "/documents")),
+        backend<Api["SharedDocumentOut"][]>(`/api/v1/cases/${encodeURIComponent(caseId)}/shared-documents`),
+      ]);
+      const shared = new Set(shares.filter((row) => !row.revoked_at).map((row) => row.document_id));
+      return rows.map((row) => ({ ...toDocument(row, hearings), sharedWithClient: shared.has(row.id) }));
+    },
     () => demo.listDocuments(caseId),
   );
 }
@@ -420,6 +427,17 @@ export async function uploadDocument(
         size: file.size,
         mimeType: file.type,
       }),
+  );
+}
+
+/** Share a document with the client or stop sharing it (audit-logged by the backend). */
+export async function setDocumentShared(caseId: string, documentId: string, share: boolean): Promise<ActionResult> {
+  if (!caseId || !documentId) return { status: "error", message: "document" };
+  const base = `/api/v1/cases/${encodeURIComponent(caseId)}/shared-documents`;
+  return mutate(() =>
+    share
+      ? backend(base, { method: "POST", json: { document_id: documentId } satisfies Api["SharedDocumentCreate"] })
+      : backend(`${base}/${encodeURIComponent(documentId)}`, { method: "DELETE" }),
   );
 }
 
@@ -869,8 +887,57 @@ export async function approveHearingSummary(caseId: string, hearingId: string): 
   );
 }
 
-export function downloadHearingSummary(): { status: "NOT_CONFIGURED" } {
-  return { status: "NOT_CONFIGURED" };
+/**
+ * The summary as a PDF rendered by the backend (embedded Noto Sans / Noto Sans
+ * Bengali). The content is exactly what the lawyer sees, with each claim's
+ * statement type, verification and source; returns null when there is no
+ * summary, NOT_CONFIGURED in demo mode.
+ */
+export async function downloadHearingSummaryPdf(
+  caseId: string,
+  hearingId: string,
+  language: Language,
+): Promise<{ pdf: Response } | null | "NOT_CONFIGURED"> {
+  const token = await sessionToken();
+  if (!token) return "NOT_CONFIGURED";
+  const summary = await getHearingSummary(caseId, hearingId);
+  if (!summary) return null;
+  const copy = dictionaries[language].hearingSummary;
+  const statusLabels = dictionaries[language].caseDetail.summary;
+  const profile = await getLawyerProfile();
+  const body: Api["SummaryPdfRequest"] = {
+    eyebrow: copy.eyebrow,
+    title: `${format(copy.title, { number: numberFor(language, summary.hearingNumber) })} · ${format(
+      copy.versionLabel,
+      { number: numberFor(language, summary.version) },
+    )}`,
+    meta: [
+      { label: copy.matter, value: pick(summary.matterTitle, language) },
+      { label: copy.client, value: pick(summary.clientName, language) },
+      { label: copy.court, value: pick(summary.court, language) },
+      { label: copy.hearingDate, value: summary.hearingDate },
+      { label: copy.preparedBy, value: pick(profile.name, language) },
+      { label: copy.status, value: statusLabels[summary.status] },
+    ],
+    notice: copy.notLegalAdvice,
+    sections: summary.sections.map((section) => ({
+      heading: copy.sections[section.id],
+      items: section.claims.map((claim) => ({
+        text: pick(claim.text, language) || claim.text.en || claim.text.bn,
+        tags: [copy.claimTypes[claim.type], claim.verification === "verified" ? copy.verified : copy.unverified],
+        source: `${copy.source}: ${pick(claim.source, language) || claim.source.en}`,
+      })),
+    })),
+    footer: copy.notLegalAdvice,
+    filename: `hearing-${summary.hearingNumber}-summary-v${summary.version}.pdf`,
+  };
+  const pdf = await backendRequest(
+    caseUrl(caseId, `/hearings/${encodeURIComponent(hearingId)}/summary-pdf`),
+    { method: "POST", json: body, token },
+  );
+  if (pdf.status === 404) return null;
+  if (!pdf.ok) throw new BackendError(pdf.status, pdf.statusText);
+  return { pdf };
 }
 
 // ---------- clients ----------
@@ -1070,6 +1137,7 @@ function toProfileDetail(row: Api["LawyerProfileResponse"]): LawyerProfileDetail
     chamberName: row.chamber_name ?? "",
     organizationName: row.organization_name,
     canEditOrganization: row.can_edit_organization,
+    showContactToClients: row.show_contact_to_clients,
   };
 }
 
@@ -1100,6 +1168,7 @@ export async function updateLawyerProfile(input: ProfileInput, canEditOrganizati
             phone: phone || null,
             preferred_language: input.preferredLanguage,
             chamber_name: input.chamberName.trim() || null,
+            show_contact_to_clients: input.showContactToClients,
             ...(canEditOrganization ? { organization_name: organizationName } : {}),
           } satisfies Api["LawyerProfilePatch"],
         });

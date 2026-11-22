@@ -510,3 +510,30 @@ Migration `0024_fact_quote_span` (run on Neon before deploying): `case_fact_sour
   offers a prefilled "Edit fact" form (statement + exact quote) that saves a new version and re-checks the quote.
 - Tests: `backend/tests/test_fact_quotes.py` (6), including the brief in `tests/data/`: 13/13 facts confirmable.
   `tests/rag/test_search.py::test_recall_at_10_on_20_act_queries` (0.933 < 0.95) fails without these changes too.
+
+## Portal fixes: PDFs, shared documents, lawyer card, role-specific login (2026-11-23, branch fix/ui-bugs)
+
+Migration `0025_client_docs_lawyer_contact` (run on Neon before deploying): `lawyer_profiles.show_contact_to_clients`
+(default true) and two SECURITY DEFINER functions for clients: `app.client_case_lawyer_contact(case)` and
+`app.client_shared_document_file(document)` (open case + active client membership checked inside).
+
+- Summary PDF: was a NOT_CONFIGURED stub on both sides. Now rendered by the backend (`app/pdf/render.py`, PyMuPDF
+  HTML with HarfBuzz shaping) with embedded Noto Sans + Noto Sans Bengali (OFL, `app/assets/fonts/`); Bangla runs
+  use the embedded font explicitly. Lawyer: `POST .../hearings/{id}/summary-pdf` (case members, claim labels and
+  sources kept, audit `hearing_summary.downloaded`). Client: `GET /api/v1/client/updates/{id}/pdf` (published
+  updates of open cases only, audit `client.summary_downloaded`). Content-Disposition attachment, ASCII + UTF-8 name.
+- Shared documents: the client list existed but nothing could share safely (no audit, no CSRF check, any document
+  id accepted). New `/api/v1/cases/{id}/shared-documents` GET/POST/DELETE (document must belong to the case; revoke
+  keeps the row; audit `client_document.shared/unshared`). Client download proxied by the API
+  (`/api/v1/client/documents/{id}/download`, audit `client.document_downloaded`); another client gets 404, and the
+  client documents list now 404s for non-members. Lawyer UI: Share with client / Stop sharing per ready document.
+- Lawyer card: `GET /api/v1/client/cases/{id}/lawyer` (lead lawyer's name; firm, phone, email only when filled in
+  and the lawyer allows it, profile checkbox). The dashboard shows only filled fields.
+- Login: the portals called the same login, and the backend picked the role. `expected_role` is sent by each
+  portal; another role gets the same generic 401 as a wrong password, no session, no lockout count, audit
+  `auth.login_wrong_portal`. `src/proxy.ts` resolves the role from `/api/v1/me` and keeps /lawyer/* for lawyers
+  and /client/* for clients (pages, route handlers, server actions); if the backend is unreachable it defers to
+  the layouts' session check.
+- Progress: "Case closed" is complete only for a closed case and otherwise upcoming (never current).
+- Tests: `backend/tests/test_portal_fixes.py` (4), progress cases in `test_ui_bug_fixes.py`,
+  `frontend/tests/routeAccess.test.mjs` (5).
