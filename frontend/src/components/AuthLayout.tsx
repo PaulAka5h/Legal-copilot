@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
+import { BrandLogo } from "./BrandLogo";
 import { dictionaries, type Language } from "@/lib/i18n";
 import { Icon } from "./Icon";
 import { LanguageToggle } from "./LanguageToggle";
-import { Logo } from "./Logo";
 
 export function AuthLayout({
   type,
@@ -20,7 +20,7 @@ export function AuthLayout({
   return (
     <div className={`auth-page language-${language}`} lang={language}>
       <aside className="auth-brand">
-        <Logo language={language} light />
+        <BrandLogo light priority />
         <div className="brand-message">
           <span className="eyebrow light">{copy.builtFor}</span>
           <h1>
@@ -37,7 +37,7 @@ export function AuthLayout({
       </aside>
       <section className="auth-form-side">
         <div className="mobile-auth-logo">
-          <Logo language={language} />
+          <BrandLogo priority />
         </div>
         <LanguageToggle language={language} />
         <div className="auth-card">

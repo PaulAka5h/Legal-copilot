@@ -2,8 +2,7 @@ export type Language = "en" | "bn";
 
 const en = {
   brand: {
-    name: "Legal Copilot",
-    tagline: "Legal workspace",
+    name: "PokkhoAI",
   },
   common: {
     languageEn: "EN",
@@ -496,7 +495,7 @@ const en = {
   },
   entry: {
     eyebrow: "Legal workspace",
-    title: "Log in to Legal Copilot",
+    title: "Log in to PokkhoAI",
     intro: "Choose how you want to continue.",
     lawyer: "Log in as a lawyer",
     newLawyer: "New lawyer?",
@@ -678,8 +677,7 @@ export type Dictionary = Widen<typeof en>;
 
 const bn: Dictionary = {
   brand: {
-    name: "Legal Copilot",
-    tagline: "আইনি সহায়ক",
+    name: "PokkhoAI",
   },
   common: {
     languageEn: "EN",
@@ -1174,7 +1172,7 @@ const bn: Dictionary = {
   },
   entry: {
     eyebrow: "আইনি কর্মক্ষেত্র",
-    title: "Legal Copilot-এ লগ ইন করুন",
+    title: "PokkhoAI-এ লগ ইন করুন",
     intro: "চালিয়ে যেতে আপনার অ্যাকাউন্টের ধরন বেছে নিন।",
     lawyer: "আইনজীবী হিসেবে লগ ইন করুন",
     newLawyer: "নতুন আইনজীবী?",
@@ -1370,5 +1368,5 @@ export function format(template: string, values: Record<string, string | number>
 
 export function titleFor(language: Language, key: keyof Dictionary["meta"]) {
   const copy = dictionaries[language];
-  return `${copy.meta[key]} | ${copy.brand.name}`;
+  return copy.meta[key];
 }

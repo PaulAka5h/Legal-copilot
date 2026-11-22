@@ -9,7 +9,7 @@
 
 @theme {
   --color-green: #00984a;
-  --color-deep: #076732;
+  --color-deep: #2b5641;
   --color-mid: #028b45;
   --color-ink: #141a1d;
   --color-text: #212529;
@@ -83,23 +83,10 @@
 }
 
 .logo-mark {
-  width: 39px;
+  width: 42px;
   height: 42px;
-  display: grid;
-  place-items: center;
-  background: var(--color-deep);
-  color: #fff;
-  border-radius: 6px 6px 12px 6px;
-  transform: rotate(-2deg);
-}
-
-.logo-mark span {
-  font-family: var(--font-cormorant), serif;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.5px;
-  transform: rotate(2deg);
+  flex: none;
+  object-fit: contain;
 }
 
 .logo-copy {
@@ -115,25 +102,16 @@
   letter-spacing: -0.2px;
 }
 
-.logo-copy small {
-  margin-top: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-muted);
-  letter-spacing: 0.06em;
+.brand-logo {
+  position: relative;
+  z-index: 1;
+  width: 180px;
+  height: auto;
 }
 
-.logo-light {
-  color: #fff;
-}
-
-.logo-light .logo-mark {
-  background: #fff;
-  color: var(--color-deep);
-}
-
-.logo-light .logo-copy small {
-  color: rgba(255, 255, 255, 0.68);
+/* White version of the logo for the dark-green brand panel. */
+.brand-logo-light {
+  filter: brightness(0) invert(1);
 }
 
 .auth-page {
@@ -543,14 +521,18 @@
 
   .auth-form-side {
     min-height: 100vh;
-    padding: 90px 24px 40px;
+    padding: 120px 24px 40px;
   }
 
   .mobile-auth-logo {
     position: absolute;
     display: block;
-    top: 24px;
+    top: 16px;
     left: 24px;
+  }
+
+  .mobile-auth-logo .brand-logo {
+    width: 84px;
   }
 
   .language-pill {
@@ -698,7 +680,7 @@
 }
 
 .topbar > .logo .logo-mark {
-  width: 34px;
+  width: 37px;
   height: 37px;
 }
 
@@ -1725,7 +1707,7 @@
   color: #fff;
   background: var(--color-deep);
   border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(7, 103, 50, 0.17);
+  box-shadow: 0 10px 30px rgba(43, 86, 65, 0.17);
   animation: card-in 0.4s both;
 }
 
