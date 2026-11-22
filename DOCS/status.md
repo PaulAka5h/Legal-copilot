@@ -557,8 +557,10 @@ No migration.
   invalid output gets one repair request with the validation errors (field paths only), then the next
   provider; then the labelled mock. Logs: `llm.provider_failed`, `llm.answered`, `llm.fallback_to_mock`
   with `reason` and `schema` (the log formatter dropped any reason field before; now allow-listed).
-- Provider chain (`LLM_FALLBACK_CHAIN`, `app/ai/llm.py` `resolve_chain`): gemini, gemini_fallback, groq,
-  cerebras, openrouter (OpenAI-compatible, JSON mode + schema in the prompt), mock. Skips providers without a
+- Provider chain (`LLM_FALLBACK_CHAIN=gemini,gemini_fallback,groq,openrouter,mock`, `app/ai/llm.py`
+  `resolve_chain`): Groq and OpenRouter are OpenAI-compatible (JSON mode + schema in the prompt). Cerebras was
+  dropped (needs payment). `OPENROUTER_MODEL=nvidia/nemotron-3.5-super-vl:free` (free, JSON mode +
+  structured outputs, checked 2026-11-23); render.yaml declares the chain and the keys (set in the dashboard). Skips providers without a
   key/model or approval; free tiers refused in production. UI shows "ai (provider)". DOCS/providers.md updated.
 - Tests: `tests/test_llm_chain.py` (mocked HTTP per provider, order, skips, failover, logs),
   `tests/test_strategy_llm.py` (flat/nest, Gemini path with repair and 3 plies, the root cause, skip logging,

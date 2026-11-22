@@ -2,7 +2,7 @@
 
 Used by case analysis, strategy, and hearing reassessment. Candidates are the
 providers of the chain in order (app.ai.llm.resolve_chain: e.g. gemini,
-gemini_fallback, groq, cerebras, openrouter), or one provider and its
+gemini_fallback, groq, openrouter), or one provider and its
 GEMINI_FALLBACK_MODEL. For each candidate:
 - 429 / 503, a timeout, or any other HTTP/transport error: move on to the next
   provider at once (no backoff; free tiers recover slower than a request waits);

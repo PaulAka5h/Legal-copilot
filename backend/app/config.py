@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # Second Gemini model, tried after GEMINI_MODEL keeps answering 429/503 (or fails);
     # e.g. gemini-2.5-flash. Unset = straight to the labelled mock.
     gemini_fallback_model: str | None = Field(default=None, min_length=1)
-    # Ordered LLM chain, e.g. "gemini,gemini_fallback,groq,cerebras,openrouter,mock". Providers
+    # Ordered LLM chain, e.g. "gemini,gemini_fallback,groq,openrouter,mock". Providers
     # without a key, or not in LLM_APPROVED_PROVIDERS, are skipped. Unset: LLM_PROVIDER (then
     # gemini_fallback for gemini), then mock. 429/503/timeouts/invalid output move to the next
     # provider at once, within the request deadline (app.ai.structured).
@@ -79,11 +79,8 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr | None = None
     groq_model: str = "openai/gpt-oss-120b"
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    cerebras_api_key: SecretStr | None = None
-    cerebras_model: str | None = None
-    cerebras_base_url: str = "https://api.cerebras.ai/v1"
     openrouter_api_key: SecretStr | None = None
-    openrouter_model: str | None = None  # a ":free" model
+    openrouter_model: str | None = None  # a ":free" model, e.g. nvidia/nemotron-3.5-super-vl:free
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Embeddings. e5_small_onnx (default): intfloat/multilingual-e5-small, ONNX int8, on this

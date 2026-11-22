@@ -9,13 +9,13 @@
   refused in production. JSON schema output, temperature 0. The key is sent in
   a header, never in the URL.
 
-- groq, cerebras, openrouter: free-tier OpenAI-compatible APIs, approved for
+- groq, openrouter: free-tier OpenAI-compatible APIs, approved for
   SYNTHETIC/PUBLIC DATA ONLY and refused in production (same rule as Gemini).
   JSON mode (response_format json_object) plus the JSON schema in the system
   prompt; the caller validates with Pydantic.
 
 Fallback chain (resolve_chain): LLM_FALLBACK_CHAIN, e.g.
-"gemini,gemini_fallback,groq,cerebras,openrouter,mock". A provider without a key or
+"gemini,gemini_fallback,groq,openrouter,mock". A provider without a key or
 model, or not in LLM_APPROVED_PROVIDERS, is skipped; "mock" (or no usable provider)
 ends in the deterministic mock, labelled ai_mock, when mock is allowed here.
 
@@ -47,7 +47,7 @@ class StructuredLLM(Protocol):
 
 @dataclass
 class OpenAICompatibleLLM:
-    """Chat-completions API (Ollama, Groq, Cerebras, OpenRouter).
+    """Chat-completions API (Ollama, Groq, OpenRouter).
 
     json_mode "json_schema" sends the schema as response_format (local Ollama);
     "json_object" asks for a JSON object and puts the schema in the system prompt,
@@ -210,8 +210,8 @@ def strict_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ provider chain
-CHAIN_PROVIDERS = ("gemini", "gemini_fallback", "groq", "cerebras", "openrouter", "ollama", "mock")
-HOSTED_FREE_TIER = {"groq", "cerebras", "openrouter"}
+CHAIN_PROVIDERS = ("gemini", "gemini_fallback", "groq", "openrouter", "ollama", "mock")
+HOSTED_FREE_TIER = {"groq", "openrouter"}
 
 
 @dataclass
