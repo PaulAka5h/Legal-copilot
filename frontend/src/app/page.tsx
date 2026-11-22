@@ -9,7 +9,8 @@ import { getSession, hasSessionCookie } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const language = await getLanguage();
-  return { title: titleFor(language, "home") };
+  // The root layout's title template does not apply to a page in the same segment.
+  return { title: { absolute: `${titleFor(language, "home")} · PokkhoAI` } };
 }
 
 export default async function Home() {
@@ -37,7 +38,7 @@ export default async function Home() {
           </Link>
           <p className="m-0 pl-1 text-[11px] text-[#6c757d]">
             {entry.newLawyer}{" "}
-            <Link className="font-bold text-[#076732]" href="/lawyer/signup">
+            <Link className="font-bold text-[color:var(--brand-700)]" href="/lawyer/signup">
               {entry.createAccount}
             </Link>
           </p>

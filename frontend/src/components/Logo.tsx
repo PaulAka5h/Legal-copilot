@@ -1,16 +1,14 @@
+import Image from "next/image";
 import { dictionaries, type Language } from "@/lib/i18n";
 
-export function Logo({ language, light = false }: { language: Language; light?: boolean }) {
+export function Logo({ language }: { language: Language }) {
   const copy = dictionaries[language].brand;
 
   return (
-    <span className={`logo ${light ? "logo-light" : ""}`}>
-      <span className="logo-mark">
-        <span>LC</span>
-      </span>
+    <span className="logo">
+      <Image className="logo-mark" src="/brand/pokkhoai-icon.png" alt="" width={42} height={42} />
       <span className="logo-copy">
         <b>{copy.name}</b>
-        <small>{copy.tagline}</small>
       </span>
     </span>
   );
