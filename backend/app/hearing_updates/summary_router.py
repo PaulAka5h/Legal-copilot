@@ -6,11 +6,13 @@ The client never reads this table (Rule 8): the client sees only the published
 client update.
 """
 
+import asyncio
 import json
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from fastapi.responses import Response
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -18,7 +20,8 @@ from app.auth.dependencies import LawyerDep, UserSessionDep, request_ip, require
 from app.auth.repository import write_audit_event
 from app.cases.dependencies import CaseAccessDep
 from app.errors import problem_responses
-from app.hearing_updates.summary_schemas import SummaryVersionCreate, SummaryVersionOut
+from app.hearing_updates.summary_schemas import SummaryPdfRequest, SummaryVersionCreate, SummaryVersionOut
+from app.pdf.render import Document, Item, Section, attachment_headers, render_pdf
 
 router = APIRouter(prefix="/api/v1/lawyer/cases/{case_id}/hearings/{hearing_id}", tags=["hearings"])
 
@@ -105,3 +108,43 @@ async def save_summary_version(
         details={"hearing_id": str(hearing_id), "version": row["version"]},
     )
     return SummaryVersionOut.model_validate(dict(row))
+
+
+@router.post(
+    "/summary-pdf",
+    summary="Download the hearing summary as PDF",
+    description=(
+        "Renders the summary the lawyer is viewing as a PDF on the server (embedded Noto Sans and Noto Sans "
+        "Bengali, shaped Bangla), returned as an attachment. Every claim keeps its statement type, verification "
+        "and source labels. Case members only; audit-logged. Nothing is stored."
+    ),
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}, "description": "The PDF (attachment)"},
+               **problem_responses(401, 403, 404, 422)},
+    dependencies=[Depends(require_same_origin)],
+)
+async def summary_pdf(
+    request: Request,
+    access: CaseAccessDep,
+    user: LawyerDep,
+    session: UserSessionDep,
+    hearing_id: HearingIdPath,
+    payload: Annotated[SummaryPdfRequest, Body(description="Summary content and labels")],
+) -> Response:
+    found = await session.scalar(text("SELECT 1 FROM public.hearings WHERE id = :h AND case_id = :c"),
+                                 {"h": hearing_id, "c": access.case_id})
+    if found is None:
+        raise HTTPException(status_code=404, detail="Hearing was not found.")
+    pdf = await asyncio.to_thread(render_pdf, Document(
+        eyebrow=payload.eyebrow, title=payload.title,
+        meta=[(row.label, row.value) for row in payload.meta], notice=payload.notice, footer=payload.footer,
+        sections=[Section(section.heading, [Item(item.text, item.tags, item.source) for item in section.items])
+                  for section in payload.sections],
+    ))
+    await write_audit_event(
+        session, action="hearing_summary.downloaded", actor_user_id=user.id, actor_role=user.role,
+        object_type="hearing", object_id=hearing_id, case_id=access.case_id, ip_address=request_ip(request),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return Response(content=pdf, media_type="application/pdf", headers=attachment_headers(payload.filename))

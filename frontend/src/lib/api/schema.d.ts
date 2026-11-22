@@ -75,7 +75,7 @@ export interface paths {
         put?: never;
         /**
          * Create a session
-         * @description Verifies account status and Argon2id password, enforces account lockout and per-IP throttling, then sets a hashed server-side session cookie.
+         * @description Verifies account status and Argon2id password, enforces account lockout and per-IP throttling, then sets a hashed server-side session cookie. With expected_role, an account of another role gets the same generic 401 as a wrong password and no session.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -663,7 +663,7 @@ export interface paths {
         head?: never;
         /**
          * Update the lawyer profile
-         * @description Updates name, phone, preferred language, chamber name and (owners only) the organization name. Email cannot be changed here. Audit-logged with the changed field names.
+         * @description Updates name, phone, preferred language, chamber name, whether clients see the contact card details, and (owners only) the organization name. Email cannot be changed here. Audit-logged with the changed field names.
          */
         patch: operations["patch_profile_api_v1_lawyer_profile_patch"];
         trace?: never;
@@ -757,7 +757,7 @@ export interface paths {
         };
         /**
          * List shared client documents
-         * @description Lists currently shared documents for an open client case.
+         * @description Lists documents the lawyer shared (not revoked) for an open client case; 404 for other cases.
          */
         get: operations["client_documents_api_v1_client_cases__case_id__documents_get"];
         put?: never;
@@ -808,7 +808,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/client/documents/{document_id}/download-url": {
+    "/api/v1/client/cases/{case_id}/lawyer": {
         parameters: {
             query?: never;
             header?: never;
@@ -816,10 +816,50 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a client document download URL
-         * @description Performs full authorization before returning the storage stub.
+         * Get the lawyer contact card
+         * @description The lead lawyer's name and, when the lawyer allows it in their profile, firm, phone and email. Empty fields are null. Open cases with client membership only.
          */
-        get: operations["client_document_download_api_v1_client_documents__document_id__download_url_get"];
+        get: operations["lawyer_contact_api_v1_client_cases__case_id__lawyer_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client/documents/{document_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a shared document
+         * @description Streams a document the lawyer shared with this client (attachment). Revoked, unshared, deleted or another client's documents are 404. Audit-logged.
+         */
+        get: operations["download_document_api_v1_client_documents__document_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client/updates/{update_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an approved summary as PDF
+         * @description Server-generated PDF (embedded Noto Sans / Noto Sans Bengali) of a summary the lawyer approved and published on an open case of this client. Drafts, withdrawn updates and other clients' updates are 404. Audit-logged.
+         */
+        get: operations["update_pdf_api_v1_client_updates__update_id__pdf_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -862,26 +902,6 @@ export interface paths {
          * @description Lawyer approval: makes an update visible to active client members of an open case. Audit-logged.
          */
         post: operations["publish_client_update_api_v1_client_updates__update_id__publish_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cases/{case_id}/shared-documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Share a document with a client
-         * @description Shares an existing document UUID with active client membership.
-         */
-        post: operations["share_document_api_v1_cases__case_id__shared_documents_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -943,6 +963,50 @@ export interface paths {
          */
         post: operations["withdraw_client_update_api_v1_client_updates__update_id__withdraw_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/shared-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List documents shared with the client
+         * @description Every share record of the case, including revoked ones (history).
+         */
+        get: operations["list_shared_api_v1_cases__case_id__shared_documents_get"];
+        put?: never;
+        /**
+         * Share a document with the client
+         * @description Shares one document of this case with its client members (open cases only). The document must belong to the case and not be deleted or infected. Requires can_edit_case. Audit-logged.
+         */
+        post: operations["share_api_v1_cases__case_id__shared_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{case_id}/shared-documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop sharing a document with the client
+         * @description Revokes the share at once (the record is kept with revoked_at). Requires can_edit_case. Audit-logged.
+         */
+        delete: operations["revoke_api_v1_cases__case_id__shared_documents__document_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1446,6 +1510,26 @@ export interface paths {
          * @description Saves the lawyer's edit as a new version (never overwrites). base_version must be the latest version (1 when none was saved), otherwise 409: the summary changed since it was opened. Closed cases are read-only. Audit-logged.
          */
         post: operations["save_summary_version_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lawyer/cases/{case_id}/hearings/{hearing_id}/summary-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download the hearing summary as PDF
+         * @description Renders the summary the lawyer is viewing as a PDF on the server (embedded Noto Sans and Noto Sans Bengali, shaped Bangla), returned as an attachment. Every claim keeps its statement type, verification and source labels. Case members only; audit-logged. Nothing is stored.
+         */
+        post: operations["summary_pdf_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_pdf_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2241,14 +2325,6 @@ export interface components {
             /** Processed At */
             processed_at: string | null;
         };
-        /** DownloadUrlResponse */
-        DownloadUrlResponse: {
-            /**
-             * Status
-             * @constant
-             */
-            status: "NOT_CONFIGURED";
-        };
         /** ElementOut */
         ElementOut: {
             /** Element */
@@ -2748,6 +2824,17 @@ export interface components {
              */
             occurred_at: string;
         };
+        /** LawyerContact */
+        LawyerContact: {
+            /** Full Name */
+            full_name: string;
+            /** Firm */
+            firm: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Email */
+            email: string | null;
+        };
         /** LawyerOverviewResponse */
         LawyerOverviewResponse: {
             /** Active Cases */
@@ -2771,6 +2858,8 @@ export interface components {
             chamber_name?: string | null;
             /** Organization Name */
             organization_name?: string | null;
+            /** Show Contact To Clients */
+            show_contact_to_clients?: boolean | null;
         };
         /** LawyerProfileResponse */
         LawyerProfileResponse: {
@@ -2794,6 +2883,11 @@ export interface components {
              * @description True for organization owners
              */
             can_edit_organization: boolean;
+            /**
+             * Show Contact To Clients
+             * @description The lawyer allows firm, phone and email on their clients' dashboards (name is always shown)
+             */
+            show_contact_to_clients: boolean;
         };
         /** LawyerTeamMemberResponse */
         LawyerTeamMemberResponse: {
@@ -2838,6 +2932,11 @@ export interface components {
             mfa_code?: string | null;
             /** Mfa Recovery Code */
             mfa_recovery_code?: string | null;
+            /**
+             * Expected Role
+             * @description The portal the user signs in from. An account of another role gets the same generic invalid-credentials error as a wrong password, and no session is created.
+             */
+            expected_role?: ("lawyer" | "client") | null;
         };
         /** MessageResponse */
         MessageResponse: {
@@ -2970,6 +3069,32 @@ export interface components {
             token: string;
             /** New Password */
             new_password: string;
+        };
+        /** PdfItem */
+        PdfItem: {
+            /** Text */
+            text: string;
+            /**
+             * Tags
+             * @description Statement type and verification labels
+             */
+            tags?: string[];
+            /** Source */
+            source?: string | null;
+        };
+        /** PdfMetaRow */
+        PdfMetaRow: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** PdfSection */
+        PdfSection: {
+            /** Heading */
+            heading: string;
+            /** Items */
+            items: components["schemas"]["PdfItem"][];
         };
         /** Problem */
         Problem: {
@@ -3213,8 +3338,31 @@ export interface components {
              * Format: uuid
              */
             document_id: string;
+            /**
+             * Display Name
+             * @description Name the client sees; defaults to the original filename
+             */
+            display_name?: string | null;
+        };
+        /** SharedDocumentOut */
+        SharedDocumentOut: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
             /** Display Name */
             display_name: string;
+            /**
+             * Shared At
+             * Format: date-time
+             */
+            shared_at: string;
+            /**
+             * Revoked At
+             * @description Set when sharing was turned off; the client no longer sees it
+             */
+            revoked_at: string | null;
         };
         /** StrategyComparison */
         StrategyComparison: {
@@ -3406,6 +3554,29 @@ export interface components {
             text: components["schemas"]["LocalizedText"];
             /** @description Where the claim comes from (Rule 2) */
             source: components["schemas"]["LocalizedText"];
+        };
+        /**
+         * SummaryPdfRequest
+         * @description The summary as the lawyer sees it, with labels already in the lawyer's language.
+         */
+        SummaryPdfRequest: {
+            /** Eyebrow */
+            eyebrow: string;
+            /** Title */
+            title: string;
+            /** Meta */
+            meta?: components["schemas"]["PdfMetaRow"][];
+            /**
+             * Notice
+             * @description Not-legal-advice / draft notice
+             */
+            notice?: string | null;
+            /** Sections */
+            sections: components["schemas"]["PdfSection"][];
+            /** Footer */
+            footer?: string | null;
+            /** Filename */
+            filename: string;
         };
         /** SummarySection */
         SummarySection: {
@@ -9945,13 +10116,13 @@ export interface operations {
             };
         };
     };
-    client_document_download_api_v1_client_documents__document_id__download_url_get: {
+    lawyer_contact_api_v1_client_cases__case_id__lawyer_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Document ID */
-                document_id: string;
+                /** @description Case ID */
+                case_id: string;
             };
             cookie?: never;
         };
@@ -9963,7 +10134,130 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DownloadUrlResponse"];
+                    "application/json": components["schemas"]["LawyerContact"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    download_document_api_v1_client_documents__document_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document ID */
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description Unauthorized */
@@ -10068,6 +10362,132 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    update_pdf_api_v1_client_updates__update_id__pdf_get: {
+        parameters: {
+            query?: {
+                /** @description Label language */
+                language?: "en" | "bn";
+            };
+            header?: never;
+            path: {
+                /** @description Client update ID */
+                update_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF file (attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10264,160 +10684,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__cases__schemas__ClientUpdateResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /**
-                         * Type
-                         * @default about:blank
-                         */
-                        type: string;
-                        /** Title */
-                        title: string;
-                        /** Status */
-                        status: number;
-                        /** Detail */
-                        detail: string;
-                        /** Instance */
-                        instance: string;
-                        /** Request Id */
-                        request_id: string;
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /**
-                         * Type
-                         * @default about:blank
-                         */
-                        type: string;
-                        /** Title */
-                        title: string;
-                        /** Status */
-                        status: number;
-                        /** Detail */
-                        detail: string;
-                        /** Instance */
-                        instance: string;
-                        /** Request Id */
-                        request_id: string;
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /**
-                         * Type
-                         * @default about:blank
-                         */
-                        type: string;
-                        /** Title */
-                        title: string;
-                        /** Status */
-                        status: number;
-                        /** Detail */
-                        detail: string;
-                        /** Instance */
-                        instance: string;
-                        /** Request Id */
-                        request_id: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /**
-                         * Type
-                         * @default about:blank
-                         */
-                        type: string;
-                        /** Title */
-                        title: string;
-                        /** Status */
-                        status: number;
-                        /** Detail */
-                        detail: string;
-                        /** Instance */
-                        instance: string;
-                        /** Request Id */
-                        request_id: string;
-                    };
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /**
-                         * Type
-                         * @default about:blank
-                         */
-                        type: string;
-                        /** Title */
-                        title: string;
-                        /** Status */
-                        status: number;
-                        /** Detail */
-                        detail: string;
-                        /** Instance */
-                        instance: string;
-                        /** Request Id */
-                        request_id: string;
-                    };
-                };
-            };
-        };
-    };
-    share_document_api_v1_cases__case_id__shared_documents_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Case ID */
-                case_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SharedDocumentCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
             /** @description Unauthorized */
@@ -10976,6 +11242,406 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    list_shared_api_v1_cases__case_id__shared_documents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDocumentOut"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    share_api_v1_cases__case_id__shared_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedDocumentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDocumentOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    revoke_api_v1_cases__case_id__shared_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document ID */
+                document_id: string;
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDocumentOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14993,6 +15659,135 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    summary_pdf_api_v1_lawyer_cases__case_id__hearings__hearing_id__summary_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Hearing ID */
+                hearing_id: string;
+                /** @description Case ID */
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SummaryPdfRequest"];
+            };
+        };
+        responses: {
+            /** @description The PDF (attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @default about:blank
+                         */
+                        type: string;
+                        /** Title */
+                        title: string;
+                        /** Status */
+                        status: number;
+                        /** Detail */
+                        detail: string;
+                        /** Instance */
+                        instance: string;
+                        /** Request Id */
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

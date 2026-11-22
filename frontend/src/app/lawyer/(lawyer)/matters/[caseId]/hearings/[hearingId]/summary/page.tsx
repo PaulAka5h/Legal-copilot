@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   approveHearingSummaryAction,
-  downloadHearingSummaryAction,
   saveHearingSummaryAction,
 } from "@/app/lawyer/actions";
 import { Icon } from "@/components/Icon";
@@ -442,14 +441,10 @@ export default async function HearingSummaryPage({
                   </button>
                 </form>
               )}
-              <form action={downloadHearingSummaryAction} id="download">
-                <input type="hidden" name="caseId" value={caseId} />
-                <input type="hidden" name="hearingId" value={hearingId} />
-                <button className="outline-button small" type="submit">
-                  <Icon name="download" size={14} />
-                  {copy.download}
-                </button>
-              </form>
+              <a className="outline-button small" id="download" href={`${path}/pdf`} download>
+                <Icon name="download" size={14} />
+                {copy.download}
+              </a>
             </>
           )}
         </div>

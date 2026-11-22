@@ -66,15 +66,27 @@ services:
       - key: LLM_PROVIDER
         value: gemini
       - key: LLM_APPROVED_PROVIDERS
-        value: gemini,mock
+        value: gemini,groq,openrouter,mock
+      # Analysis/strategy/hearing/fact chain: on 429/503/timeout/invalid output the next provider is
+      # tried at once; providers without a key are skipped; the labelled mock comes last.
+      - key: LLM_FALLBACK_CHAIN
+        value: gemini,gemini_fallback,groq,openrouter,mock
       - key: GEMINI_API_KEY
         sync: false               # analysis and search query rewriting (search still works without it)
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
-      # Tried after GEMINI_MODEL keeps answering 429/503 (3 retries: 2 s, 5 s, 10 s), before
-      # the labelled mock. gemini-2.5-flash answers 404 for new keys (checked 2026-11-21).
+      # gemini-2.5-flash answers 404 for new keys (checked 2026-11-21).
       - key: GEMINI_FALLBACK_MODEL
         value: gemini-3.5-flash
+      # Free tiers, synthetic/public data only (DOCS/providers.md). Keys set in the Render dashboard.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: nvidia/nemotron-3.5-super-vl:free   # free, JSON mode + structured outputs (checked 2026-11-23)
 
       # --- Documents ---
       - key: MALWARE_SCANNER

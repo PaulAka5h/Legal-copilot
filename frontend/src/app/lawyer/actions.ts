@@ -11,7 +11,6 @@ import {
   editFact,
   createClient,
   createMatter,
-  downloadHearingSummary,
   editMatter,
   extractFacts,
   getDocumentStatus,
@@ -23,6 +22,7 @@ import {
   runAnalysis,
   runStrategy,
   saveHearingSummaryVersion,
+  setDocumentShared,
   setMatterArchived,
   submitHearingUpdate,
   updateLawyerProfile,
@@ -240,23 +240,6 @@ export async function approveHearingSummaryAction(formData: FormData) {
   redirect(`${path}?approved=1#share`);
 }
 
-export async function downloadHearingSummaryAction(formData: FormData) {
-  const session = await getSession();
-  if (!session || session.role !== "lawyer") redirect("/lawyer/login");
-
-  const caseId = String(formData.get("caseId") ?? "");
-  const hearingId = String(formData.get("hearingId") ?? "");
-  const path = summaryPath(caseId, hearingId);
-  const summary = await getHearingSummary(caseId, hearingId);
-
-  if (!caseId || !hearingId || !summary) {
-    redirect(`/lawyer/matters/${encodeURIComponent(caseId)}`);
-  }
-
-  const download = downloadHearingSummary();
-  redirect(`${path}?download=${download.status}#download`);
-}
-
 /** Upload one file (FormData: caseId, hearingId, file). */
 export async function uploadDocumentAction(
   formData: FormData,
@@ -338,6 +321,16 @@ export async function confirmFactAction(formData: FormData) {
     redirect(`${path}?${query.toString()}#fact-${encodeURIComponent(factId)}`);
   }
   finish(caseId, "facts", result);
+}
+
+/** Share a document with the client or stop sharing it; back to the tab the lawyer was on. */
+export async function toggleDocumentShareAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  const tab = field(formData, "tab") === "documents" ? "documents" : "hearings";
+  const result = await setDocumentShared(caseId, field(formData, "documentId"), formData.get("share") === "1");
+  revalidatePath("/client/dashboard");
+  finish(caseId, tab, result);
 }
 
 export async function editFactAction(formData: FormData) {
@@ -454,6 +447,7 @@ export async function updateProfileAction(formData: FormData) {
       preferredLanguage: language,
       chamberName: String(formData.get("chamberName") ?? ""),
       organizationName: String(formData.get("organizationName") ?? ""),
+      showContactToClients: formData.get("showContactToClients") === "on",
     },
     // Decided by the server (owner role), never by the form.
     Boolean((await getLawyerProfileDetail())?.canEditOrganization),

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { usedDemoData } from "@/lib/api/backendClient";
-import { downloadClientSummaryAction } from "@/app/client/actions";
 import { Icon } from "@/components/Icon";
 import { PageHeading } from "@/components/lawyer/PageHeading";
 import { getApprovedSummary } from "@/lib/api/client";
@@ -74,13 +73,15 @@ export default async function ClientSummaryPage({
           </p>
         </aside>
 
-        <form action={downloadClientSummaryAction} id="download" className="mt-4">
-          <input type="hidden" name="summaryId" value={summary.id} />
-          <button className="outline-button small" type="submit">
-            <Icon name="download" size={14} />
-            {copy.clientSummaries.download}
-          </button>
-        </form>
+        <a
+          className="outline-button small mt-4 inline-flex"
+          id="download"
+          href={`/client/summaries/${encodeURIComponent(summary.id)}/pdf`}
+          download
+        >
+          <Icon name="download" size={14} />
+          {copy.clientSummaries.download}
+        </a>
 
         {download === "NOT_CONFIGURED" ? (
           <p

@@ -294,6 +294,7 @@ export function MatterWorkspace({
                     language={language}
                     copy={copy}
                     onRetry={handleRetry}
+                    share={locked || demo ? undefined : { caseId, tab: "documents" }}
                   />
 
                   {!locked ? (

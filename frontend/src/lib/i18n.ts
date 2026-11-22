@@ -233,6 +233,9 @@ const en = {
     documentsSub: "All files grouped by hearing",
     documentsCount: "{count} files",
     documentsEmpty: "No documents for this hearing yet.",
+    shareWithClient: "Share with client",
+    sharedWithClient: "Shared with client",
+    stopSharing: "Stop sharing",
     documentsMock:
       "SAMPLE_DATA_NOT_REAL_LAW — Mock documents. Files are not stored or uploaded.",
     sizeKb: "{value} KB",
@@ -283,6 +286,7 @@ const en = {
       draftNotice:
         "AI output is a draft for your review. It is not legal advice and does not predict the outcome.",
       mockOrigin: "Mock AI output (ai_mock) — not from a model",
+      aiOrigin: "ai ({provider})",
       done: "Saved.",
       failed: "The request failed: {detail}",
       quoteNotFound:
@@ -460,6 +464,8 @@ const en = {
     chamber: "Chamber name",
     organization: "Organization name",
     organizationOwnerOnly: "Only the organization owner can change this.",
+    showContact: "Show my firm, phone and email to my clients",
+    showContactHint: "Your clients see your name on their dashboard. With this on, they also see the firm, phone and email you filled in.",
     saveProfile: "Save profile",
     cancel: "Cancel",
     profileSaved: "Profile saved.",
@@ -904,6 +910,9 @@ const bn: Dictionary = {
     documentsSub: "শুনানি অনুযায়ী সব ফাইল",
     documentsCount: "{count}টি ফাইল",
     documentsEmpty: "এই শুনানির জন্য এখনো কোনো নথি নেই।",
+    shareWithClient: "মক্কেলের সাথে শেয়ার করুন",
+    sharedWithClient: "মক্কেলের সাথে শেয়ার করা",
+    stopSharing: "শেয়ার বন্ধ করুন",
     documentsMock:
       "SAMPLE_DATA_NOT_REAL_LAW — মক নথি। ফাইল কোথাও সংরক্ষণ বা আপলোড করা হয় না।",
     sizeKb: "{value} কেবি",
@@ -954,6 +963,7 @@ const bn: Dictionary = {
       draftNotice:
         "এআই-এর ফলাফল আপনার পর্যালোচনার জন্য খসড়া। এটি আইনি পরামর্শ নয় এবং ফলাফলের পূর্বাভাস দেয় না।",
       mockOrigin: "মক এআই ফলাফল (ai_mock) — কোনো মডেল থেকে নয়",
+      aiOrigin: "এআই ({provider})",
       done: "সংরক্ষিত হয়েছে।",
       failed: "অনুরোধটি ব্যর্থ হয়েছে: {detail}",
       quoteNotFound:
@@ -1132,6 +1142,8 @@ const bn: Dictionary = {
     chamber: "চেম্বারের নাম",
     organization: "প্রতিষ্ঠানের নাম",
     organizationOwnerOnly: "শুধু প্রতিষ্ঠানের মালিক এটি পরিবর্তন করতে পারেন।",
+    showContact: "আমার ফার্ম, ফোন ও ইমেইল আমার মক্কেলদের দেখান",
+    showContactHint: "মক্কেলরা তাদের ড্যাশবোর্ডে আপনার নাম দেখেন। এটি চালু থাকলে তারা আপনার দেওয়া ফার্ম, ফোন ও ইমেইলও দেখেন।",
     saveProfile: "প্রোফাইল সংরক্ষণ",
     cancel: "বাতিল",
     profileSaved: "প্রোফাইল সংরক্ষিত হয়েছে।",

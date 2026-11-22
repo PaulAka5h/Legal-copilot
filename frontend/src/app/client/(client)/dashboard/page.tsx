@@ -154,24 +154,33 @@ export default async function ClientDashboardPage({
               <p>{dashboard.lawyerSub}</p>
             </div>
           </div>
-          <dl className="profile-list">
-            <div>
-              <dt>{dashboard.firm}</dt>
-              <dd>{pick(caseData.lawyer.firm, language)}</dd>
-            </div>
-            <div>
-              <dt>{dashboard.phone}</dt>
-              <dd>
-                <a href={`tel:${caseData.lawyer.phone}`}>{caseData.lawyer.phone}</a>
-              </dd>
-            </div>
-            <div>
-              <dt>{dashboard.email}</dt>
-              <dd>
-                <a href={`mailto:${caseData.lawyer.email}`}>{caseData.lawyer.email}</a>
-              </dd>
-            </div>
-          </dl>
+          {/* Only the fields the lawyer filled in and allows clients to see. */}
+          {caseData.lawyer.firm || caseData.lawyer.phone || caseData.lawyer.email ? (
+            <dl className="profile-list">
+              {caseData.lawyer.firm ? (
+                <div>
+                  <dt>{dashboard.firm}</dt>
+                  <dd>{pick(caseData.lawyer.firm, language)}</dd>
+                </div>
+              ) : null}
+              {caseData.lawyer.phone ? (
+                <div>
+                  <dt>{dashboard.phone}</dt>
+                  <dd>
+                    <a href={`tel:${caseData.lawyer.phone.replace(/[^0-9+]/g, "")}`}>{caseData.lawyer.phone}</a>
+                  </dd>
+                </div>
+              ) : null}
+              {caseData.lawyer.email ? (
+                <div>
+                  <dt>{dashboard.email}</dt>
+                  <dd>
+                    <a href={`mailto:${caseData.lawyer.email}`}>{caseData.lawyer.email}</a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
         </div>
 
         <div className="panel docs-panel">

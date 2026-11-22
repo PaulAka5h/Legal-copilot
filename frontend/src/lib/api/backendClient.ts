@@ -38,7 +38,7 @@ export class BackendError extends Error {
   }
 }
 
-type Method = "GET" | "POST" | "PATCH";
+type Method = "GET" | "POST" | "PATCH" | "DELETE";
 type RequestOptions = {
   method?: Method;
   json?: unknown;

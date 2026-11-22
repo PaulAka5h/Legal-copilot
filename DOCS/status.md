@@ -510,3 +510,59 @@ Migration `0024_fact_quote_span` (run on Neon before deploying): `case_fact_sour
   offers a prefilled "Edit fact" form (statement + exact quote) that saves a new version and re-checks the quote.
 - Tests: `backend/tests/test_fact_quotes.py` (6), including the brief in `tests/data/`: 13/13 facts confirmable.
   `tests/rag/test_search.py::test_recall_at_10_on_20_act_queries` (0.933 < 0.95) fails without these changes too.
+
+## Portal fixes: PDFs, shared documents, lawyer card, role-specific login (2026-11-23, branch fix/ui-bugs)
+
+Migration `0025_client_docs_lawyer_contact` (run on Neon before deploying): `lawyer_profiles.show_contact_to_clients`
+(default true) and two SECURITY DEFINER functions for clients: `app.client_case_lawyer_contact(case)` and
+`app.client_shared_document_file(document)` (open case + active client membership checked inside).
+
+- Summary PDF: was a NOT_CONFIGURED stub on both sides. Now rendered by the backend (`app/pdf/render.py`, PyMuPDF
+  HTML with HarfBuzz shaping) with embedded Noto Sans + Noto Sans Bengali (OFL, `app/assets/fonts/`); Bangla runs
+  use the embedded font explicitly. Lawyer: `POST .../hearings/{id}/summary-pdf` (case members, claim labels and
+  sources kept, audit `hearing_summary.downloaded`). Client: `GET /api/v1/client/updates/{id}/pdf` (published
+  updates of open cases only, audit `client.summary_downloaded`). Content-Disposition attachment, ASCII + UTF-8 name.
+- Shared documents: the client list existed but nothing could share safely (no audit, no CSRF check, any document
+  id accepted). New `/api/v1/cases/{id}/shared-documents` GET/POST/DELETE (document must belong to the case; revoke
+  keeps the row; audit `client_document.shared/unshared`). Client download proxied by the API
+  (`/api/v1/client/documents/{id}/download`, audit `client.document_downloaded`); another client gets 404, and the
+  client documents list now 404s for non-members. Lawyer UI: Share with client / Stop sharing per ready document.
+- Lawyer card: `GET /api/v1/client/cases/{id}/lawyer` (lead lawyer's name; firm, phone, email only when filled in
+  and the lawyer allows it, profile checkbox). The dashboard shows only filled fields.
+- Login: the portals called the same login, and the backend picked the role. `expected_role` is sent by each
+  portal; another role gets the same generic 401 as a wrong password, no session, no lockout count, audit
+  `auth.login_wrong_portal`. `src/proxy.ts` resolves the role from `/api/v1/me` and keeps /lawyer/* for lawyers
+  and /client/* for clients (pages, route handlers, server actions); if the backend is unreachable it defers to
+  the layouts' session check.
+- Progress: "Case closed" is complete only for a closed case and otherwise upcoming (never current).
+- Tests: `backend/tests/test_portal_fixes.py` (4), progress cases in `test_ui_bug_fixes.py`,
+  `frontend/tests/routeAccess.test.mjs` (5).
+
+## Strategy with a real LLM, and the free-provider fallback chain (2026-11-23, branch fix/ui-bugs)
+
+No migration.
+
+- Root cause (live: one-node ai_mock strategy after a verified Gemini analysis): strategy called the LLM only
+  when a finding was fully verified (`verification == "verified"`). With a real model, element quotes are
+  often not locatable, so findings stay "unverified" even though their section citation is verified (the
+  analysis still succeeds on verified citations). Strategy then skipped the LLM entirely and stored an empty
+  tree labelled ai_mock ("The analysis found no verified finding."). Now strategy uses findings with a verified
+  citation (`usable_findings`), tells the model which elements are unproven, and logs
+  `llm.fallback_to_mock` with `reason=strategy:no_finding_with_verified_citation` when it really has nothing.
+- Strategy output: flat node list with `parent_id` (`StrategyFlatDraft`, prompt `strategy-tree-v2-flat`),
+  rebuilt into the 3-ply tree in code (`nest_nodes`: misplaced/duplicate nodes and bad chunk ids dropped with
+  warnings). The verifier still runs on every node. Strategy has its own 90 s LLM budget, analysis 60 s, both
+  capped by the 105 s request deadline (frontend timeout 120 s).
+- `app/ai/structured.py`: no backoff; 429/503/timeouts/transport errors go to the next provider at once;
+  invalid output gets one repair request with the validation errors (field paths only), then the next
+  provider; then the labelled mock. Logs: `llm.provider_failed`, `llm.answered`, `llm.fallback_to_mock`
+  with `reason` and `schema` (the log formatter dropped any reason field before; now allow-listed).
+- Provider chain (`LLM_FALLBACK_CHAIN=gemini,gemini_fallback,groq,openrouter,mock`, `app/ai/llm.py`
+  `resolve_chain`): Groq and OpenRouter are OpenAI-compatible (JSON mode + schema in the prompt). Cerebras was
+  dropped (needs payment). `OPENROUTER_MODEL=nvidia/nemotron-3.5-super-vl:free` (free, JSON mode +
+  structured outputs, checked 2026-11-23); render.yaml declares the chain and the keys (set in the dashboard). Skips providers without a
+  key/model or approval; free tiers refused in production. UI shows "ai (provider)". DOCS/providers.md updated.
+- Tests: `tests/test_llm_chain.py` (mocked HTTP per provider, order, skips, failover, logs),
+  `tests/test_strategy_llm.py` (flat/nest, Gemini path with repair and 3 plies, the root cause, skip logging,
+  live cheque case opt-in: `LIVE_LLM_TEST=1` + `GEMINI_API_KEY`/`GEMINI_MODEL`),
+  `tests/ai/test_structured_retries.py` rewritten for no-backoff + repair.

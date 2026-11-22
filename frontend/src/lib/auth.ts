@@ -101,7 +101,7 @@ export async function signUpLawyer(
     return { status: "invalid", errors };
   }
 
-  const login = await signInWithBackend(email, password);
+  const login = await signInWithBackend(email, password, "lawyer");
   if (!login || "status" in login) {
     return { status: "error", message: copy.errors.general };
   }
