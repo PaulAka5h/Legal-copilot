@@ -8,6 +8,15 @@ vectors and query vectors can never be mixed silently):
 - input: NFC text with "query: " (searches) or "passage: " (legal chunks), XLM-R
   tokenizer, truncated to 512 tokens including the special tokens;
 - mean pooling over the attention mask, then L2 normalization; 384 dimensions.
+
+Two tokenizer backends give the same XLM-R ids:
+- `tokenizers` (tokenizer.json): the reference. Ingestion, the embed worker and the
+  Kaggle script use it, so stored chunk vectors are reproducible exactly. Its Unigram
+  trie costs ~285 MB of RAM.
+- `sentencepiece` (sentencepiece.bpe.model, the model's original tokenizer): ~15 MB;
+  used for queries on the 512 MB server. Checked on all 39,587 chunks and the 98 eval
+  queries: identical ids except 8 chunks where two segmentations score the same (e.g.
+  "contin|gen|cy" vs "cont|ingen|cy") and trailing whitespace, which queries strip.
 Runs on CPU with onnxruntime only (no torch). Text never leaves the server and is
 never logged.
 """
@@ -26,6 +35,8 @@ E5_SMALL_VERSION = 1
 E5_SMALL_DIM = 384
 E5_SMALL_MAX_TOKENS = 512
 E5_SMALL_MODEL_SHA256 = "f5c0888fe75d7bd39d468b23417c8831247b70078ecc19e72041df3d86676842"
+E5_SMALL_SPM_SHA256 = "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+TOKENIZER_BACKENDS = ("tokenizers", "sentencepiece")
 QUERY_PREFIX = "query: "
 PASSAGE_PREFIX = "passage: "
 DEFAULT_MODEL_DIR = Path(__file__).resolve().parents[3] / "models" / "multilingual-e5-small-onnx-int8"
@@ -60,6 +71,38 @@ def load_tokenizer(directory: Path | None = None):
     return tokenizer
 
 
+class _Ids:
+    __slots__ = ("ids",)
+
+    def __init__(self, ids: list[int]) -> None:
+        self.ids = ids
+
+
+class XlmrSentencePiece:
+    """XLM-R ids from sentencepiece.bpe.model, as the fairseq/transformers XLM-R tokenizer
+    maps them: <s>=0, <pad>=1, </s>=2, <unk>=3, every other piece = sentencepiece id + 1.
+    encode() adds <s> ... </s> and truncates to max_length like tokenizers does."""
+
+    def __init__(self, path: Path, verify: bool = True) -> None:
+        import sentencepiece
+
+        if not path.is_file():
+            raise ModelFilesError(f"{path} not found; run scripts/export_e5_small_onnx.py")
+        if verify and sha256_file(path) != E5_SMALL_SPM_SHA256:
+            raise ModelFilesError("sentencepiece.bpe.model is not the pinned file (SHA-256 differs)")
+        self._sp = sentencepiece.SentencePieceProcessor(model_file=str(path))
+        self.max_length: int | None = None
+
+    def enable_truncation(self, max_length: int) -> None:
+        self.max_length = max_length
+
+    def encode(self, text: str) -> _Ids:
+        pieces = [3 if i == 0 else i + 1 for i in self._sp.encode(text)]  # sentencepiece <unk> is 0
+        if self.max_length is not None:
+            pieces = pieces[: self.max_length - 2]
+        return _Ids([0, *pieces, 2])
+
+
 def mean_pool_normalize(hidden: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """[batch, tokens, dim] + [batch, tokens] -> unit-length [batch, dim] float32."""
     weights = mask[..., None].astype(np.float32)
@@ -77,8 +120,12 @@ class E5SmallOnnx:
     embedding_version = E5_SMALL_VERSION
     dimension = E5_SMALL_DIM
 
-    def __init__(self, directory: Path | None = None, threads: int = 1, verify: bool = True) -> None:
+    def __init__(self, directory: Path | None = None, threads: int = 1, verify: bool = True,
+                 tokenizer: str = "tokenizers") -> None:
         import onnxruntime as ort
+
+        if tokenizer not in TOKENIZER_BACKENDS:
+            raise ValueError(f"tokenizer must be one of {TOKENIZER_BACKENDS}")
 
         directory = directory or model_dir()
         model_path = directory / "model.onnx"
@@ -86,7 +133,10 @@ class E5SmallOnnx:
             raise ModelFilesError(f"{model_path} not found; run scripts/export_e5_small_onnx.py")
         if verify and sha256_file(model_path) != E5_SMALL_MODEL_SHA256:
             raise ModelFilesError("model.onnx is not the pinned e5-small int8 build (SHA-256 differs)")
-        self.tokenizer = load_tokenizer(directory)
+        if tokenizer == "sentencepiece":
+            self.tokenizer = XlmrSentencePiece(directory / "sentencepiece.bpe.model", verify)
+        else:
+            self.tokenizer = load_tokenizer(directory)
         self.tokenizer.enable_truncation(max_length=E5_SMALL_MAX_TOKENS)  # counts <s> and </s>
 
         options = ort.SessionOptions()
@@ -96,6 +146,10 @@ class E5SmallOnnx:
         # buffers, no memory-pattern pre-allocation.
         options.enable_cpu_mem_arena = False
         options.enable_mem_pattern = False
+        # EXTENDED, not the default ALL: ALL adds layout transforms that pre-pack the weights
+        # and raise RSS from ~185 MB to ~475 MB (peak ~550 MB during load: OOM in 512 MB).
+        # The vectors are bit-identical to ALL (checked), so stored embeddings stay valid.
+        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
         options.log_severity_level = 3
         self.session = ort.InferenceSession(str(model_path), options, providers=["CPUExecutionProvider"])
         self._inputs = {i.name for i in self.session.get_inputs()}
@@ -128,7 +182,8 @@ class E5SmallQueryEmbedder:
         self.model = model
 
     def embed_query(self, query: str) -> list[float]:
-        return self.model.encode([query], QUERY_PREFIX)[0].tolist()
+        # Strip: a trailing space would add a lone "▁" token under `tokenizers` only.
+        return self.model.encode([query.strip()], QUERY_PREFIX)[0].tolist()
 
 
 class E5SmallDocumentEmbedder:

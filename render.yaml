@@ -1,5 +1,6 @@
 # Render Blueprint: PokkhoAI API on the FREE plan (512 MB RAM, Docker).
-# Database: Neon. Documents: Backblaze B2. Embeddings + analysis: Gemini API (one key).
+# Database: Neon. Documents: Backblaze B2. Search embeddings: multilingual-e5-small (ONNX int8)
+# inside the image. LLM (analysis + search query rewriting): Gemini API (one key).
 # Step-by-step guide: DOCS/deploy_render_free.md
 #
 # Values marked `sync: false` are secrets or per-account values: Render asks for
@@ -19,7 +20,7 @@ services:
     envVars:
       # --- App ---
       - key: APP_ENV
-        value: development        # demo: Gemini (LLM and embeddings) is refused in production by design
+        value: development        # demo: the Gemini LLM is refused in production by design
       - key: LOG_LEVEL
         value: INFO
       - key: APP_ORIGIN
@@ -48,14 +49,18 @@ services:
         value: "true"
 
       # --- AI providers ---
-      # Query embeddings must use the model the demo knowledge base was embedded with
-      # (deploy/demo_data.dump: gemini-embedding-001, 1024 dims, embedding_version 1);
-      # otherwise search answers 503 EMBEDDING_MODEL_MISMATCH. The analysis threshold
-      # follows the provider (app/config.py DEFAULT_MIN_SIMILARITY).
+      # Query embeddings must use the model the knowledge base was embedded with
+      # (deploy/neon_cutover_e5small.sh: intfloat/multilingual-e5-small, 384 dims,
+      # embedding_version 1); otherwise search answers 503 EMBEDDING_MODEL_MISMATCH.
+      # The model is built into the image (Dockerfile.render) and runs on this CPU: query
+      # text does not leave the server for embedding. The analysis threshold follows the
+      # provider (app/config.py DEFAULT_MIN_SIMILARITY).
       - key: EMBEDDING_PROVIDER
-        value: gemini
-      - key: GEMINI_EMBEDDING_MODEL
-        value: gemini-embedding-001
+        value: e5_small_onnx
+      # One Gemini call per new search (cached) and per analysed fact rewrites the query
+      # into Bangla + English + keywords; on any LLM error the plain query is searched.
+      - key: SEARCH_QUERY_REWRITE
+        value: "true"
       - key: RERANKER_PROVIDER
         value: mock
       - key: LLM_PROVIDER
@@ -63,7 +68,7 @@ services:
       - key: LLM_APPROVED_PROVIDERS
         value: gemini,mock
       - key: GEMINI_API_KEY
-        sync: false               # REQUIRED: legal search embeds queries with it
+        sync: false               # analysis and search query rewriting (search still works without it)
       - key: GEMINI_MODEL
         value: gemini-3.5-flash-lite
       # Tried after GEMINI_MODEL keeps answering 429/503 (3 retries: 2 s, 5 s, 10 s), before

@@ -230,7 +230,7 @@ def build_query_embedder(settings: Settings) -> QueryEmbedder:
     provider = settings.embedding_provider
     if provider == "e5_small_onnx":
         try:
-            return E5SmallQueryEmbedder(E5SmallOnnx(threads=settings.e5_onnx_threads))
+            return E5SmallQueryEmbedder(E5SmallOnnx(threads=settings.e5_onnx_threads, tokenizer="sentencepiece"))
         except Exception as error:  # model files missing or not the pinned build, out of memory
             raise ProviderNotConfigured(f"Query embedder unavailable: {type(error).__name__}: {error}") from error
     if provider in OFF_SERVER_PROVIDERS and settings.app_env == "production":

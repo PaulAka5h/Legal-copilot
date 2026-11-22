@@ -50,6 +50,11 @@ from app.rag.text import BANGLA_STOPWORDS, nfc
 # k=30 with the dense list weighted 1.5 beat k=60 / 1:1 (Recall@10 0.909 vs 0.879).
 RRF_K = 30
 DENSE_WEIGHT = 1.5
+# rewritten_search: weight of the typed query's list vs each LLM variant (1.0). Tuned on the
+# full corpus (60 queries, replayed rewrites): 2.0 gave Recall@10 0.850 vs 0.783 at 1.0 and
+# Bangla 0.867 vs 0.600; a variant that drifts to another Act no longer outvotes the
+# typed query's own top hits (DOCS/eval_results.md).
+ORIGINAL_QUERY_WEIGHT = 2.0
 DENSE_K = 50
 SPARSE_K = 50
 FUSED_K = 60
@@ -153,12 +158,14 @@ _SELECT_FUSED = """
 class FusionConfig:
     """Weighted Reciprocal Rank Fusion: score = sum(weight / (rrf_k + rank)) over the lists.
 
-    A weight of 0 leaves that list out of the query entirely.
+    A weight of 0 leaves that list out of the query entirely. `original` weights the
+    user's own query against its LLM variants (weight 1 each) in rewritten_search.
     """
 
     rrf_k: int = RRF_K
     dense: float = DENSE_WEIGHT
     sparse: float = 1.0
+    original: float = ORIGINAL_QUERY_WEIGHT
 
 
 DEFAULT_FUSION = FusionConfig()
@@ -364,9 +371,11 @@ async def rewritten_search(
         return replace(first, hits=first.hits[:k], warnings=[*first.warnings, *extra]), rewrite
     scores: dict[UUID, float] = {}
     best: dict[UUID, SearchHit] = {}
-    for result in results:
+    for index, result in enumerate(results):
+        weight = fusion.original if index == 0 else 1.0
         for rank, hit in enumerate(result.hits, start=1):
-            scores[hit.canonical_section_id] = scores.get(hit.canonical_section_id, 0.0) + 1.0 / (fusion.rrf_k + rank)
+            scores[hit.canonical_section_id] = (scores.get(hit.canonical_section_id, 0.0)
+                                                + weight / (fusion.rrf_k + rank))
             best.setdefault(hit.canonical_section_id, hit)
     ranked = sorted(best, key=lambda c: (-scores[c], str(c)))
     warnings = list(dict.fromkeys(w for r in results for w in r.warnings))

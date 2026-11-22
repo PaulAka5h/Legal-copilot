@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Highest OCR render resolution; photos are scaled to an A4 page at this DPI.
     # 300 is Tesseract's sweet spot; Dockerfile.render uses 200 to fit 512 MB.
     ocr_dpi: int = Field(default=300, ge=100, le=600)
+    # Documents extracted (rendered + OCR'd) at once per process; others wait their turn.
+    # 1 keeps a 512 MB server safe: two scans at once measured 501 MiB with e5-small loaded.
+    extraction_max_concurrent: int = Field(default=1, ge=1, le=16)
     max_pdf_pages: int = Field(default=200, gt=0)
     # Documents stuck in 'processing' longer than this are marked failed (retryable)
     # by a sweep at startup and by `python -m app.documents.recovery`.
@@ -77,6 +80,9 @@ class Settings(BaseSettings):
     embedding_provider: Literal["e5_small_onnx", "local", "hf_api", "gemini"] = "e5_small_onnx"
     # onnxruntime intra-op threads for e5_small_onnx query embedding (1 on the 512 MB Render box).
     e5_onnx_threads: int = Field(default=1, ge=1, le=64)
+    # Load the query embedder at startup (Render: its one-time load peak then never
+    # coincides with an OCR upload, and the first search is fast). Off by default (tests).
+    preload_query_embedder: bool = False
     hf_api_token: SecretStr | None = None
     hf_api_timeout_seconds: float = Field(default=30, gt=0)
     gemini_embedding_model: str = Field(default="gemini-embedding-001", min_length=1)

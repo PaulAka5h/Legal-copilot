@@ -9,6 +9,7 @@ import importlib.util
 import json
 import shutil
 import unicodedata
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -55,6 +56,47 @@ def test_vectors_are_384_unit_and_deterministic(model):
     assert np.array_equal(together, alone)  # one text per run: no batch effects
     query = model.encode(texts[:1], e5.QUERY_PREFIX)[0]
     assert not np.array_equal(query, together[0])  # "query: " vs "passage: "
+
+
+@needs_model
+def test_session_skips_the_memory_hungry_layout_optimizations(model):
+    # ORT_ENABLE_ALL pre-packs weights: ~475 MB RSS, OOM on Render's 512 MB. EXTENDED gives
+    # bit-identical vectors at ~185 MB (measured).
+    import onnxruntime as ort
+
+    level = ort.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+    assert model.session.get_session_options().graph_optimization_level == level
+    options = ort.SessionOptions()
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    full = ort.InferenceSession(str(BUNDLE / "model.onnx"), options, providers=["CPUExecutionProvider"])
+    ids = np.array([model.tokenizer.encode(e5.PASSAGE_PREFIX + "ধারা ১৩৮ cheque").ids], dtype=np.int64)
+    feeds = {"input_ids": ids, "attention_mask": np.ones_like(ids)}
+    if "token_type_ids" in {i.name for i in full.get_inputs()}:
+        feeds["token_type_ids"] = np.zeros_like(ids)
+    assert np.array_equal(full.run(["last_hidden_state"], feeds)[0],
+                          model.session.run(["last_hidden_state"], feeds)[0])
+
+
+@needs_model
+def test_sentencepiece_query_tokenizer_matches_the_reference_ids(model):
+    light = e5.E5SmallOnnx(threads=1, tokenizer="sentencepiece")
+    samples = ["cheque dishonoured for insufficient funds", "ধারা ১৩৮ চেক প্রত্যাখ্যান মামলা",
+               "a  b   c, tab\there; new\nline", "émoji 🙂 ½ ﬁ Ⅻ zero\u200bwidth", "ক\u09cbর্ট",
+               "SAMPLE_DATA_NOT_REAL_LAW " + "ধারা " * 700]
+    for text in samples:
+        assert light.tokenizer.encode(e5.QUERY_PREFIX + text).ids == model.tokenizer.encode(e5.QUERY_PREFIX + text).ids
+    assert len(light.tokenizer.encode("ধারা " * 700).ids) == e5.E5_SMALL_MAX_TOKENS
+    query = e5.E5SmallQueryEmbedder(light)
+    assert query.embed_query("cheque bounced ") == e5.E5SmallQueryEmbedder(model).embed_query("cheque bounced")
+
+
+@needs_model
+def test_a_sentencepiece_file_that_is_not_pinned_is_refused(tmp_path):
+    (tmp_path / "sentencepiece.bpe.model").write_bytes(b"not the pinned tokenizer")
+    with pytest.raises(e5.ModelFilesError):
+        e5.XlmrSentencePiece(tmp_path / "sentencepiece.bpe.model")
+    with pytest.raises(ValueError):
+        e5.E5SmallOnnx(BUNDLE, tokenizer="other")
 
 
 @needs_model
@@ -208,6 +250,27 @@ def test_rewritten_search_fuses_variant_lists_by_section(monkeypatch):
     assert set(result.warnings) == {"w-q", "w-চ", "w-c", "w-n"}
 
 
+def test_the_typed_query_outweighs_a_drifting_variant(monkeypatch):
+    typed, drift = uuid4(), uuid4()
+    # Typed query: its section at rank 1. Two LLM variants drift to another Act (ranks 1 and 3).
+    lists = {"q": [_hit(typed)], "চেক প্রত্যাখ্যান": [_hit(drift)],
+             "cheque dishonour": [_hit(uuid4()), _hit(uuid4()), _hit(drift)], "negotiable instrument dishonour": []}
+
+    async def fake_search(session, *, query, **kwargs):
+        return SearchResult(lists[query], [], "mock", "m", 3)
+
+    monkeypatch.setattr(retrieval, "hybrid_search", fake_search)
+    assert DEFAULT_FUSION.original == 2.0
+    result, _ = asyncio.run(retrieval.rewritten_search(
+        None, query="q", rewriter=QueryRewriter(FakeLLM(VARIANTS)), embedder=None, reranker=None, k=2))
+    assert [h.canonical_section_id for h in result.hits] == [typed, drift]  # 2/31 > 1/31 + 1/33
+    equal = replace(DEFAULT_FUSION, original=1.0)
+    result, _ = asyncio.run(retrieval.rewritten_search(
+        None, query="q", rewriter=QueryRewriter(FakeLLM(VARIANTS)), embedder=None, reranker=None, k=2,
+        fusion=equal))
+    assert result.hits[0].canonical_section_id == drift  # equal weights: the drift outvotes the typed query
+
+
 def test_rewritten_search_without_llm_is_plain_search_and_flags_failures(monkeypatch):
     async def fake_search(session, *, query, k, **kwargs):
         return SearchResult([_hit(uuid4()) for _ in range(k)], [], "mock", "m", 1)
@@ -219,3 +282,45 @@ def test_rewritten_search_without_llm_is_plain_search_and_flags_failures(monkeyp
     failed, _ = asyncio.run(retrieval.rewritten_search(None, query="q", rewriter=QueryRewriter(FakeLLM("bad")),
                                                        embedder=None, reranker=None, k=3))
     assert REWRITE_FAILED_WARNING in failed.warnings
+
+
+# ---------------------------------------------------------------- startup preload
+def test_preload_builds_the_embedder_once_and_never_blocks_startup(monkeypatch):
+    import logging
+
+    from app import main
+    from app.rag.search import providers
+
+    calls = []
+    monkeypatch.setattr(providers, "get_query_embedder", lambda: calls.append(1))
+    asyncio.run(main._preload_query_embedder(logging.getLogger("test")))
+    assert calls == [1]
+
+    def broken():
+        raise providers.ProviderNotConfigured("model files missing")
+
+    monkeypatch.setattr(providers, "get_query_embedder", broken)
+    asyncio.run(main._preload_query_embedder(logging.getLogger("test")))  # logs, does not raise
+    assert Settings(_env_file=None).preload_query_embedder is False
+
+
+# ---------------------------------------------------------------- memory guard: one extraction at a time
+def test_extractions_run_one_at_a_time_by_default():
+    from app.documents.processing import extraction_slots
+
+    assert Settings(_env_file=None).extraction_max_concurrent == 1
+    running, peak = 0, 0
+
+    async def extract():
+        nonlocal running, peak
+        async with extraction_slots(1):
+            running += 1
+            peak = max(peak, running)
+            await asyncio.sleep(0.01)
+            running -= 1
+
+    async def main():
+        await asyncio.gather(*(extract() for _ in range(4)))
+
+    asyncio.run(main())
+    assert peak == 1

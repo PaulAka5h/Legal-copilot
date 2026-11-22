@@ -6,13 +6,13 @@ Standalone (no project imports): it runs in the Dockerfile.render build stage wi
 numpy, onnx and onnxruntime installed, and locally with `uv run`.
 
 1. Downloads intfloat/multilingual-e5-small at a pinned revision: onnx/model.onnx (the
-   fp32 ONNX export the model authors published with optimum) and onnx/tokenizer.json.
-   Both are checked against pinned SHA-256 values.
+   fp32 ONNX export the model authors published with optimum), onnx/tokenizer.json and
+   sentencepiece.bpe.model. All are checked against pinned SHA-256 values.
 2. Applies onnxruntime dynamic int8 quantization (quantize_dynamic) with UINT8 weights
    (U8U8). U8S8 can saturate on x86 CPUs without VNNI, which would make vectors depend
    on the CPU; U8U8 is exact on every x86-64 CPU, so the vectors made on a laptop, on a
    Kaggle box, and on Render are the same.
-3. Writes model.onnx, tokenizer.json and manifest.json (hashes, revision, recipe) and
+3. Writes model.onnx, tokenizer.json, sentencepiece.bpe.model and manifest.json (hashes, revision, recipe) and
    prints the manifest. Re-running with the same pinned inputs and library versions
    gives a byte-identical model; the Dockerfile checks the output hash.
 """
@@ -32,6 +32,8 @@ REVISION = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
 SOURCES = {
     "onnx/model.onnx": "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665",
     "onnx/tokenizer.json": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+    # The original XLM-R tokenizer: the server's low-memory query tokenizer.
+    "sentencepiece.bpe.model": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
 }
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "models" / "multilingual-e5-small-onnx-int8"
 
@@ -71,6 +73,7 @@ def main() -> None:
         fp32 = Path(tmp_dir) / "model_fp32.onnx"
         download("onnx/model.onnx", SOURCES["onnx/model.onnx"], fp32)
         download("onnx/tokenizer.json", SOURCES["onnx/tokenizer.json"], args.out / "tokenizer.json")
+        download("sentencepiece.bpe.model", SOURCES["sentencepiece.bpe.model"], args.out / "sentencepiece.bpe.model")
         int8 = Path(tmp_dir) / "model.onnx"
         quantize_dynamic(fp32, int8, weight_type=QuantType.QUInt8, per_channel=False, reduce_range=False)
         shutil.move(int8, args.out / "model.onnx")
@@ -86,6 +89,7 @@ def main() -> None:
         "onnxruntime_version": onnxruntime.__version__,
         "model_sha256": model_sha,
         "tokenizer_sha256": sha256_file(args.out / "tokenizer.json"),
+        "sentencepiece_sha256": sha256_file(args.out / "sentencepiece.bpe.model"),
         "model_bytes": os.path.getsize(args.out / "model.onnx"),
         "dimension": 384,
         "pooling": "mean over attention mask, then L2 normalize",

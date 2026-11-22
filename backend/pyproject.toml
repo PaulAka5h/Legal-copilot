@@ -27,6 +27,7 @@ dependencies = [
     "minio>=7.2",
     "onnxruntime>=1.32",
     "tokenizers>=0.23",
+    "sentencepiece>=0.2",
 ]
 
 [dependency-groups]

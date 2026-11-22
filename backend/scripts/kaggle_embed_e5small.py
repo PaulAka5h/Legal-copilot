@@ -59,6 +59,8 @@ def _init(model_dir: str) -> None:
     options = ort.SessionOptions()
     options.intra_op_num_threads = 1
     options.inter_op_num_threads = 1
+    # Same level as the app (EXTENDED: bit-identical vectors, ~290 MB less RAM than ALL).
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
     options.log_severity_level = 3
     _session = ort.InferenceSession(os.path.join(model_dir, "model.onnx"), options,
                                     providers=["CPUExecutionProvider"])
