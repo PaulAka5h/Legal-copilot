@@ -23041,6 +23041,46 @@
        "not_applicable"
       ],
       "title": "Quote Check"
+     },
+     "quote_start": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote Start",
+      "description": "Offset of the exact quote in the page text"
+     },
+     "quote_end": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote End",
+      "description": "End offset (exclusive) of the exact quote"
+     },
+     "quote_match": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "exact",
+         "normalized"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quote Match",
+      "description": "How the quote was found; null when it was not found (unverified)"
      }
     },
     "type": "object",
@@ -23835,20 +23875,21 @@
     "properties": {
      "en": {
       "type": "string",
-      "maxLength": 4000,
+      "maxLength": 20000,
       "title": "En",
       "default": ""
      },
      "bn": {
       "type": "string",
-      "maxLength": 4000,
+      "maxLength": 20000,
       "title": "Bn",
       "default": ""
      }
     },
     "additionalProperties": false,
     "type": "object",
-    "title": "LocalizedText"
+    "title": "LocalizedText",
+    "description": "Hearing notes can hold the order text and the notes (8000 characters each)."
    },
    "LoginRequest": {
     "properties": {

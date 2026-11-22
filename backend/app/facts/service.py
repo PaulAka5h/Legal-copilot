@@ -22,12 +22,15 @@ from app.documents import repository as docs
 from app.facts import repository as repo
 from app.facts.extractor import PROMPT_VERSION, FactExtractor, PageInput, batch_pages
 from app.facts.schemas import ExtractionOutput, FactSourceIn
-from app.rag.text import normalize_for_match, quote_in_text
+from app.rag.quote_locator import locate_normalized
+from app.rag.text import normalize_for_match
 
 MAX_ATTEMPTS = 2  # first try plus one retry
 MAX_PAGES_PER_RUN = 150
 MIN_QUOTE_CHARS = 20
 MIN_QUOTE_WORDS = 4
+MAX_QUOTE_CHARS = 2000
+QUOTE_NOT_FOUND = "QUOTE_NOT_FOUND"  # stable prefix of the confirm error, read by the frontend
 
 
 class FactError(Exception):
@@ -60,14 +63,28 @@ def substantive_quote(quote: str) -> bool:
     return len(normalized) >= MIN_QUOTE_CHARS and len(normalized.split()) >= MIN_QUOTE_WORDS
 
 
+def check_quote(quote: str, page: PageInput | None) -> dict:
+    """Find the quote on the page with the citation verifier's normalization (no fuzzy match).
+
+    Found: quote_check passed, and the stored quote becomes the exact page span
+    page.text[start:end]. Not found (or too short to support a fact): failed,
+    shown as unverified; the quote is kept as given so the lawyer can fix it.
+    """
+    located = locate_normalized(quote, page.text) if page is not None else None
+    if (located is None or not substantive_quote(located.text)
+            or len(located.text) > MAX_QUOTE_CHARS):
+        return {"quote": quote, "quote_check": "failed", "quote_start": None, "quote_end": None,
+                "quote_match": None}
+    return {"quote": located.text, "quote_check": "passed", "quote_start": located.start,
+            "quote_end": located.end, "quote_match": located.method}
+
+
 def check_sources(statement_type: str, sources: list[dict], pages: dict[tuple[UUID, int], PageInput]) -> tuple[str, list[dict]]:
-    """Attach page ids and quote_check to each source; return (fact source_check, sources)."""
+    """Attach page ids, quote_check and the exact span to each source; return (fact source_check, sources)."""
     checked = []
     for source in sources:
         page = pages.get((UUID(str(source["document_id"])), source["page_no"]))
-        passed = page is not None and substantive_quote(source["quote"]) and quote_in_text(source["quote"], page.text)
-        checked.append({**source, "page_id": page.page_id if page else None,
-                        "quote_check": "passed" if passed else "failed"})
+        checked.append({**source, "page_id": page.page_id if page else None, **check_quote(source["quote"], page)})
     if not checked:
         return ("failed" if statement_type == "document_says" else "not_applicable"), checked
     return ("passed" if all(s["quote_check"] == "passed" for s in checked) else "failed"), checked
@@ -170,12 +187,15 @@ async def _insert_page_source(session, fact_id, case_id, organization_id, source
             "fact_id": fact_id, "case_id": case_id, "organization_id": organization_id,
             "source_kind": "lawyer_note", "document_id": None, "page_id": None, "page_no": None,
             "quote": source["quote"][:2000], "quote_check": "not_applicable",
+            "quote_start": None, "quote_end": None, "quote_match": None,
         })
         return
     await repo.insert_source(session, {
         "fact_id": fact_id, "case_id": case_id, "organization_id": organization_id,
         "source_kind": "document_page", "document_id": page.document_id, "page_id": page.page_id,
         "page_no": page.page_no, "quote": source["quote"][:2000], "quote_check": source["quote_check"],
+        "quote_start": source.get("quote_start"), "quote_end": source.get("quote_end"),
+        "quote_match": source.get("quote_match"),
     })
 
 
@@ -251,7 +271,8 @@ async def edit_fact(session: AsyncSession, *, case_id: UUID, organization_id: UU
             "fact_id": fact_id, "case_id": case_id, "organization_id": organization_id,
             "source_kind": source["source_kind"], "document_id": source["document_id"],
             "page_id": source["page_id"], "page_no": source["page_no"], "quote": source["quote"],
-            "quote_check": source["quote_check"],
+            "quote_check": source["quote_check"], "quote_start": source.get("quote_start"),
+            "quote_end": source.get("quote_end"), "quote_match": source.get("quote_match"),
         })
     return fact_id
 
@@ -263,7 +284,8 @@ async def review(session: AsyncSession, *, current: dict, status: str, user_id: 
         raise FactError(409, "This version was already reviewed; edit it to create a new draft version.")
     if (status == "lawyer_reviewed" and current["statement_type"] == "document_says"
             and current["source_check"] != "passed"):
-        raise FactError(409, "The quote was not found on the cited page; edit the fact or its source first.")
+        raise FactError(409, QUOTE_NOT_FOUND + ": The quote was not found on the cited page; "
+                             "edit the fact or its source first.")
     if not await repo.review_fact(session, current["id"], status, user_id, note):
         raise FactError(409, "The fact was changed by someone else; reload and try again.")
 

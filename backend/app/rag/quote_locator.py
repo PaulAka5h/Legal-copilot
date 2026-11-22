@@ -7,7 +7,9 @@ Steps, in order (the first that succeeds wins):
 1. exact:      the quote is a substring of the chunk as stored (NFC).
 2. normalized: equal after normalization: NFC, whitespace collapsed, curly quotes,
                dashes and the danda unified (। ॥ | -> ।; no space before a danda),
-               ZWJ/ZWNJ ignored, case ignored (English).
+               ZWJ/ZWNJ ignored, case ignored (English). A hyphen at a line end
+               ("dis-\nhonoured") is tried as written, joined with its hyphen
+               ("উপ-ধারা") and joined without it ("dishonoured").
 3. fuzzy:      a word-aligned window of the normalized chunk with
                difflib ratio >= FUZZY_MIN_RATIO; only for quotes of at least
                FUZZY_MIN_CHARS characters and FUZZY_MIN_WORDS words.
@@ -44,24 +46,59 @@ class Located:
     ratio: float = 1.0
 
 
-def _normalize(value: str) -> tuple[str, list[int]]:
+def _word_char(ch: str) -> bool:
+    """Letters, digits, and combining marks (Bangla vowel signs are marks, not letters)."""
+    return ch.isalnum() or unicodedata.category(ch).startswith("M")
+
+
+def _line_end_hyphen(value: str, i: int) -> int | None:
+    """If value[i] is a hyphen that ends a line inside a word, the index after the line break."""
+    if i == 0 or not _word_char(value[i - 1]):
+        return None
+    j = i + 1
+    while j < len(value) and value[j] in " \t\r":
+        j += 1
+    if j >= len(value) or value[j] != "\n":
+        return None
+    j += 1
+    while j < len(value) and value[j].isspace():
+        j += 1
+    return j if j < len(value) and _word_char(value[j]) else None
+
+
+HyphenMode = str  # "as_is" | "keep" (drop the line break) | "join" (drop hyphen and line break)
+HYPHEN_MODES: tuple[HyphenMode, ...] = ("as_is", "keep", "join")
+
+
+def _normalize(value: str, hyphens: HyphenMode = "as_is") -> tuple[str, list[int]]:
     """Normalized text plus, for each normalized char, the index of its source char."""
     out: list[str] = []
     index: list[int] = []
-    for i, ch in enumerate(value):
+    i = 0
+    while i < len(value):
+        ch = value[i]
+        i += 1
         if ch in _DROP:
             continue
         ch = _MAP.get(ch, ch).lower()
+        if ch == "-" and hyphens != "as_is":
+            resume = _line_end_hyphen(value, i - 1)
+            if resume is not None:
+                if hyphens == "keep":
+                    out.append(ch)
+                    index.append(i - 1)
+                i = resume
+                continue
         if ch.isspace():
             if out and out[-1] != " ":
                 out.append(" ")
-                index.append(i)
+                index.append(i - 1)
             continue
         if ch == "।" and out and out[-1] == " ":  # "শব্দ ।" == "শব্দ।"
             out.pop()
             index.pop()
         out.append(ch)
-        index.append(i)
+        index.append(i - 1)
     while out and out[-1] == " ":
         out.pop()
         index.pop()
@@ -118,6 +155,24 @@ def _fuzzy(norm_text: str, norm_quote: str, lo: int, hi: int) -> tuple[float, in
     return best
 
 
+def locate_normalized(quote: str, text: str) -> Located | None:
+    """Steps 1-2 only (exact, then normalized with each line-end hyphen mode); never fuzzy."""
+    needle = unicodedata.normalize("NFC", quote).strip()
+    if not needle or not text:
+        return None
+    at = text.find(needle)
+    if at >= 0:
+        return Located(needle, at, at + len(needle), "exact")
+    for mode in HYPHEN_MODES:
+        norm_text, index = _normalize(text, mode)
+        norm_quote, _ = _normalize(needle, mode)
+        at = norm_text.find(norm_quote) if norm_quote else -1
+        if at >= 0:
+            s, e = _span(text, index, at, at + len(norm_quote))
+            return Located(text[s:e], s, e, "normalized")
+    return None
+
+
 def locate_quote(quote: str | None, chunk_text: str,
                  hint: tuple[int, int] | None = None) -> Located | None:
     """The exact span of `chunk_text` that `quote` stands for, or None (not in the source)."""
@@ -131,14 +186,13 @@ def locate_quote(quote: str | None, chunk_text: str,
     if at >= 0:
         return Located(needle, at, at + len(needle), "exact")
 
+    found = locate_normalized(needle, text)
+    if found is not None:
+        return found
     norm_text, index = _normalize(text)
     norm_quote, _ = _normalize(needle)
     if not norm_quote or not norm_text:
         return None
-    at = norm_text.find(norm_quote)
-    if at >= 0:
-        s, e = _span(text, index, at, at + len(norm_quote))
-        return Located(text[s:e], s, e, "normalized")
 
     if len(norm_quote) < FUZZY_MIN_CHARS or len(norm_quote.split()) < FUZZY_MIN_WORDS:
         return None

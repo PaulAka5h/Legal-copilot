@@ -1,6 +1,7 @@
 import {
   addFactAction,
   confirmFactAction,
+  editFactAction,
   extractFactsAction,
   rejectFactAction,
 } from "@/app/lawyer/actions";
@@ -25,22 +26,94 @@ const reviewTone: Record<CaseFact["review"], string> = {
   lawyer_rejected: "bg-[#f8e9e5] text-[#8a2e1e]",
 };
 
+/** Prefilled edit of a fact whose quote was not found: opens with one click. */
+function EditFactForm({
+  caseId,
+  fact,
+  language,
+  copy,
+}: {
+  caseId: string;
+  fact: CaseFact;
+  language: Language;
+  copy: AiCopy;
+}) {
+  const source = fact.sources.find((item) => item.documentId && item.page !== null);
+  if (!source?.documentId || source.page === null) return null;
+  return (
+    <details className="mt-2">
+      <summary className="outline-button small inline-flex cursor-pointer list-none">
+        <Icon name="document" size={14} />
+        {copy.editFact}
+      </summary>
+      <form action={editFactAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="caseId" value={caseId} />
+        <input type="hidden" name="factId" value={fact.id} />
+        <input type="hidden" name="documentId" value={source.documentId} />
+        <input type="hidden" name="page" value={source.page} />
+        <p className="m-0 text-[9px] leading-relaxed text-[color:var(--color-muted)]">{copy.editFactHint}</p>
+        <label className="block" htmlFor={`edit-statement-${fact.id}`}>
+          <span className="field-label">{copy.factStatement}</span>
+          <textarea
+            id={`edit-statement-${fact.id}`}
+            name="statement"
+            required
+            maxLength={4000}
+            rows={2}
+            defaultValue={fact.statement}
+            className={`${inputClass} min-h-[60px] py-2`}
+          />
+        </label>
+        <label className="block" htmlFor={`edit-quote-${fact.id}`}>
+          <span className="field-label">
+            {format(copy.editFactQuote, { page: numberFor(language, source.page) })}
+          </span>
+          <textarea
+            id={`edit-quote-${fact.id}`}
+            name="quote"
+            required
+            maxLength={2000}
+            rows={3}
+            defaultValue={source.quote ?? ""}
+            className={`${inputClass} min-h-[70px] py-2`}
+          />
+        </label>
+        <div className="flex justify-end">
+          <button className="primary-button fit" type="submit">
+            {copy.saveEditedFact}
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
 function FactItem({
   caseId,
   fact,
   language,
   copy,
   locked,
+  quoteError,
 }: {
   caseId: string;
   fact: CaseFact;
   language: Language;
   copy: AiCopy;
   locked: boolean;
+  quoteError: boolean;
 }) {
   const reviewable = !locked && fact.review === "draft";
+  const quoteMissing =
+    fact.statementType === "document_says" &&
+    fact.sources.some((source) => source.page !== null && source.verification !== "verified");
   return (
-    <li className="border-t border-[color:var(--color-border)] py-3 first:border-0">
+    <li
+      id={`fact-${fact.id}`}
+      className={`border-t border-[color:var(--color-border)] py-3 first:border-0 ${
+        quoteError ? "scroll-mt-24 rounded-md bg-[#fdf3f0] px-2" : ""
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone={reviewTone[fact.review]}>{copy.review[fact.review]}</Pill>
         <Pill tone="bg-[color:var(--color-surface)] text-[color:var(--color-muted)]">
@@ -71,6 +144,14 @@ function FactItem({
           {source.verification === "verified" ? copy.verified : copy.unverified}
         </p>
       ))}
+      {reviewable && (quoteMissing || quoteError) ? (
+        <>
+          <p className="mt-1.5 text-[9px] font-semibold text-[#8a2e1e]" role={quoteError ? "alert" : undefined}>
+            {quoteError ? copy.quoteNotFound : copy.quoteUnverified}
+          </p>
+          <EditFactForm caseId={caseId} fact={fact} language={language} copy={copy} />
+        </>
+      ) : null}
       {reviewable ? (
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <form action={confirmFactAction}>
@@ -108,12 +189,14 @@ export function FactsPanel({
   language,
   copy,
   locked,
+  quoteErrorFactId = null,
 }: {
   caseId: string;
   facts: CaseFact[];
   language: Language;
   copy: AiCopy;
   locked: boolean;
+  quoteErrorFactId?: string | null;
 }) {
   const visible = facts.filter((fact) => fact.review !== "lawyer_rejected");
   return (
@@ -138,6 +221,7 @@ export function FactsPanel({
               language={language}
               copy={copy}
               locked={locked}
+              quoteError={fact.id === quoteErrorFactId}
             />
           ))}
         </ul>

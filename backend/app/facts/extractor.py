@@ -13,6 +13,7 @@ from uuid import UUID
 
 from app.ai.llm import StructuredLLM, strict_json_schema
 from app.facts.schemas import ExtractionOutput
+from app.facts.sentences import sentence_spans
 
 PROMPT_VERSION = "fact-extraction-v1"
 MAX_BATCH_CHARS = 12_000
@@ -93,7 +94,6 @@ class LLMFactExtractor:
         return self.llm.complete_json(SYSTEM_PROMPT, build_user_prompt(pages), "fact_extraction", self.schema)
 
 
-_SENTENCE = re.compile(r"[^\n।.!?]+[।.!?]?")
 _YEAR = re.compile(r"(?<![\d০-৯])(?:1[89]|20)\d{2}(?![\d০-৯])|(?<![০-৯\d])(?:১[৮৯]|২০)[০-৯]{2}(?![০-৯\d])")
 
 
@@ -110,8 +110,9 @@ class MockFactExtractor:
     def extract_batch(self, pages: list[PageInput]) -> str:
         facts = []
         for page in pages:
-            for match in _SENTENCE.finditer(page.text):
-                sentence = match.group(0).strip()
+            for start, end in sentence_spans(page.text):
+                quote = page.text[start:end]  # verbatim page text, line breaks included
+                sentence = " ".join(quote.split())
                 if 10 <= len(sentence) <= 500 and _YEAR.search(sentence):
                     facts.append({
                         "category": "date",
@@ -119,7 +120,7 @@ class MockFactExtractor:
                         "statement_type": "document_says",
                         "attributes": {"date_certainty": "unknown"},
                         "sources": [{"document_id": str(page.document_id), "page_no": page.page_no,
-                                     "quote": sentence}],
+                                     "quote": quote[:2000]}],
                     })
                 if len(facts) >= 50:
                     break

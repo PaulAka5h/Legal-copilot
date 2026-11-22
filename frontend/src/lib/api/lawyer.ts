@@ -22,6 +22,7 @@ import type {
   CreateClientError,
   ClientSummary,
   DocumentStatus,
+  EditFactInput,
   EditMatterInput,
   EditMatterResult,
   Hearing,
@@ -451,6 +452,7 @@ function toFact(row: Api["FactOut"]): CaseFact {
     aiMock: row.origin === "ai_mock",
     usableInAnalysis: row.usable_in_analysis,
     sources: row.sources.map((source) => ({
+      documentId: source.document_id,
       page: source.page_no,
       quote: source.quote,
       verification: verification(source.quote_check === "passed"),
@@ -625,6 +627,28 @@ export async function confirmFact(caseId: string, factId: string): Promise<Actio
     backend(caseUrl(caseId, `/facts/${encodeURIComponent(factId)}/confirm`), {
       method: "POST",
       json: {} satisfies Api["FactReviewRequest"],
+    }),
+  );
+}
+
+/**
+ * Fix a fact whose quote was not found: a new version (never an overwrite) with
+ * the corrected statement and quote; the backend re-checks the quote on the page.
+ */
+export async function editFact(caseId: string, factId: string, input: EditFactInput): Promise<ActionResult> {
+  const statement = input.statement.trim();
+  const quote = input.quote.trim();
+  if (!statement || statement.length > 4000) return { status: "error", message: "statement" };
+  if (!quote || quote.length > 2000 || !input.documentId || !(input.page >= 1)) {
+    return { status: "error", message: "quote" };
+  }
+  return mutate(() =>
+    backend(caseUrl(caseId, `/facts/${encodeURIComponent(factId)}`), {
+      method: "PATCH",
+      json: {
+        statement,
+        sources: [{ document_id: input.documentId, page_no: input.page, quote }],
+      } satisfies Api["FactEditRequest"],
     }),
   );
 }

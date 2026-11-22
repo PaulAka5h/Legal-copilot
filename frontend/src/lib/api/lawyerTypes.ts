@@ -231,6 +231,7 @@ export type FactCategory =
 export type FactReview = "draft" | "lawyer_reviewed" | "lawyer_rejected";
 
 export type FactSource = {
+  documentId: string | null;
   page: number | null;
   quote: string | null;
   verification: Verification;
@@ -245,6 +246,13 @@ export type CaseFact = {
   aiMock: boolean;
   usableInAnalysis: boolean;
   sources: FactSource[];
+};
+
+export type EditFactInput = {
+  statement: string;
+  documentId: string;
+  page: number;
+  quote: string;
 };
 
 export type NewFactInput = {

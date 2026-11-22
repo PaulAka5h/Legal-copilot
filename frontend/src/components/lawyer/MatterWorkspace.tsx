@@ -31,7 +31,7 @@ import {
 
 export type WorkspaceTab = "hearings" | "documents" | "facts" | "analysis";
 export type WorkspaceNotice = {
-  status: "ok" | "error" | "NOT_CONFIGURED";
+  status: "ok" | "error" | "NOT_CONFIGURED" | "quote_not_found";
   detail: string;
 } | null;
 
@@ -191,7 +191,9 @@ export function MatterWorkspace({
         >
           {notice.status === "ok"
             ? copy.ai.done
-            : notice.status === "NOT_CONFIGURED"
+            : notice.status === "quote_not_found"
+              ? copy.ai.quoteNotFound
+              : notice.status === "NOT_CONFIGURED"
               ? demo
                 ? copy.ai.demoOnly
                 : copy.ai.notConfigured
@@ -206,6 +208,7 @@ export function MatterWorkspace({
           language={language}
           copy={copy.ai}
           locked={locked || demo}
+          quoteErrorFactId={notice?.status === "quote_not_found" ? notice.detail : null}
         />
       ) : tab === "analysis" ? (
         <AnalysisPanel

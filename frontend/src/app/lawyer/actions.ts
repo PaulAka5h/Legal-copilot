@@ -8,6 +8,7 @@ import {
   addHearingNote,
   approveHearingSummary,
   confirmFact,
+  editFact,
   createClient,
   createMatter,
   downloadHearingSummary,
@@ -321,10 +322,37 @@ export async function addFactAction(formData: FormData) {
   finish(caseId, "facts", result);
 }
 
+/** Stable prefix of the backend's confirm error when the quote is not on the cited page. */
+const QUOTE_NOT_FOUND = "QUOTE_NOT_FOUND";
+
 export async function confirmFactAction(formData: FormData) {
   await requireLawyer();
   const caseId = field(formData, "caseId");
-  finish(caseId, "facts", await confirmFact(caseId, field(formData, "factId")));
+  const factId = field(formData, "factId");
+  const result = await confirmFact(caseId, factId);
+  if (result.status === "error" && result.message.startsWith(QUOTE_NOT_FOUND)) {
+    // A clear message and the Edit fact form for this fact, not a generic failure.
+    const path = `/lawyer/matters/${encodeURIComponent(caseId)}`;
+    revalidatePath(path);
+    const query = new URLSearchParams({ tab: "facts", ai: "quote_not_found", detail: factId });
+    redirect(`${path}?${query.toString()}#fact-${encodeURIComponent(factId)}`);
+  }
+  finish(caseId, "facts", result);
+}
+
+export async function editFactAction(formData: FormData) {
+  await requireLawyer();
+  const caseId = field(formData, "caseId");
+  finish(
+    caseId,
+    "facts",
+    await editFact(caseId, field(formData, "factId"), {
+      statement: field(formData, "statement"),
+      documentId: field(formData, "documentId"),
+      page: Number(field(formData, "page")),
+      quote: field(formData, "quote"),
+    }),
+  );
 }
 
 export async function rejectFactAction(formData: FormData) {

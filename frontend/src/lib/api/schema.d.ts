@@ -2504,6 +2504,21 @@ export interface components {
              * @enum {string}
              */
             quote_check: "passed" | "failed" | "not_applicable";
+            /**
+             * Quote Start
+             * @description Offset of the exact quote in the page text
+             */
+            quote_start?: number | null;
+            /**
+             * Quote End
+             * @description End offset (exclusive) of the exact quote
+             */
+            quote_end?: number | null;
+            /**
+             * Quote Match
+             * @description How the quote was found; null when it was not found (unverified)
+             */
+            quote_match?: ("exact" | "normalized") | null;
         };
         /** FindingChange */
         FindingChange: {
@@ -2794,7 +2809,10 @@ export interface components {
             /** Org Role */
             org_role: string;
         };
-        /** LocalizedText */
+        /**
+         * LocalizedText
+         * @description Hearing notes can hold the order text and the notes (8000 characters each).
+         */
         LocalizedText: {
             /**
              * En

@@ -490,3 +490,23 @@ Migration `0023_archive_summary_versions` (run on Neon before deploying this bra
   import a removed `backend.src` package; `test_security.py::test_auth_abuse_invitation_expired_denied` fails on
   the previous commit too, and `::test_citation_integrity_no_fabricated_sources` expects a list from the research
   search endpoint, which now returns an object (no code touched by this branch).
+
+## Fact quotes: confirm no longer fails on split sentences (2026-11-23, branch fix/ui-bugs)
+
+Migration `0024_fact_quote_span` (run on Neon before deploying): `case_fact_sources.quote_start`,
+`quote_end`, `quote_match` (exact | normalized), set only when the quote was found.
+
+- Cause: the mock/OCR sentence splitter cut at every "." and every line break, so facts became fragments
+  ("… a cheque, No.", "10 Apr 2026") that were too short to pass the quote check, and confirm returned 409.
+  On `case1_cheque_dishonour.pdf` 7 of 13 extracted facts could not be confirmed.
+- `app/facts/sentences.py`: sentence spans that skip abbreviations (No., Mr., Ltd., Dr., v., s., Tk., নং., initials),
+  never split numbers (5,00,000; 5.5), join wrapped lines, and break after headings and blank lines. The mock
+  quotes the verbatim page span.
+- Quote matching for facts uses the citation verifier's normalization (`quote_locator.locate_normalized`: NFC,
+  whitespace, quotes/dashes/danda, and now line-end hyphens tried as written, joined with the hyphen, and joined
+  without it). No fuzzy match for facts. Found: the stored quote is the exact page span with offsets. Not found:
+  `quote_check = failed` (shown as unverified).
+- Confirm error starts with `QUOTE_NOT_FOUND:`. The facts tab shows a clear message, flags unverified quotes, and
+  offers a prefilled "Edit fact" form (statement + exact quote) that saves a new version and re-checks the quote.
+- Tests: `backend/tests/test_fact_quotes.py` (6), including the brief in `tests/data/`: 13/13 facts confirmable.
+  `tests/rag/test_search.py::test_recall_at_10_on_20_act_queries` (0.933 < 0.95) fails without these changes too.

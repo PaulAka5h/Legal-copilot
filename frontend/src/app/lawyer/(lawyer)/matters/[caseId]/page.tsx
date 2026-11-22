@@ -108,7 +108,7 @@ export default async function LawyerMatterPage({
       ? tab
       : "hearings";
   const notice: WorkspaceNotice =
-    ai === "ok" || ai === "error" || ai === "NOT_CONFIGURED"
+    ai === "ok" || ai === "error" || ai === "NOT_CONFIGURED" || ai === "quote_not_found"
       ? { status: ai, detail: detail ?? "" }
       : null;
   const { reached, total, percent } = progressFor(stages);
