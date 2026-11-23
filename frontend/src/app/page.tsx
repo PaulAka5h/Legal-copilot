@@ -38,7 +38,7 @@ export default async function Home() {
           </Link>
           <p className="m-0 pl-1 text-[11px] text-[#6c757d]">
             {entry.newLawyer}{" "}
-            <Link className="font-bold text-[color:var(--brand-700)]" href="/lawyer/signup">
+            <Link className="font-bold text-deep" href="/lawyer/signup">
               {entry.createAccount}
             </Link>
           </p>

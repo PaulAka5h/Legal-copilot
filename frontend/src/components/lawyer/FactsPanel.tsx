@@ -22,8 +22,8 @@ const CATEGORIES: FactCategory[] = [
 
 const reviewTone: Record<CaseFact["review"], string> = {
   draft: "bg-[#f5efe1] text-[#806b43]",
-  lawyer_reviewed: "bg-[var(--brand-100)] text-[var(--brand-800)]",
-  lawyer_rejected: "bg-[#f8e9e5] text-[#8a2e1e]",
+  lawyer_reviewed: "bg-[#eaf6ef] text-[var(--color-deep)]",
+  lawyer_rejected: "bg-[#eef0f2] text-[#3c4347]",
 };
 
 /** Prefilled edit of a fact whose quote was not found: opens with one click. */
@@ -111,7 +111,7 @@ function FactItem({
     <li
       id={`fact-${fact.id}`}
       className={`border-t border-[color:var(--color-border)] py-3 first:border-0 ${
-        quoteError ? "scroll-mt-24 rounded-md bg-[#fdf3f0] px-2" : ""
+        quoteError ? "scroll-mt-24 rounded-md bg-[#eef0f2] px-2" : ""
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +123,7 @@ function FactItem({
           {copy.categories[fact.category]}
         </Pill>
         {fact.usableInAnalysis ? (
-          <Pill tone="bg-[var(--brand-100)] text-[var(--brand-800)]">{copy.usable}</Pill>
+          <Pill tone="bg-[#eaf6ef] text-[var(--color-deep)]">{copy.usable}</Pill>
         ) : null}
         {fact.aiMock ? (
           <Pill tone="bg-[#f5efe1] text-[#806b43]">{copy.mockOrigin}</Pill>
@@ -146,7 +146,7 @@ function FactItem({
       ))}
       {reviewable && (quoteMissing || quoteError) ? (
         <>
-          <p className="mt-1.5 text-[9px] font-semibold text-[#8a2e1e]" role={quoteError ? "alert" : undefined}>
+          <p className="mt-1.5 text-[9px] font-semibold text-[#3c4347]" role={quoteError ? "alert" : undefined}>
             {quoteError ? copy.quoteNotFound : copy.quoteUnverified}
           </p>
           <EditFactForm caseId={caseId} fact={fact} language={language} copy={copy} />
