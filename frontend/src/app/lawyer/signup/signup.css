@@ -2,7 +2,7 @@
   display: block;
   margin-top: 6px;
   color: #3c4347;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
   line-height: 1.4;
 }
