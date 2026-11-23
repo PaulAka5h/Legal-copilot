@@ -23,7 +23,7 @@ import {
 } from "@/lib/i18n";
 
 const inputClass =
-  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--brand-600)]";
+  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
 
 export function HearingsTimeline({
   caseId,
@@ -101,12 +101,12 @@ export function HearingsTimeline({
                   aria-hidden="true"
                   className={`absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white ${
                     current
-                      ? "bg-[var(--brand-800)] shadow-[0_0_0_1px_var(--brand-800),0_0_0_5px_var(--brand-100)]"
+                      ? "bg-[var(--color-green)] shadow-[0_0_0_1px_var(--color-green),0_0_0_5px_#eaf6ef]"
                       : "bg-[#b8c0c4] shadow-[0_0_0_1px_#b8c0c4]"
                   }`}
                 />
                 <div className="flex flex-col">
-                  <small className="text-[8px] font-bold text-[color:var(--brand-800)]">
+                  <small className="text-[8px] font-bold text-[color:var(--color-green)]">
                     {hearingDateLabel(hearing.date, language)}
                   </small>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -117,7 +117,7 @@ export function HearingsTimeline({
                     </b>
                     <SummaryBadge status={hearing.summaryStatus} copy={copy} />
                     <Link
-                      className="text-[8px] font-bold text-[color:var(--brand-700)] underline underline-offset-2"
+                      className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
                       href={`/lawyer/matters/${caseId}/hearings/${hearing.id}/summary`}
                     >
                       {copy.viewSummary}
@@ -132,13 +132,13 @@ export function HearingsTimeline({
 
                   <div className="mt-2">
                     {edited ? (
-                      <span className="mr-2 inline-flex rounded-full bg-[var(--brand-100)] px-2 py-0.5 text-[8px] font-bold text-[color:var(--brand-800)]">
+                      <span className="mr-2 inline-flex rounded-full bg-[#eaf6ef] px-2 py-0.5 text-[8px] font-bold text-[color:var(--color-deep)]">
                         {copy.edited}
                       </span>
                     ) : null}
 
                     <details className="mt-1">
-                      <summary className="cursor-pointer list-none text-[8px] font-bold text-[color:var(--brand-800)]">
+                      <summary className="cursor-pointer list-none text-[8px] font-bold text-[color:var(--color-deep)]">
                         {copy.noteHistory} ·{" "}
                         {format(copy.versionCount, {
                           count: numberFor(language, hearing.notes.length),
@@ -150,7 +150,7 @@ export function HearingsTimeline({
                             key={version.id}
                             className="rounded-md bg-[color:var(--color-surface)] px-2.5 py-2"
                           >
-                            <small className="text-[8px] font-bold text-[color:var(--brand-800)]">
+                            <small className="text-[8px] font-bold text-[color:var(--color-deep)]">
                               {format(copy.versionNumber, {
                                 number: numberFor(language, versionIndex + 1),
                               })}

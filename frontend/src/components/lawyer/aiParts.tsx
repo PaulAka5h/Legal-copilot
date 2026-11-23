@@ -5,10 +5,10 @@ import type { Dictionary } from "@/lib/i18n";
 export type AiCopy = Dictionary["caseDetail"]["ai"];
 
 export const inputClass =
-  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--brand-600)]";
+  "w-full rounded-[9px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 text-[11px] text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-green)]";
 
 const strengthTone: Record<Strength, string> = {
-  strong: "bg-[var(--brand-100)] text-[var(--brand-800)]",
+  strong: "bg-[#eaf6ef] text-[var(--color-deep)]",
   moderate: "bg-[color:var(--color-pale)] text-[#26617f]",
   weak: "bg-[#f5efe1] text-[#806b43]",
   insufficient: "bg-[color:var(--color-surface)] text-[color:var(--color-muted)]",
@@ -36,9 +36,9 @@ export function VerificationBadge({
   copy: AiCopy;
 }) {
   return verification === "verified" ? (
-    <Pill tone="bg-[var(--brand-100)] text-[var(--brand-800)]">{copy.verified}</Pill>
+    <Pill tone="bg-[#eaf6ef] text-[var(--color-deep)]">{copy.verified}</Pill>
   ) : (
-    <Pill tone="bg-[#f8e9e5] text-[#8a2e1e]">{copy.unverified}</Pill>
+    <Pill tone="bg-[#eef0f2] text-[#3c4347]">{copy.unverified}</Pill>
   );
 }
 
@@ -52,7 +52,7 @@ export function CitationLine({ citation, copy }: { citation: Citation; copy: AiC
       <div className="flex flex-wrap items-center gap-2">
         {citation.url ? (
           <a
-            className="text-[9px] font-bold text-[color:var(--brand-700)] underline underline-offset-2"
+            className="text-[9px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
             href={citation.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -97,7 +97,7 @@ export function DraftNotice({ copy, aiMock, provider }: { copy: AiCopy; aiMock: 
       {aiMock ? (
         <b className="ml-1 text-[#806b43]">{copy.mockOrigin}</b>
       ) : provider ? (
-        <b className="ml-1 text-[color:var(--brand-800)]">{copy.aiOrigin.replace("{provider}", provider)}</b>
+        <b className="ml-1 text-[color:var(--color-deep)]">{copy.aiOrigin.replace("{provider}", provider)}</b>
       ) : null}
     </p>
   );

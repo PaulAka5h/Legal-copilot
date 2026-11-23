@@ -7,17 +7,10 @@
   --font-noto-serif-bengali: "Noto Serif Bengali";
 }
 
-:root {
-  --brand-900: #1f3f30;
-  --brand-800: #2b5641;
-  --brand-700: #36694f;
-  --brand-600: #44805f;
-  --brand-300: #a9c7b6;
-  --brand-100: #e4efe8;
-  --brand-50: #f2f7f4;
-}
-
 @theme {
+  --color-green: #00984a;
+  --color-deep: #076732;
+  --color-mid: #028b45;
   --color-ink: #141a1d;
   --color-text: #212529;
   --color-muted: #6c757d;
@@ -63,7 +56,7 @@
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible {
-    outline: 2px solid var(--brand-600);
+    outline: 3px solid rgba(0, 152, 74, 0.2);
     outline-offset: 2px;
   }
 
@@ -104,7 +97,7 @@
 
 .logo-copy b {
   font-family: var(--font-cormorant), serif;
-  font-size: 19px;
+  font-size: max(var(--text-floor, 0px), calc(19px * var(--type-scale, 1)));
   font-weight: 700;
   letter-spacing: -0.2px;
 }
@@ -136,7 +129,7 @@
   display: flex;
   flex-direction: column;
   color: #fff;
-  background: var(--brand-800);
+  background: var(--color-deep);
 }
 
 .auth-brand::before {
@@ -173,8 +166,8 @@
 
 .eyebrow {
   display: block;
-  color: var(--brand-800);
-  font-size: 11px;
+  color: var(--color-green);
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   line-height: 1.3;
   font-weight: 700;
   text-transform: uppercase;
@@ -182,14 +175,14 @@
 }
 
 .eyebrow.light {
-  color: var(--brand-300);
+  color: #9be0ba;
 }
 
 .brand-message h1 {
   margin: 22px 0 18px;
   color: #fff;
   font-family: var(--font-serif);
-  font-size: clamp(46px, 4.2vw, 68px);
+  font-size: calc(clamp(46px, 4.2vw, 68px) * var(--type-scale, 1));
   line-height: 0.96;
   letter-spacing: -2px;
 }
@@ -197,7 +190,7 @@
 .brand-message p {
   max-width: 490px;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 16px;
+  font-size: max(var(--text-floor, 0px), calc(16px * var(--type-scale, 1)));
   line-height: 1.75;
 }
 
@@ -208,7 +201,7 @@
   gap: 9px;
   align-items: center;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
 }
 
 .auth-form-side {
@@ -232,7 +225,7 @@
 .language-pill > span {
   align-self: center;
   color: #b3b8bb;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .language-pill button {
@@ -241,14 +234,14 @@
   color: var(--color-muted);
   padding: 6px 11px;
   border-radius: 99px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
 .language-pill button.active {
-  background: var(--brand-800);
+  background: var(--color-green);
   color: #fff;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--brand-800) 20%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 152, 74, 0.2);
 }
 
 .auth-card {
@@ -259,7 +252,7 @@
 .auth-card h2 {
   margin: 12px 0 8px;
   font-family: var(--font-serif);
-  font-size: 38px;
+  font-size: max(var(--text-floor, 0px), calc(38px * var(--type-scale, 1)));
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.6px;
@@ -268,7 +261,7 @@
 .form-intro {
   margin: 0 0 30px;
   color: var(--color-muted);
-  font-size: 14px;
+  font-size: max(var(--text-floor, 0px), calc(14px * var(--type-scale, 1)));
 }
 
 .mock-note {
@@ -278,18 +271,18 @@
   background: var(--color-surface);
   border: 1px dashed var(--color-border);
   border-radius: 8px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   line-height: 1.5;
 }
 
 .form-error {
   margin: 0 0 18px;
   padding: 10px 12px;
-  color: #8a2e1e;
-  background: #fdf3f0;
-  border: 1px solid #f0cfc6;
+  color: #3c4347;
+  background: #eef0f2;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
   line-height: 1.5;
 }
@@ -303,7 +296,7 @@
   display: block;
   margin-bottom: 8px;
   color: #3c4347;
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -321,8 +314,8 @@
 }
 
 .input-wrap:focus-within {
-  border-color: var(--brand-600);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-600) 15%, transparent);
+  border-color: var(--color-green);
+  box-shadow: 0 0 0 3px rgba(0, 152, 74, 0.08);
 }
 
 .input-wrap input {
@@ -331,7 +324,7 @@
   outline: 0;
   color: var(--color-text);
   background: transparent;
-  font-size: 13px;
+  font-size: max(var(--text-floor, 0px), calc(13px * var(--type-scale, 1)));
 }
 
 .field-action {
@@ -344,7 +337,7 @@
 .field-action.text-action {
   flex: none;
   color: var(--color-blue);
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   font-weight: 600;
   cursor: pointer;
 }
@@ -355,14 +348,14 @@
   outline: 0;
   color: var(--color-text);
   background: transparent;
-  font-size: 13px;
+  font-size: max(var(--text-floor, 0px), calc(13px * var(--type-scale, 1)));
 }
 
 .field-hint {
   display: block;
   margin-top: 6px;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .credentials .credential-value {
@@ -376,7 +369,7 @@
   justify-content: space-between;
   gap: 16px;
   margin: 1px 0 24px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .check-label {
@@ -403,16 +396,16 @@
 }
 
 .check-label input:checked + span {
-  background: var(--brand-800);
+  background: var(--color-green);
   color: #fff;
-  border-color: var(--brand-800);
+  border-color: var(--color-green);
 }
 
 .text-link {
   color: var(--color-blue);
   border: 0;
   background: none;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -427,10 +420,10 @@
   border: 0;
   border-radius: 10px;
   color: #fff;
-  background: var(--brand-800);
-  font-size: 12px;
+  background: var(--color-green);
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   font-weight: 700;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--brand-800) 18%, transparent);
+  box-shadow: 0 8px 20px rgba(0, 152, 74, 0.18);
   transition:
     transform 0.2s,
     box-shadow 0.2s,
@@ -439,8 +432,8 @@
 
 .primary-button:hover {
   transform: translateY(-2px);
-  background: var(--brand-900);
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--brand-800) 24%, transparent);
+  background: var(--color-mid);
+  box-shadow: 0 12px 24px rgba(0, 152, 74, 0.24);
 }
 
 .primary-button:active {
@@ -458,18 +451,18 @@
   border-top: 1px solid var(--color-border);
   text-align: center;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .auth-switch button {
   border: 0;
   background: none;
-  color: var(--brand-700);
+  color: var(--color-deep);
   font-weight: 700;
 }
 
 .auth-switch a {
-  color: var(--brand-700);
+  color: var(--color-deep);
   font-weight: 700;
 }
 
@@ -482,10 +475,10 @@
   gap: 11px;
   margin-top: 24px;
   padding: 14px;
-  color: var(--brand-800);
-  background: var(--brand-50);
+  color: var(--color-deep);
+  background: #edf8f2;
   border-radius: 10px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .help-note span {
@@ -550,7 +543,7 @@
 
 @media (max-width: 620px) {
   .auth-card h2 {
-    font-size: 34px;
+    font-size: max(var(--text-floor, 0px), calc(34px * var(--type-scale, 1)));
   }
 }
 
@@ -592,7 +585,7 @@
 .side-section-label {
   margin: 0 10px 10px;
   color: #9aa0a5;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -618,18 +611,18 @@
   background: none;
   text-align: left;
   text-decoration: none;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
 .sidebar nav a:hover {
-  background: var(--brand-50);
-  color: var(--brand-800);
+  background: #f6faf8;
+  color: var(--color-deep);
 }
 
 .sidebar nav a.active {
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eaf6ef;
 }
 
 .sidebar nav a.active::before {
@@ -638,7 +631,7 @@
   left: 0;
   width: 3px;
   height: 22px;
-  background: var(--brand-800);
+  background: var(--color-green);
   border-radius: 3px;
 }
 
@@ -646,8 +639,8 @@
   margin-left: auto;
   min-width: 22px;
   padding: 3px;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: rgba(0, 152, 74, 0.1);
   border-radius: 6px;
   text-align: center;
 }
@@ -657,7 +650,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -668,13 +661,13 @@
 }
 
 .sidebar-footer b {
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .sidebar-footer small {
   margin-top: 3px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 400;
 }
 
@@ -729,9 +722,9 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: var(--brand-800);
+  background: var(--color-deep);
   border-radius: 10px;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -749,13 +742,13 @@
 .user-meta > span:last-child {
   display: flex;
   flex-direction: column;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .user-meta small {
   margin-top: 2px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .icon-button {
@@ -767,8 +760,8 @@
 }
 
 .icon-button:hover {
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #e8eee9;
 }
 
 .main-content {
@@ -789,7 +782,7 @@
 .page-heading h1 {
   margin: 8px 0 5px;
   font-family: var(--font-serif);
-  font-size: clamp(34px, 3vw, 44px);
+  font-size: calc(clamp(34px, 3vw, 44px) * var(--type-scale, 1));
   line-height: 1;
   letter-spacing: -1px;
 }
@@ -797,7 +790,7 @@
 .page-heading p {
   margin: 0;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .outline-button {
@@ -807,12 +800,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--brand-800);
-  border: 1px solid var(--brand-300);
+  color: var(--color-deep);
+  border: 1px solid #cbd7cf;
   background: rgba(255, 255, 255, 0.55);
   border-radius: 9px;
   text-decoration: none;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 700;
   transition: 0.2s;
 }
@@ -866,8 +859,8 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eaf6ef;
 }
 
 .stat-icon.blue {
@@ -882,7 +875,7 @@
 
 .stat-value {
   font-family: var(--font-serif);
-  font-size: 32px;
+  font-size: max(var(--text-floor, 0px), calc(32px * var(--type-scale, 1)));
   font-weight: 700;
   line-height: 1;
   color: var(--color-ink);
@@ -891,7 +884,7 @@
 .stat-label {
   margin-top: 8px;
   color: #4e565a;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -903,7 +896,7 @@
   padding-top: 11px;
   color: var(--color-muted);
   border-top: 1px solid var(--color-border);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .dashboard-grid {
@@ -926,14 +919,14 @@
 
 .panel-head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: max(var(--text-floor, 0px), calc(14px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
 .panel-head p {
   margin: 4px 0 0;
   color: var(--color-muted);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .hearing-list {
@@ -956,7 +949,7 @@
 }
 
 .hearing-row:hover .hearing-info b {
-  color: var(--brand-800);
+  color: var(--color-green);
 }
 
 .date-box {
@@ -966,21 +959,21 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eaf6ef;
   border-radius: 9px;
 }
 
 .date-box b {
   font-family: var(--font-serif);
-  font-size: 17px;
+  font-size: max(var(--text-floor, 0px), calc(17px * var(--type-scale, 1)));
   font-weight: 700;
   line-height: 1;
 }
 
 .date-box small {
   margin-top: 2px;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -1002,14 +995,14 @@
 
 .hearing-info b {
   color: var(--color-ink);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   transition: 0.2s;
 }
 
 .hearing-info small {
   margin-top: 5px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .activity-list {
@@ -1029,8 +1022,8 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eef6f1;
   border-radius: 9px;
 }
 
@@ -1042,7 +1035,7 @@
 
 .activity-item b {
   color: var(--color-ink);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .activity-item p {
@@ -1050,12 +1043,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: #555e62;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .activity-item small {
   color: #9aa0a5;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
 }
 
 .quick-wrap {
@@ -1077,8 +1070,8 @@
   color: #fff;
   border: 0;
   border-radius: 50%;
-  background: var(--brand-800);
-  box-shadow: 0 10px 25px color-mix(in srgb, var(--brand-800) 32%, transparent);
+  background: var(--color-green);
+  box-shadow: 0 10px 25px rgba(0, 152, 74, 0.32);
   transition:
     transform 0.3s,
     background 0.2s;
@@ -1090,7 +1083,7 @@
 
 .quick-button.is-open {
   transform: rotate(45deg);
-  background: var(--brand-800);
+  background: var(--color-deep);
 }
 
 .quick-menu {
@@ -1115,13 +1108,13 @@
   background: none;
   text-align: left;
   text-decoration: none;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
 .quick-menu a:hover {
-  background: var(--brand-100);
-  color: var(--brand-800);
+  background: #edf8f2;
+  color: var(--color-deep);
 }
 
 .quick-menu a span:first-child {
@@ -1129,8 +1122,8 @@
   height: 30px;
   display: grid;
   place-items: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eaf6ef;
   border-radius: 8px;
 }
 
@@ -1216,12 +1209,12 @@
     gap: 4px;
     color: var(--color-muted);
     text-decoration: none;
-    font-size: 9px;
+    font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
     font-weight: 600;
   }
 
   .bottom-nav a.active {
-    color: var(--brand-800);
+    color: var(--color-deep);
   }
 }
 
@@ -1249,7 +1242,7 @@
 
   .topbar .language-pill button {
     padding: 5px 7px;
-    font-size: 9px;
+    font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   }
 
   .user-meta {
@@ -1269,7 +1262,7 @@
   }
 
   .page-heading h1 {
-    font-size: 36px;
+    font-size: max(var(--text-floor, 0px), calc(36px * var(--type-scale, 1)));
     line-height: 1.05;
   }
 
@@ -1343,7 +1336,7 @@
   border: 0;
   outline: 0;
   background: none;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .filter-pills {
@@ -1360,12 +1353,12 @@
   border-radius: 7px;
   color: var(--color-muted);
   background: none;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
 .filter-pills button.active {
-  color: var(--brand-800);
+  color: var(--color-deep);
   background: #fff;
   box-shadow: 0 2px 7px rgba(0, 0, 0, 0.07);
 }
@@ -1392,14 +1385,14 @@
   background: var(--color-surface);
   color: #525a5e;
   text-align: left;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .table-header {
   min-height: 37px;
   color: #959ca0;
   background: var(--color-surface);
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1412,14 +1405,14 @@
 
 .matter-cell small {
   margin-bottom: 5px;
-  color: var(--brand-800);
-  font-size: 7px;
+  color: var(--color-green);
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
 .matter-cell b {
   color: var(--color-ink);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .hearing-number {
@@ -1427,10 +1420,10 @@
   height: 27px;
   display: grid;
   place-items: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #edf7f1;
   border-radius: 7px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .status {
@@ -1439,10 +1432,10 @@
   display: flex;
   gap: 5px;
   align-items: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #ebf7f0;
   border-radius: 99px;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-style: normal;
   font-weight: 600;
 }
@@ -1450,7 +1443,7 @@
 .status > span {
   width: 5px;
   height: 5px;
-  background: var(--brand-800);
+  background: var(--color-green);
   border-radius: 50%;
 }
 
@@ -1470,7 +1463,7 @@
   align-items: center;
   justify-content: space-between;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .empty-state {
@@ -1480,7 +1473,7 @@
   align-content: center;
   gap: 10px;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .client-form {
@@ -1501,10 +1494,10 @@
   height: 30px;
   display: grid;
   place-items: center;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #eaf6ef;
   border-radius: 8px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -1526,7 +1519,7 @@
   border-radius: 9px;
   background: var(--color-surface);
   outline: 0;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .form-grid .input-wrap {
@@ -1557,14 +1550,14 @@
   background: none;
   border-radius: 9px;
   text-decoration: none;
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 700;
   transition: 0.2s;
 }
 
 .ghost-button:hover {
-  color: var(--brand-800);
-  background: var(--brand-50);
+  color: var(--color-deep);
+  background: #f6faf8;
 }
 
 .language-bn .status,
@@ -1613,7 +1606,7 @@
   .table-row > span[data-label]::before {
     content: attr(data-label);
     color: #9aa0a5;
-    font-size: 7px;
+    font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
     text-transform: uppercase;
   }
 
@@ -1658,11 +1651,11 @@
   background: var(--color-surface);
   color: #525a5e;
   text-decoration: none;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .client-row:hover {
-  background: var(--brand-50);
+  background: #fbfdfc;
 }
 
 .client-identity,
@@ -1674,13 +1667,13 @@
 
 .client-identity b {
   color: var(--color-ink);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .client-identity small {
   margin-top: 4px;
-  color: var(--brand-800);
-  font-size: 7px;
+  color: var(--color-green);
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -1695,15 +1688,15 @@
 .client-contact small {
   margin-top: 4px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .case-count {
   padding: 5px 9px;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #edf7f1;
   border-radius: 99px;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1716,7 +1709,7 @@
   gap: 7px;
   color: var(--color-muted);
   text-decoration: none;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -1725,7 +1718,7 @@
 }
 
 .back-link:hover {
-  color: var(--brand-700);
+  color: var(--color-deep);
 }
 
 .case-hero {
@@ -1735,15 +1728,15 @@
   justify-content: space-between;
   gap: 25px;
   color: #fff;
-  background: var(--brand-800);
+  background: var(--color-deep);
   border-radius: 14px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--brand-800) 17%, transparent);
+  box-shadow: 0 10px 30px rgba(7, 103, 50, 0.17);
   animation: card-in 0.4s both;
 }
 
 .case-id {
   color: rgba(255, 255, 255, 0.65);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -1752,7 +1745,7 @@
   margin: 11px 0 8px;
   color: #fff;
   font-family: var(--font-serif);
-  font-size: 35px;
+  font-size: max(var(--text-floor, 0px), calc(35px * var(--type-scale, 1)));
   line-height: 1;
 }
 
@@ -1763,7 +1756,7 @@
   flex-wrap: wrap;
   gap: 7px;
   color: rgba(255, 255, 255, 0.68);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .hearing-badge {
@@ -1775,8 +1768,8 @@
 }
 
 .hearing-badge small {
-  color: var(--brand-300);
-  font-size: 8px;
+  color: #9cdab8;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -1784,7 +1777,7 @@
 .hearing-badge b {
   margin-top: 6px;
   font-family: var(--font-serif);
-  font-size: 21px;
+  font-size: max(var(--text-floor, 0px), calc(21px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -1803,7 +1796,7 @@
 .reset-status {
   margin: 0;
   color: var(--color-muted);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   text-align: right;
 }
 
@@ -1834,9 +1827,9 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: var(--brand-800);
+  background: var(--color-green);
   border-radius: 50%;
-  box-shadow: 0 0 0 9px var(--brand-100);
+  box-shadow: 0 0 0 9px #edf8f2;
 }
 
 .success-card .eyebrow {
@@ -1846,13 +1839,13 @@
 .success-card h1 {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 35px;
+  font-size: max(var(--text-floor, 0px), calc(35px * var(--type-scale, 1)));
 }
 
 .success-card > p {
   margin: 8px 0 25px;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .credentials {
@@ -1872,13 +1865,13 @@
 .credentials small {
   display: block;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .credentials b {
   display: block;
   margin-top: 7px;
-  font-size: 13px;
+  font-size: max(var(--text-floor, 0px), calc(13px * var(--type-scale, 1)));
   letter-spacing: 0.05em;
 }
 
@@ -1892,7 +1885,7 @@
   border: 0;
   color: var(--color-blue);
   background: none;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -1903,10 +1896,10 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  color: var(--brand-800);
-  background: var(--brand-50);
+  color: var(--color-deep);
+  background: #edf8f2;
   border-radius: 9px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .success-card .mock-note {
@@ -1948,14 +1941,14 @@
 
 .profile-list dt {
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
 .profile-list dd {
   margin: 0;
   color: var(--color-ink);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
   text-align: right;
 }
@@ -2024,7 +2017,7 @@
   }
 
   .case-hero h1 {
-    font-size: 31px;
+    font-size: max(var(--text-floor, 0px), calc(31px * var(--type-scale, 1)));
   }
 
   .hearing-badge {
@@ -2043,7 +2036,7 @@
   }
 
   .success-card h1 {
-    font-size: 31px;
+    font-size: max(var(--text-floor, 0px), calc(31px * var(--type-scale, 1)));
   }
 }
 
@@ -2066,7 +2059,7 @@
 .case-id i {
   margin-left: 8px;
   padding: 4px 7px;
-  color: var(--brand-100);
+  color: #d3f5e1;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 99px;
   font-style: normal;
@@ -2088,9 +2081,9 @@
 }
 
 .percent {
-  color: var(--brand-800);
+  color: var(--color-green);
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: max(var(--text-floor, 0px), calc(24px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -2106,14 +2099,14 @@
   left: 5%;
   right: 5%;
   height: 4px;
-  background: var(--brand-300);
+  background: var(--color-surface);
   border-radius: 5px;
 }
 
 .progress-track span {
   display: block;
   height: 100%;
-  background: var(--brand-800);
+  background: var(--color-green);
   border-radius: 5px;
   animation: progress 1.1s 0.25s both;
   transform-origin: left;
@@ -2143,37 +2136,37 @@
   background: #fff;
   border: 2px solid var(--color-border);
   border-radius: 50%;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
 .stage.complete .stage-dot {
   color: #fff;
-  background: var(--brand-800);
-  border-color: var(--brand-800);
+  background: var(--color-green);
+  border-color: var(--color-green);
 }
 
 .stage.current .stage-dot {
-  color: var(--brand-800);
+  color: var(--color-deep);
   background: #fff;
-  border: 3px solid var(--brand-800);
-  box-shadow: 0 0 0 5px var(--brand-100);
+  border: 3px solid var(--color-green);
+  box-shadow: 0 0 0 5px #eaf6ef;
 }
 
 .stage b {
   margin-top: 10px;
   color: #51595d;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .stage.current b {
-  color: var(--brand-800);
+  color: var(--color-deep);
 }
 
 .stage small {
   margin-top: 4px;
   color: #9aa0a5;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
 }
 
 .next-hearing {
@@ -2206,14 +2199,14 @@
   padding: 4px;
   background: #28708d;
   text-align: center;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
 .calendar-large b {
   color: var(--color-ink);
   font-family: var(--font-serif);
-  font-size: 25px;
+  font-size: max(var(--text-floor, 0px), calc(25px * var(--type-scale, 1)));
   font-weight: 700;
   line-height: 1;
   margin-top: 4px;
@@ -2221,39 +2214,39 @@
 
 .calendar-large span {
   color: var(--color-muted);
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
 }
 
 .next-hearing h2 {
   margin: 6px 0 4px;
-  font-size: 15px;
+  font-size: max(var(--text-floor, 0px), calc(15px * var(--type-scale, 1)));
 }
 
 .next-hearing p {
   margin: 0;
   color: var(--color-muted);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .lawyer-entered {
   display: block;
   margin-top: 6px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .count-chip {
   padding: 6px 9px;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #edf8f2;
   border-radius: 7px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 700;
   white-space: nowrap;
 }
 
 .profile-list dd a {
-  color: var(--brand-700);
+  color: var(--color-deep);
   text-decoration: none;
 }
 
@@ -2279,7 +2272,7 @@
   color: #687176;
   background: var(--color-surface);
   border-radius: 5px 5px 9px 5px;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -2292,13 +2285,13 @@
 .document-row b {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .document-row small {
   margin-top: 4px;
   color: var(--color-muted);
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
 }
 
 .document-row button,
@@ -2311,7 +2304,7 @@
   border: 0;
   color: var(--color-blue);
   background: none;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -2332,7 +2325,7 @@
 }
 
 .summary-row:hover b {
-  color: var(--brand-800);
+  color: var(--color-green);
 }
 
 .summary-row > span:first-child {
@@ -2343,36 +2336,36 @@
 
 .summary-row b {
   color: var(--color-ink);
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   transition: 0.2s;
 }
 
 .summary-row p {
   margin: 4px 0 0;
   color: #555e62;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   line-height: 1.5;
 }
 
 .summary-row small {
   margin-top: 5px;
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .summary-row > span:last-child {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--brand-800);
+  color: var(--color-green);
 }
 
 .approved-badge {
   padding: 4px 8px;
-  color: var(--brand-800);
-  background: var(--brand-100);
+  color: var(--color-deep);
+  background: #ebf7f0;
   border-radius: 99px;
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   font-style: normal;
   font-weight: 700;
   white-space: nowrap;
@@ -2383,19 +2376,19 @@
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
   color: var(--color-muted);
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
 }
 
 .summary-detail > p {
   margin: 14px 0 0;
   color: #3c4347;
-  font-size: 13px;
+  font-size: max(var(--text-floor, 0px), calc(13px * var(--type-scale, 1)));
   line-height: 1.7;
 }
 
 .summary-detail .empty-note {
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .summary-meta {
@@ -2406,13 +2399,13 @@
 
 .summary-meta small {
   color: var(--color-muted);
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
 }
 
 .empty-note {
   margin: 16px 0 0;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .toast {
@@ -2430,7 +2423,7 @@
   background: var(--color-ink);
   border-radius: 10px;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   animation: toast-in 0.25s both;
 }
 
@@ -2487,7 +2480,7 @@
   }
 
   .summary-row b {
-    font-size: 10px;
+    font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   }
 }
 
@@ -2514,8 +2507,8 @@
 }
 
 .stage-label {
-  color: var(--brand-300);
-  font-size: 8px;
+  color: #9cdab8;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -2534,7 +2527,7 @@
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -2545,17 +2538,17 @@
 
 .stage-picker button {
   padding: 8px 12px;
-  color: var(--brand-800);
+  color: var(--color-deep);
   background: #fff;
   border: 0;
   border-radius: 8px;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 700;
   transition: background 0.2s;
 }
 
 .stage-picker button:hover {
-  background: var(--brand-100);
+  background: #eaf6ef;
 }
 
 .stage-picker select:disabled,
@@ -2566,13 +2559,13 @@
 
 .stage-help {
   color: rgba(255, 255, 255, 0.55);
-  font-size: 7px;
+  font-size: max(var(--text-floor, 0px), calc(7px * var(--type-scale, 1)));
   line-height: 1.45;
 }
 
 .stage-hearing {
-  color: var(--brand-300);
-  font-size: 8px;
+  color: #9cdab8;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 600;
 }
 
@@ -2583,11 +2576,11 @@
 }
 
 .matters-table a.table-row:hover {
-  background: var(--brand-50);
+  background: #fbfcfb;
 }
 
 .matters-table a.table-row:focus-visible {
-  outline: 2px solid var(--brand-600);
+  outline: 3px solid rgba(0, 152, 74, 0.2);
   outline-offset: -3px;
 }
 
@@ -2657,36 +2650,36 @@
   display: inline-flex;
   align-items: center;
   padding: 8px 12px;
-  color: var(--brand-800);
+  color: var(--color-deep);
   background: #fff;
   border: 0;
   border-radius: 8px;
-  font-size: 8px;
+  font-size: max(var(--text-floor, 0px), calc(8px * var(--type-scale, 1)));
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .case-action:hover {
-  background: var(--brand-100);
+  background: #eaf6ef;
 }
 
 .case-action.danger {
-  color: #8a2e1e;
+  color: var(--color-text);
 }
 
 .case-action.danger:hover {
-  background: #fdf3f0;
+  background: #eef0f2;
 }
 
 .success-note {
   margin: 0 0 18px;
   padding: 10px 12px;
-  color: var(--brand-800);
-  background: var(--brand-100);
-  border: 1px solid var(--brand-300);
+  color: var(--color-deep);
+  background: #eaf6ef;
+  border: 1px solid #bfe3cd;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
   line-height: 1.5;
 }
@@ -2712,13 +2705,13 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   outline: none;
 }
 
 .edit-case-grid input:focus,
 .edit-case-grid select:focus {
-  border-color: var(--brand-600);
+  border-color: var(--color-green);
 }
 
 .edit-case-grid textarea {
@@ -2728,14 +2721,14 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 9px;
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   line-height: 1.5;
   outline: none;
   resize: vertical;
 }
 
 .edit-case-grid textarea:focus {
-  border-color: var(--brand-600);
+  border-color: var(--color-green);
 }
 
 .edit-case-grid .wide {
@@ -2745,7 +2738,7 @@
 .profile-subhead {
   margin: 24px 0 2px;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: max(var(--text-floor, 0px), calc(13px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -2766,12 +2759,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   cursor: pointer;
 }
 
 .profile-checks input {
-  accent-color: var(--brand-800);
+  accent-color: var(--color-deep);
 }
 
 .photo-row {
@@ -2791,7 +2784,7 @@
 
 .photo-upload input[type="file"] {
   max-width: 260px;
-  font-size: 11px;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
 }
 
 .edit-case-grid input:disabled {
@@ -2803,7 +2796,7 @@
   display: block;
   margin-top: 6px;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
 }
 
 .confirm-actions {
@@ -2831,18 +2824,18 @@
 .confirm-dialog h2 {
   margin: 0;
   color: var(--color-ink);
-  font-size: 16px;
+  font-size: max(var(--text-floor, 0px), calc(16px * var(--type-scale, 1)));
 }
 
 .confirm-dialog p {
   margin: 10px 0 0;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: max(var(--text-floor, 0px), calc(12px * var(--type-scale, 1)));
   line-height: 1.6;
 }
 
 .primary-button.danger {
-  background: #a3361f;
+  background: var(--color-ink);
 }
 
 .archived-chip {
@@ -2852,7 +2845,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  font-size: 9px;
+  font-size: max(var(--text-floor, 0px), calc(9px * var(--type-scale, 1)));
   font-weight: 700;
 }
 
@@ -2882,13 +2875,99 @@
   padding: 6px 11px;
   border-radius: 7px;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: max(var(--text-floor, 0px), calc(10px * var(--type-scale, 1)));
   font-weight: 600;
   text-decoration: none;
 }
 
 .case-switcher a.active {
-  color: var(--brand-800);
+  color: var(--color-deep);
   background: #fff;
   box-shadow: 0 2px 7px rgba(0, 0, 0, 0.07);
+}
+
+/* English readability scale.
+   Bangla keeps its current sizes: --text-floor stays 0 and --type-scale stays 1.
+   English text is floored at 14px and scaled by 1.25 so hierarchy is preserved. */
+html[lang="en"] {
+  --text-floor: 14px;
+  --type-scale: 1.25;
+}
+
+/* Tailwind text-size utilities used directly in components. */
+html[lang="en"] .text-xs {
+  font-size: 14px;
+}
+
+html[lang="en"] .text-sm {
+  font-size: 16px;
+}
+
+html[lang="en"] .text-\[7px\],
+html[lang="en"] .text-\[8px\],
+html[lang="en"] .text-\[9px\],
+html[lang="en"] .text-\[10px\],
+html[lang="en"] .text-\[11px\],
+html[lang="en"] .text-\[12px\] {
+  font-size: 14px;
+}
+
+html[lang="en"] .text-\[13px\] {
+  font-size: 15px;
+}
+
+html[lang="en"] .text-\[14px\] {
+  font-size: 16px;
+}
+
+html[lang="en"] .text-\[20px\] {
+  font-size: 25px;
+}
+
+html[lang="en"] .text-\[34px\] {
+  font-size: 42px;
+}
+
+html[lang="en"] .text-\[35px\] {
+  font-size: 44px;
+}
+
+/* The sidebar count badge inherits the browser's reduced <small> size. */
+html[lang="en"] .sidebar nav small {
+  font-size: 14px;
+}
+
+/* Main body copy stays at a standard readable size. */
+html[lang="en"] .form-intro,
+html[lang="en"] .brand-message p,
+html[lang="en"] .summary-detail > p,
+html[lang="en"] .confirm-dialog p,
+html[lang="en"] .success-card > p,
+html[lang="en"] .empty-state,
+html[lang="en"] .empty-note,
+html[lang="en"] .help-note {
+  font-size: 16px;
+}
+
+/* Fixed-size date chips need a little more room for the larger English labels. */
+@media (min-width: 621px) {
+  html[lang="en"] .hearing-row {
+    grid-template-columns: 56px 1fr auto;
+  }
+}
+
+@media (max-width: 620px) {
+  html[lang="en"] .hearing-row {
+    grid-template-columns: 56px 1fr;
+  }
+}
+
+html[lang="en"] .date-box {
+  width: 52px;
+  height: 52px;
+}
+
+html[lang="en"] .calendar-large {
+  width: 78px;
+  height: 90px;
 }

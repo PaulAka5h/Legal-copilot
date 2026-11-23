@@ -44,15 +44,15 @@ function fileSize(
 const statusTone: Record<DocumentStatus, string> = {
   uploading: "text-[#806b43]",
   processing: "text-[#26617f]",
-  ready: "text-[var(--brand-800)]",
-  failed: "text-[#8a2e1e]",
+  ready: "text-[var(--color-deep)]",
+  failed: "text-[#3c4347]",
 };
 
 const summaryTone: Record<SummaryStatus, string> = {
   none: "bg-[color:var(--color-surface)] text-[color:var(--color-muted)]",
   processing: "bg-[#f5efe1] text-[#806b43]",
   draft_ready: "bg-[color:var(--color-pale)] text-[#26617f]",
-  approved: "bg-[var(--brand-100)] text-[var(--brand-800)]",
+  approved: "bg-[#eaf6ef] text-[var(--color-deep)]",
 };
 
 export function SummaryBadge({
@@ -114,7 +114,7 @@ export function DocumentList({
           {document.status === "failed" ? (
             <button
               type="button"
-              className="shrink-0 text-[8px] font-bold text-[#8a2e1e] underline"
+              className="shrink-0 text-[8px] font-bold text-[#3c4347] underline"
               onClick={() => onRetry(document)}
             >
               {copy.retry}
@@ -126,7 +126,7 @@ export function DocumentList({
               <input type="hidden" name="tab" value={share.tab} />
               <input type="hidden" name="share" value={document.sharedWithClient ? "0" : "1"} />
               {document.sharedWithClient ? (
-                <span className="rounded-full bg-[var(--brand-100)] px-2 py-0.5 text-[8px] font-bold text-[var(--brand-800)]">
+                <span className="rounded-full bg-[#eaf6ef] px-2 py-0.5 text-[8px] font-bold text-[var(--color-deep)]">
                   {copy.sharedWithClient}
                 </span>
               ) : null}
@@ -134,7 +134,7 @@ export function DocumentList({
                 type="submit"
                 role="switch"
                 aria-checked={Boolean(document.sharedWithClient)}
-                className="text-[8px] font-bold text-[color:var(--brand-700)] underline underline-offset-2"
+                className="text-[8px] font-bold text-[color:var(--color-deep)] underline underline-offset-2"
               >
                 {document.sharedWithClient ? copy.stopSharing : copy.shareWithClient}
               </button>
@@ -165,7 +165,7 @@ export function HearingUpload({
     <div
       className={`mt-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors ${
         dragging
-          ? "border-[var(--brand-800)] bg-[var(--brand-100)]"
+          ? "border-[var(--color-green)] bg-[#eaf6ef]"
           : "border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
       }`}
       onDragOver={(event) => {
@@ -210,7 +210,7 @@ export function HearingUpload({
       </div>
       {error ? (
         <p
-          className="mt-2 text-[9px] font-semibold text-[#8a2e1e]"
+          className="mt-2 text-[9px] font-semibold text-[#3c4347]"
           role="alert"
         >
           {error}

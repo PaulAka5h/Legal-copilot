@@ -1,8 +1,8 @@
 .field-error {
   display: block;
   margin-top: 6px;
-  color: #8a2e1e;
-  font-size: 11px;
+  color: #3c4347;
+  font-size: max(var(--text-floor, 0px), calc(11px * var(--type-scale, 1)));
   font-weight: 600;
   line-height: 1.4;
 }
